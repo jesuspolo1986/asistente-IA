@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analista Conversacional de Supermercado</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px;
+            background-color: #e9eef2; 
+            color: #333; 
+        }
+        .container { 
+            max-width: 900px; 
+            margin: auto; 
+            background: #ffffff; 
+            padding: 40px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); 
+        }
+        h1 { 
+            color: #007bff; 
+            text-align: center; 
+            margin-bottom: 10px; 
+            font-size: 2.2em;
+        }
+        h2 {
+            color: #555;
+            text-align: center;
+            font-weight: 300;
+            margin-bottom: 30px;
+        }
+        textarea { 
+            width: 100%; 
+            padding: 15px; 
+            margin-bottom: 20px; 
+            border: 1px solid #ccc; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            resize: vertical; 
+            min-height: 120px; 
+            box-sizing: border-box; 
+            transition: border-color 0.3s;
+        }
+        textarea:focus {
+            border-color: #007bff;
+        }
+        button { 
+            background-color: #28a745; 
+            color: white; 
+            padding: 15px 25px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 18px; 
+            transition: background-color 0.3s, transform 0.2s; 
+            width: 100%; 
+            font-weight: bold;
+        }
+        button:hover { 
+            background-color: #218838; 
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background-color: #90a4ae;
+            cursor: not-allowed;
+        }
+        #responseArea { 
+            margin-top: 30px; 
+            padding: 25px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            background-color: #f7f7f7; 
+            white-space: pre-wrap; 
+            word-wrap: break-word; 
+            font-size: 1em; 
+        }
+        .loading { 
+            text-align: center; 
+            color: #ffc107; 
+            font-weight: bold; 
+        }
+        .success { color: #1e7e34; }
+        .error { color: #dc3545; }
+        .info { font-size: 0.8em; color: #6c757d; text-align: center; margin-top: 20px; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
+        strong { font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🛒 Analista Conversacional de Supermercado</h1>
+    <h2>API impulsada por Gemini (Finalizada y Desplegada)</h2>
+
+    <p>Ingresa una pregunta compleja de negocio para que la IA analice la base de datos de ventas, productos y clientes:</p>
+
+    <textarea id="questionInput" placeholder="Ejemplo: ¿Cuál fue la categoría de producto más vendida en términos de ingresos el mes pasado, y cuál es la edad promedio de los clientes que compraron ese producto en la Sucursal Norte?"></textarea>
+
+    <button id="sendButton" onclick="sendQuery()">Analizar Datos con IA</button>
+
+    <div id="responseArea">
+        <p class="info">La respuesta del analista (Gemini) aparecerá aquí.</p>
+    </div>
+
+    <p class="info">Tu API URL: https://asistente-ia-ksrx.onrender.com/api/consulta</p>
+</div>
+
+<script>
+    // ** URL DE TU API FINALIZADA **
+    const API_ENDPOINT = "https://asistente-ia-ksrx.onrender.com/api/consulta";
+    
+    // Elementos del DOM
+    const questionInput = document.getElementById('questionInput');
+    const responseArea = document.getElementById('responseArea');
+    const sendButton = document.getElementById('sendButton');
+
+    async function sendQuery() {
+        const question = questionInput.value.trim();
+        
+        if (!question) {
+            responseArea.innerHTML = '<p class="error">Por favor, escribe una pregunta antes de analizar.</p>';
+            return;
+        }
+
+        // 1. Deshabilitar botón y mostrar carga
+        sendButton.disabled = true;
+        responseArea.innerHTML = '<p class="loading">Cargando... La IA está generando el SQL, ejecutándolo y analizando la respuesta. Por favor, espere.</p>';
+
+        try {
+            // 2. Enviar la solicitud POST a tu API
+            const response = await fetch(API_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ question: question })
+            });
+
+            // 3. Leer la respuesta JSON
+            const data = await response.json();
+            
+            // 4. Mostrar el resultado
+            if (data.status === 'success') {
+                responseArea.innerHTML = `
+                    <h3 class="success">✅ Análisis Exitoso</h3>
+                    <p><strong>Pregunta Analizada:</strong> ${data.query}</p>
+                    <hr>
+                    <p>${data.response}</p>
+                `;
+            } else {
+                // Manejo de errores de la lógica interna (ej. Falló al generar SQL, 429, etc.)
+                let errorMessage = 'Ocurrió un error inesperado al procesar la solicitud.';
+                
+                // Si la respuesta incluye texto de error conocido
+                if (data.response) {
+                    errorMessage = data.response.replace(/\n/g, '<br>'); // Formatear saltos de línea
+                }
+                
+                responseArea.innerHTML = `
+                    <h3 class="error">❌ Error en la Consulta</h3>
+                    <p class="error">${errorMessage}</p>
+                `;
+            }
+
+        } catch (error) {
+            // Manejo de errores de red (ej. Render está caído, error de CORS)
+            responseArea.innerHTML = `<h3 class="error">❌ Error de Conexión</h3><p>No se pudo conectar con el servidor de Render. Verifica si el servicio está "Live". Detalles: ${error.message}</p>`;
+        } finally {
+            // 5. Reactivar el botón
+            sendButton.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,23 +1,30 @@
-# ai_analyzer.py (Versión Final, Optimizada para Render)
+# ai_analyzer.py (VERSIÓN FINAL LIMPIA)
 
 from google import genai
 from google.genai import types
 import os
 from datetime import datetime, timedelta
-import re # <-- Importado para la limpieza robusta de SQL
+import re 
+# IMPORTANTE: Importar SOLO las funciones necesarias del gestor de DB
+from db_manager import execute_dynamic_query, main_db_setup 
+
 
 # --- 1. CONFIGURACIÓN E INICIALIZACIÓN DEL CLIENTE GEMINI ---
 
 # La clave será inyectada automáticamente por Render (variable de entorno).
-# Si no la encuentra (ej. pruebas locales sin env), usamos la temporal que proporcionaste.
-API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyCqOU1flrQJgVtGp_s9VeNOum_o5C8b6vA") # Usa la clave que subiste
+# Usamos un valor de 'placeholder' si no se encuentra para evitar exponer la clave.
+# Asegúrate de que la variable GEMINI_API_KEY esté en Render.
+API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_FALLBACK_API_KEY_HERE") 
 
+client = None # Inicializar cliente a None
 try:
-    # Inicializa el cliente usando la clave obtenida
-    client = genai.Client(api_key=API_KEY)
-    print("INFO: Cliente Gemini inicializado correctamente.")
+    if API_KEY != "YOUR_FALLBACK_API_KEY_HERE":
+        client = genai.Client(api_key=API_KEY)
+        print("INFO: Cliente Gemini inicializado correctamente.")
+    else:
+        print("ADVERTENCIA: Usando clave de API de fallback. Verifica la variable GEMINI_API_KEY en Render.")
 except Exception as e:
-    print(f"ERROR CRÍTICO: No se pudo inicializar el cliente Gemini. La API Key podría ser inválida o faltar. Detalle: {e}")
+    print(f"ERROR CRÍTICO: No se pudo inicializar el cliente Gemini. Detalle: {e}")
     client = None
 
 
@@ -86,11 +93,13 @@ CREATE TABLE DetalleVenta (
 );
 """
 
+
 # --- 3. FUNCIONES DE UTILIDAD Y CONTEXTO DE FECHA ---
+# (Las funciones de utilidad y contexto permanecen iguales)
+
 def get_fechas_analisis():
     """Devuelve las fechas clave para el contexto temporal de la IA."""
     now = datetime.now()
-    # Para la referencia de "el mes pasado", calculamos el primer día del mes actual y luego retrocedemos
     primer_dia_mes_actual = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     ultimo_dia_mes_pasado = primer_dia_mes_actual - timedelta(days=1)
     
@@ -102,6 +111,7 @@ def get_fechas_analisis():
 
 
 # --- 4. GENERACIÓN DE CONSULTA SQL ---
+
 def generate_sql_query(question, correction_context=None):
     """
     Llama a Gemini para convertir la pregunta del usuario en una consulta SQL.
@@ -121,16 +131,15 @@ def generate_sql_query(question, correction_context=None):
         """
 
     # --- PROMPT DE SISTEMA CRÍTICO ---
-    # El prompt está diseñado para obligar a la IA a responder SOLO con el código.
     prompt = f"""
-    Eres un conversor de lenguaje natural a SQL para una base de datos SQLite.
+    Esa un conversor de lenguaje natural a SQL para una base de datos SQLite.
     Tu objetivo es generar la consulta SQL SELECT más precisa y eficiente.
 
     --- REGLAS CRÍTICAS ---
     1. **NO** devuelvas explicaciones, comentarios, o texto adicional.
     2. **SOLO** devuelve la sentencia SQL de tipo SELECT.
     3. Usa JOINs para conectar las 7 tablas del esquema.
-    4. Para consultas temporales como 'el mes pasado', usa el contexto de fecha y la función STRFTIME de SQLite.
+    4. Para consultas temporales como 'el mes pasado', usa el contexto de fecha y la función DATE/STRFTIME de SQLite.
 
     --- CONTEXTO DE TIEMPO ---
     * Fecha y hora actual (NOW): {fechas["fecha_actual_iso"]}
@@ -151,7 +160,7 @@ def generate_sql_query(question, correction_context=None):
             model='gemini-2.5-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
-                temperature=0.0, # Mantenemos baja para precisión
+                temperature=0.0,
                 system_instruction="SOLO responde con la sentencia SQL SELECT, sin texto adicional."
             )
         )
@@ -159,30 +168,27 @@ def generate_sql_query(question, correction_context=None):
         raw_text = response.text.strip()
         
         # ** LÓGICA DE LIMPIEZA ROBÚSTA (REGEX) **
-        # Buscamos la primera aparición de SELECT (sin importar mayúsculas/minúsculas)
-        # y extraemos el contenido hasta el final o hasta el primer punto y coma.
         sql_match = re.search(r'SELECT.*', raw_text, re.IGNORECASE | re.DOTALL)
         
         if sql_match:
             sql_query = sql_match.group(0).strip()
             
-            # Limpieza: eliminar cualquier cosa después del primer punto y coma, si existe
             if ';' in sql_query:
                 sql_query = sql_query.split(';')[0].strip()
             
             return sql_query, None
         else:
-            # Si no encuentra 'SELECT', devolvemos la salida cruda para depuración
             return raw_text, "El modelo no generó una sentencia SQL que comience con 'SELECT'."
 
     except genai.errors.APIError as e:
-        # Esto capturaría errores como 429 Resource Exhausted o clave inválida
         return None, f"Error al generar SQL con Gemini: {e}"
     except Exception as e:
         return None, f"Error desconocido al generar SQL: {e}"
 
 
 # --- 5. INTERPRETACIÓN DE RESULTADOS ---
+# (La función de interpretación permanece igual)
+
 def generate_ai_response(question, columns, data, sql_query, db_error):
     """
     Interpreta los resultados de la DB y genera una respuesta conversacional.
@@ -190,23 +196,31 @@ def generate_ai_response(question, columns, data, sql_query, db_error):
     if not client:
         return "ERROR: Cliente Gemini no inicializado. No se puede interpretar la respuesta."
     
-    # Manejo de errores de DB (si pasamos esta etapa es que la autocorrección falló)
     if db_error:
         data_summary = f"ERROR DE BASE DE DATOS: {db_error}"
     else:
-        # Formatear columnas y datos para el prompt
-        data_summary = f"Columnas: {columns}\nDatos:\n"
+        # --- BLINDAJE DE FORMATO: Aseguramos la estructura para el modelo ---
+        data_summary = f"Columnas: {columns}\n\nRESULTADOS DE DATOS OBTENIDOS:\n"
         
-        # Limitar la salida para evitar exceder el token limit en caso de grandes resultados
-        limit = 50 
-        for i, row in enumerate(data):
-            if i < limit:
-                data_summary += f"{row}\n"
-            else:
-                data_summary += f"...y {len(data) - limit} filas más (truncado).\n"
-                break
-    
-    # Prompt para la Interpretación: Pide formato Markdown si es necesario.
+        is_empty = not data or (len(data) == 1 and all(d is None for d in data[0]))
+        
+        if is_empty:
+            data_summary += "[No se encontraron registros de datos o los valores son NULL/None.]"
+        
+        else:
+            limit = 50 
+            
+            for i, row in enumerate(data):
+                if i < limit:
+                    row_data = ', '.join([f"{col}: {val}" for col, val in zip(columns, row)])
+                    data_summary += f"- Fila {i+1}: {row_data}\n"
+                else:
+                    data_summary += f"...y {len(data) - limit} filas más (truncado).\n"
+                    break
+        # ----------------------------------------------------------------------
+
+
+    # Prompt para la Interpretación
     prompt = f"""
     Efectuaste la siguiente consulta SQL: {sql_query}
     Eres un Analista de Datos Conversacional. Analiza los siguientes resultados
@@ -215,8 +229,9 @@ def generate_ai_response(question, columns, data, sql_query, db_error):
     --- REGLAS DE RESPUESTA ---
     1. Utiliza un tono profesional, claro y conciso.
     2. Si los resultados son datos tabulares, utiliza **formato Markdown (tablas)** para presentarlos.
-    3. Si el resultado es un único valor (ej. una suma), solo proporciona el número y explica a qué corresponde.
+    3. Si el resultado es un único valor (ej. una suma o promedio), solo proporciona el número y explica a qué corresponde.
     4. NO muestres el código SQL ni los datos crudos, solo la interpretación.
+    5. Si el resultado de la DB contiene valores NULL/None, explica de forma concisa que la información solicitada no está disponible.
 
     --- CONTEXTO DE LA CONSULTA ---
     Pregunta Original: "{question}"
