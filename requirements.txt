@@ -1,0 +1,7 @@
+# Dependencias actuales del proyecto
+google-genai
+# Dependencias para Flask API (Fase 2)
+Flask
+gunicorn # Servidor HTTP para producción (Render lo usa)
+# Driver para DBs reales (lo usaremos si migramos de SQLite)
+# psycopg2-binary

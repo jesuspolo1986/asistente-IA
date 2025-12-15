@@ -1,0 +1,10 @@
+# Ignorar carpetas de Python y archivos temporales
+__pycache__/
+.venv/
+venv/
+*.pyc
+
+# Ignorar archivos de base de datos local
+supermercado.db
+
+# Ignorar claves de API (aunque estamos usando os.environ, es buena práctica)
