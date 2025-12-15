@@ -4,10 +4,10 @@ from flask import Flask, request, jsonify
 import db_manager
 import supermercado
 import os
-
+from flask_cors import CORS
 # --- INICIALIZACIÓN DE LA APLICACIÓN ---
 app = Flask(__name__)
-
+CORS(app)
 # La conexión a la DB y la generación de datos se hace una vez al iniciar el servidor.
 # Esto asegura que la DB esté lista y que la conexión se reutilice en las peticiones.
 CONN = db_manager.main_db_setup() 
