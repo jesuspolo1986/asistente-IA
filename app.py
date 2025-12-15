@@ -1,16 +1,31 @@
 # app.py (Servidor Flask API para el Analista Conversacional)
 
 from flask import Flask, request, jsonify
-import db_manager
-import supermercado
-import os
+# Importar solo las funciones de conexión necesarias y el módulo
+from db_manager import create_connection, create_tables 
+import db_manager 
+import supermercado # Contiene run_chat_analysis_api
 from flask_cors import CORS
+import os
+
 # --- INICIALIZACIÓN DE LA APLICACIÓN ---
 app = Flask(__name__)
 CORS(app)
-# La conexión a la DB y la generación de datos se hace una vez al iniciar el servidor.
-# Esto asegura que la DB esté lista y que la conexión se reutilice en las peticiones.
-CONN = db_manager.main_db_setup() 
+
+# --- SOLUCIÓN CRÍTICA PARA EL ERROR DE MEMORIA (SIGKILL) ---
+# Se utiliza la función simple de conexión y creación de tablas.
+# NO se llama a main_db_setup() que internamente podría haber llamado a seed_data().
+
+print("INFO: Intentando establecer una conexión ligera a la base de datos...")
+
+# 1. Crear la conexión al archivo existente (supermercado.db)
+CONN = create_connection() 
+
+# 2. Asegurarse de que las tablas existan (CREATE IF NOT EXISTS)
+if CONN is not None:
+    create_tables(CONN)
+    print("INFO: Conexión a la DB exitosa. Tablas verificadas.")
+
 
 if CONN is None:
     print("FATAL: No se pudo establecer la conexión a la base de datos (SQLite).")
@@ -52,6 +67,7 @@ def handle_query():
     # 3. Llamada al Orquestador Principal
     try:
         # Usamos la función optimizada para la API (devuelve el texto)
+        # Nota: La función run_chat_analysis_api debe estar en el archivo supermercado.py o ai_analyzer.py (si lo renombraste)
         response_text = supermercado.run_chat_analysis_api(CONN, question)
         
         # Determinamos el estado basado en si la respuesta contiene un error crítico
@@ -75,6 +91,6 @@ def handle_query():
 
 if __name__ == '__main__':
     # Usamos Gunicorn para producción, pero Flask para desarrollo local
-    # NOTA: En Render, usaremos Gunicorn para servir 'app.py' de manera robusta.
     print("Servidor Flask iniciado en modo desarrollo.")
+    # Asegúrate de que tu ambiente local tenga la variable PORT o usará 5000
     app.run(debug=True, port=os.environ.get('PORT', 5000), host='0.0.0.0')
