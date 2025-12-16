@@ -1,21 +1,18 @@
 # app.py (Servidor Flask API para el Analista Conversacional)
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
 # Importar solo las funciones de conexión necesarias y el módulo
 from db_manager import create_connection, create_tables 
-import db_manager 
 import supermercado # Contiene run_chat_analysis_api
-from flask_cors import CORS
 import os
 
 # --- INICIALIZACIÓN DE LA APLICACIÓN ---
 app = Flask(__name__)
 CORS(app)
 
-# --- SOLUCIÓN CRÍTICA PARA EL ERROR DE MEMORIA (SIGKILL) ---
-# Se utiliza la función simple de conexión y creación de tablas.
-# NO se llama a main_db_setup() que internamente podría haber llamado a seed_data().
-
+# --- CONFIGURACIÓN DE LA BASE DE DATOS (Solución de Estabilidad Crítica) ---
+# Usamos la conexión ligera para evitar el fallo SIGKILL en Render.
 print("INFO: Intentando establecer una conexión ligera a la base de datos...")
 
 # 1. Crear la conexión al archivo existente (supermercado.db)
@@ -25,23 +22,28 @@ CONN = create_connection()
 if CONN is not None:
     create_tables(CONN)
     print("INFO: Conexión a la DB exitosa. Tablas verificadas.")
-
-
-if CONN is None:
+else:
     print("FATAL: No se pudo establecer la conexión a la base de datos (SQLite).")
 
 
-# --- RUTAS DE LA API ---
+# --- RUTAS DE LA APLICACIÓN ---
 
+# 1. RUTA PRINCIPAL (/) - Sirve el Frontend
 @app.route('/', methods=['GET'])
-def home():
-    """Ruta de salud simple."""
-    return "Analista Conversacional (Gemini AI) API v3.0 está ACTIVO.", 200
+def serve_frontend():
+    """
+    Sirve el archivo index.html (frontend) en la ruta raíz (/).
+    Esto soluciona el problema de que el celular solo veía el mensaje "Activo".
+    """
+    # Asume que index.html está en la misma carpeta que app.py
+    return send_from_directory('.', 'index.html')
 
+
+# 2. RUTA DE LA API (/api/consulta) - Maneja la Lógica de la IA
 @app.route('/api/consulta', methods=['POST'])
 def handle_query():
     """
-    Ruta principal para procesar las preguntas del usuario. 
+    Ruta principal para procesar las preguntas del usuario (NL2SQL). 
     Espera JSON: {"question": "..."}
     """
     
@@ -64,10 +66,9 @@ def handle_query():
 
     print(f"\n[API RECIBIDA] Pregunta: {question}")
     
-    # 3. Llamada al Orquestador Principal
+    # 3. Llamada al Orquestador Principal (Gemini)
     try:
-        # Usamos la función optimizada para la API (devuelve el texto)
-        # Nota: La función run_chat_analysis_api debe estar en el archivo supermercado.py o ai_analyzer.py (si lo renombraste)
+        # La función run_chat_analysis_api llama a Gemini, obtiene el SQL, lo ejecuta y analiza el resultado.
         response_text = supermercado.run_chat_analysis_api(CONN, question)
         
         # Determinamos el estado basado en si la respuesta contiene un error crítico
@@ -82,7 +83,7 @@ def handle_query():
         }), 200
 
     except Exception as e:
-        # Error inesperado durante el procesamiento
+        # Error inesperado durante el procesamiento (ej. fallo de la API de Gemini)
         return jsonify({
             "status": "error", 
             "error": f"Error interno del servidor al procesar la consulta: {str(e)}"
