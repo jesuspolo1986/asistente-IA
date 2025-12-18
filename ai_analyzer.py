@@ -1,25 +1,25 @@
-# ai_analyzer.py (VERSIÓN PROFESIONAL CON SEGMENTACIÓN)
+# ai_analyzer.py (VERSIÓN EXPERTA: ADAPTATIVA + PREDICTIVA)
 
 from google import genai
 from google.genai import types
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import re 
-from db_manager import execute_dynamic_query, main_db_setup 
+from db_manager import execute_dynamic_query 
 
 # --- 1. CONFIGURACIÓN ---
-API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_FALLBACK_API_KEY_HERE") 
+# Asegúrate de tener la variable de entorno GEMINI_API_KEY en Render
+API_KEY = os.environ.get("GEMINI_API_KEY", "TU_CLAVE_AQUI") 
 
 client = None
 try:
-    if API_KEY != "YOUR_FALLBACK_API_KEY_HERE":
+    if API_KEY != "TU_CLAVE_AQUI":
         client = genai.Client(api_key=API_KEY)
-        print("INFO: Cliente Gemini inicializado correctamente.")
+        print("INFO: Cliente Gemini 2.0 inicializado correctamente.")
     else:
-        print("ADVERTENCIA: Usando clave de API de fallback.")
+        print("ADVERTENCIA: API Key no configurada correctamente.")
 except Exception as e:
     print(f"ERROR CRÍTICO: {e}")
-    client = None
 
 # --- 2. ESQUEMA DE LA BASE DE DATOS ---
 ESQUEMA_DB = """
@@ -32,85 +32,83 @@ CREATE TABLE Ventas (id_venta INTEGER PRIMARY KEY, id_cliente INTEGER, id_sucurs
 CREATE TABLE DetalleVenta (id_detalle INTEGER PRIMARY KEY, id_venta INTEGER, id_producto INTEGER, cantidad INTEGER, subtotal REAL, FOREIGN KEY (id_venta) REFERENCES Ventas (id_venta), FOREIGN KEY (id_producto) REFERENCES Productos (id_producto));
 """
 
-# --- 3. UTILIDADES ---
-def get_fechas_analisis():
-    now = datetime.now()
-    return {
-        "fecha_actual": now.strftime("%Y-%m-%d %H:%M:%S"),
-        "mes_actual": now.strftime("%Y-%m"),
-    }
-
-# --- 4. GENERACIÓN DE SQL CON CAPA DE NEGOCIO ---
+# --- 3. GENERACIÓN DE SQL CON CAPA DE NEGOCIO AVANZADA ---
 def generate_sql_query(question, correction_context=None):
     if not client: return None, "Error de Cliente"
     
-    fechas = get_fechas_analisis()
+    fecha_hoy = datetime.now().strftime("%Y-%m-%d")
     
-    # REGLAS DE NEGOCIO INYECTADAS
-# --- REGLAS DE NEGOCIO DINÁMICAS (ADAPTABLES A CUALQUIER INDUSTRIA) ---
+    # ESTA ES LA CAPA DE INTELIGENCIA QUE HACE TU CHATBOT ÚNICO
     LOGICA_NEGOCIO = """
-    1. 'Clientes de Alto Valor': Son aquellos cuyo gasto total acumulado es SUPERIOR al promedio de gasto de toda la base de datos multiplicado por 2. 
-       Lógica SQL: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING SUM(total) > (SELECT AVG(total) * 2 FROM Ventas))
+    1. 'Clientes de Alto Valor': No uses montos fijos. Define como Alto Valor a quienes gastan más del DOBLE del promedio general.
+       SQL Sugerido: ... WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING SUM(total) > (SELECT AVG(total) * 2 FROM Ventas))
 
-    2. 'Clientes en Riesgo': Clientes que tienen un número de compras inferior al promedio de compras por cliente.
-       Lógica SQL: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING COUNT(id_venta) < (SELECT COUNT(*) * 1.0 / COUNT(DISTINCT id_cliente) FROM Ventas))
+    2. 'Proyecciones y Tendencias': Para proyectar el próximo mes, calcula el promedio de ventas de los últimos 3 meses y aplica la diferencia porcentual del último mes.
+       SQL Sugerido: Usa STRFTIME('%Y-%m', fecha_venta) para agrupar por meses.
 
-    3. 'Sucursales y Ubicaciones': Siempre usa JOIN con la tabla Sucursales. Si el usuario menciona un nombre (ej. 'Norte'), usa LIKE '%Norte%' para ser flexible con nombres compuestos como 'Norte Bogotá'.
+    3. 'Filtros de Sucursal/Ciudad': NUNCA filtres nombres directamente en la tabla Ventas. Haz JOIN con Sucursales o Ciudades y usa LIKE '%nombre%' para evitar errores de coincidencia exacta.
+
+    4. 'Clientes en Riesgo': Clientes con menos compras que el promedio de frecuencia de la base de datos.
     """
 
     prompt = f"""
-    Eres un Analista de Datos Senior. Traduce la pregunta a SQL para SQLite.
-    
+    Eres un Analista de Datos Senior experto en SQLite.
+    Convierte la pregunta del usuario en una consulta SQL profesional.
+
     {LOGICA_NEGOCIO}
 
-    --- ESQUEMA ---
+    --- ESQUEMA DE TABLAS ---
     {ESQUEMA_DB}
 
-    --- CONTEXTO TEMPORAL ---
-    Fecha actual: {fechas['fecha_actual']}
-    
+    --- CONTEXTO ---
+    Fecha de hoy: {fecha_hoy}
     Pregunta: {question}
-    {f'ERROR ANTERIOR: {correction_context}' if correction_context else ''}
+    {f'CONTEXTO DE ERROR ANTERIOR: {correction_context}' if correction_context else ''}
     
-    Genera SOLO el código SQL SELECT:
+    Responde SOLO con el código SQL SELECT, sin explicaciones ni bloques de código markdown:
     """
     
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
+            model='gemini-2.0-flash',
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                system_instruction="Responde estrictamente con SQL SELECT. No expliques."
-            )
+                system_instruction="Genera código SQL SELECT puro. No incluyas ```sql ni texto extra."
+            ),
+            contents=prompt
         )
         
-        sql_query = re.search(r'SELECT.*', response.text.strip(), re.IGNORECASE | re.DOTALL)
-        return (sql_query.group(0).split(';')[0].strip(), None) if sql_query else (response.text, "Error de formato")
+        sql_clean = response.text.strip().replace('```sql', '').replace('```', '').split(';')[0]
+        return sql_clean, None
 
     except Exception as e:
         return None, str(e)
 
-# --- 5. INTERPRETACIÓN ---
+# --- 4. INTERPRETACIÓN DE RESULTADOS ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    if not client: return "Error de Cliente"
+    if not client: return "Error: IA no configurada."
     
-    data_summary = f"Columnas: {columns}\nDatos: {data[:20]}" # Enviamos top 20 para ahorrar tokens
-    if not data: data_summary = "No se encontraron resultados para esta consulta."
-
+    # Manejo de casos sin datos
+    data_str = str(data[:15]) if data else "No se encontraron registros."
+    
     prompt = f"""
-    Eres un Analista de Negocios. Interpreta estos resultados de la base de datos.
-    Pregunta del usuario: {question}
-    Resultados: {data_summary}
+    Eres un Analista de Negocios Senior. Tu trabajo es explicar resultados financieros.
+    
+    Pregunta original: {question}
+    Columnas: {columns}
+    Datos encontrados: {data_str}
     
     Instrucciones:
-    1. Si hay datos, preséntalos en una tabla Markdown elegante.
-    2. Responde de forma muy profesional, como un consultor.
-    3. Si no hay datos, explica que no hay registros que cumplan con los criterios de ese segmento.
+    1. Si hay datos, crea una tabla Markdown elegante.
+    2. Realiza un breve análisis estratégico (insights).
+    3. Si es una predicción, explica la base del cálculo (tendencia).
+    4. Si no hay datos, explica de forma proactiva qué podría estar pasando.
+    
+    Responde con un tono ejecutivo y profesional:
     """
     
     try:
-        response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
         return response.text
     except Exception as e:
-        return f"Error en interpretación: {e}"
+        return f"Error al interpretar resultados: {e}"
