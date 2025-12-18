@@ -1,79 +1,61 @@
-# app.py (Servidor Flask API para el Analista Conversacional)
+# app.py (VERSIÓN OPTIMIZADA)
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
-# Importar solo las funciones de conexión necesarias y el módulo
 from db_manager import create_connection, create_tables 
-import supermercado # Contiene run_chat_analysis_api
+import supermercado 
 import os
+import atexit # Para cerrar la conexión limpiamente
 
-# --- INICIALIZACIÓN DE LA APLICACIÓN ---
 app = Flask(__name__)
 CORS(app)
 
-# --- CONFIGURACIÓN DE LA BASE DE DATOS (Solución de Estabilidad Crítica) ---
-# Usamos la conexión ligera para evitar el fallo SIGKILL en Render.
-print("INFO: Intentando establecer una conexión ligera a la base de datos...")
-
-# 1. Crear la conexión al archivo existente (supermercado.db)
+# --- INICIALIZACIÓN ---
+print("INFO: Iniciando Asistente IA...")
 CONN = create_connection() 
 
-# 2. Asegurarse de que las tablas existan (CREATE IF NOT EXISTS)
 if CONN is not None:
     create_tables(CONN)
-    print("INFO: Conexión a la DB exitosa. Tablas verificadas.")
+    print("INFO: Base de datos lista y conectada.")
 else:
-    print("FATAL: No se pudo establecer la conexión a la base de datos (SQLite).")
+    print("FATAL: Error al conectar con SQLite.")
 
+# Cerrar conexión al apagar el servidor para evitar bloqueos en Render
+@atexit.register
+def close_db_connection():
+    if CONN:
+        CONN.close()
+        print("INFO: Conexión a DB cerrada correctamente.")
 
-# --- RUTAS DE LA APLICACIÓN ---
+# --- RUTAS ---
 
-# 1. RUTA PRINCIPAL (/) - Sirve el Frontend
 @app.route('/', methods=['GET'])
 def serve_frontend():
-    """
-    Sirve el archivo index.html (frontend) en la ruta raíz (/).
-    Esto soluciona el problema de que el celular solo veía el mensaje "Activo".
-    """
-    # Asume que index.html está en la misma carpeta que app.py
+    # Sirve el index.html desde la carpeta raíz
     return send_from_directory('.', 'index.html')
 
-
-# 2. RUTA DE LA API (/api/consulta) - Maneja la Lógica de la IA
 @app.route('/api/consulta', methods=['POST'])
 def handle_query():
-    """
-    Ruta principal para procesar las preguntas del usuario (NL2SQL). 
-    Espera JSON: {"question": "..."}
-    """
-    
-    # 1. Validación de la Conexión
     if CONN is None:
-        return jsonify({
-            "status": "error",
-            "error": "Error 500: La conexión a la base de datos es nula. Revise la inicialización."
-        }), 500
+        return jsonify({"status": "error", "error": "DB Desconectada"}), 500
     
-    # 2. Extracción y Validación de la Pregunta
     try:
         data = request.get_json()
         question = data.get('question', '').strip()
     except Exception:
-        return jsonify({"status": "error", "error": "Formato de solicitud JSON inválido."}), 400
+        return jsonify({"status": "error", "error": "JSON Inválido"}), 400
 
     if not question:
-        return jsonify({"status": "error", "error": "Por favor, provea una pregunta válida."}), 400
+        return jsonify({"status": "error", "error": "Pregunta vacía"}), 400
 
-    print(f"\n[API RECIBIDA] Pregunta: {question}")
+    print(f"[*] Procesando: {question}")
     
-    # 3. Llamada al Orquestador Principal (Gemini)
     try:
-        # La función run_chat_analysis_api llama a Gemini, obtiene el SQL, lo ejecuta y analiza el resultado.
+        # Aquí es donde ocurre la magia llamando a tu nuevo ai_analyzer
         response_text = supermercado.run_chat_analysis_api(CONN, question)
         
-        # Determinamos el estado basado en si la respuesta contiene un error crítico
         status = "success"
-        if response_text.startswith("ERROR") or response_text.startswith("ALERTA"):
+        if "ERROR" in response_text.upper() or "ALERTA" in response_text.upper():
             status = "failed"
         
         return jsonify({
@@ -83,15 +65,8 @@ def handle_query():
         }), 200
 
     except Exception as e:
-        # Error inesperado durante el procesamiento (ej. fallo de la API de Gemini)
-        return jsonify({
-            "status": "error", 
-            "error": f"Error interno del servidor al procesar la consulta: {str(e)}"
-        }), 500
-
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 if __name__ == '__main__':
-    # Usamos Gunicorn para producción, pero Flask para desarrollo local
-    print("Servidor Flask iniciado en modo desarrollo.")
-    # Asegúrate de que tu ambiente local tenga la variable PORT o usará 5000
-    app.run(debug=True, port=os.environ.get('PORT', 5000), host='0.0.0.0')
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, port=port, host='0.0.0.0')
