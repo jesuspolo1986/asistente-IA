@@ -1,25 +1,25 @@
-# ai_analyzer.py (VERSIÓN EXPERTA: ADAPTATIVA + PREDICTIVA)
+# ai_analyzer.py (VERSIÓN ANTIBLOQUEO Y PREDICTIVA)
 
 from google import genai
 from google.genai import types
 import os
 from datetime import datetime
 import re 
+import time 
 from db_manager import execute_dynamic_query 
 
 # --- 1. CONFIGURACIÓN ---
-# Asegúrate de tener la variable de entorno GEMINI_API_KEY en Render
-API_KEY = os.environ.get("GEMINI_API_KEY", "TU_CLAVE_AQUI") 
+# --- 1. CONFIGURACIÓN ---
+# Aquí "GEMINI_API_KEY" es el nombre que pusiste en Render
+API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAnfL9ZGSvmPI8iMfQPHuHtAjLWcC7mKsg") 
 
 client = None
 try:
-    if API_KEY != "TU_CLAVE_AQUI":
-        client = genai.Client(api_key=API_KEY)
-        print("INFO: Cliente Gemini 2.0 inicializado correctamente.")
-    else:
-        print("ADVERTENCIA: API Key no configurada correctamente.")
+    # Si la variable de entorno existe, la usa. Si no, usa el fallback (tu nueva llave)
+    client = genai.Client(api_key=API_KEY)
+    print("INFO: Cliente Gemini inicializado (Modo Resiliente).")
 except Exception as e:
-    print(f"ERROR CRÍTICO: {e}")
+    print(f"ERROR: {e}")
 
 # --- 2. ESQUEMA DE LA BASE DE DATOS ---
 ESQUEMA_DB = """
@@ -32,83 +32,49 @@ CREATE TABLE Ventas (id_venta INTEGER PRIMARY KEY, id_cliente INTEGER, id_sucurs
 CREATE TABLE DetalleVenta (id_detalle INTEGER PRIMARY KEY, id_venta INTEGER, id_producto INTEGER, cantidad INTEGER, subtotal REAL, FOREIGN KEY (id_venta) REFERENCES Ventas (id_venta), FOREIGN KEY (id_producto) REFERENCES Productos (id_producto));
 """
 
-# --- 3. GENERACIÓN DE SQL CON CAPA DE NEGOCIO AVANZADA ---
+# --- 3. GENERACIÓN DE SQL CON REINTENTOS ---
 def generate_sql_query(question, correction_context=None):
     if not client: return None, "Error de Cliente"
     
     fecha_hoy = datetime.now().strftime("%Y-%m-%d")
-    
-    # ESTA ES LA CAPA DE INTELIGENCIA QUE HACE TU CHATBOT ÚNICO
     LOGICA_NEGOCIO = """
-    1. 'Clientes de Alto Valor': No uses montos fijos. Define como Alto Valor a quienes gastan más del DOBLE del promedio general.
-       SQL Sugerido: ... WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING SUM(total) > (SELECT AVG(total) * 2 FROM Ventas))
-
-    2. 'Proyecciones y Tendencias': Para proyectar el próximo mes, calcula el promedio de ventas de los últimos 3 meses y aplica la diferencia porcentual del último mes.
-       SQL Sugerido: Usa STRFTIME('%Y-%m', fecha_venta) para agrupar por meses.
-
-    3. 'Filtros de Sucursal/Ciudad': NUNCA filtres nombres directamente en la tabla Ventas. Haz JOIN con Sucursales o Ciudades y usa LIKE '%nombre%' para evitar errores de coincidencia exacta.
-
-    4. 'Clientes en Riesgo': Clientes con menos compras que el promedio de frecuencia de la base de datos.
+    1. 'Alto Valor': Gasto > (promedio * 2).
+    2. 'Proyección': Calcula tendencia mensual y proyecta el mes siguiente.
+    3. 'Filtros': Siempre usa JOIN para nombres de ciudades o sucursales.
     """
 
-    prompt = f"""
-    Eres un Analista de Datos Senior experto en SQLite.
-    Convierte la pregunta del usuario en una consulta SQL profesional.
+    prompt = f"SQL Expert: Convierte a SQLite: {question}. Esquema: {ESQUEMA_DB}. Hoy: {fecha_hoy}. Reglas: {LOGICA_NEGOCIO}"
 
-    {LOGICA_NEGOCIO}
+    for intento in range(3):
+        try:
+            response = client.models.generate_content(
+                model='gemini-1.5-flash',
+                config=types.GenerateContentConfig(temperature=0.0, system_instruction="Solo SQL SELECT puro."),
+                contents=prompt
+            )
+            # Limpieza profunda del SQL
+            sql = response.text.strip().replace('```sql', '').replace('```', '').replace('\n', ' ')
+            sql = sql.split(';')[0].strip()
+            return sql, None
+        except Exception as e:
+            if "429" in str(e) and intento < 2:
+                time.sleep(10) # Espera 10 segundos si la cuota se agota
+                continue
+            return None, str(e)
 
-    --- ESQUEMA DE TABLAS ---
-    {ESQUEMA_DB}
-
-    --- CONTEXTO ---
-    Fecha de hoy: {fecha_hoy}
-    Pregunta: {question}
-    {f'CONTEXTO DE ERROR ANTERIOR: {correction_context}' if correction_context else ''}
-    
-    Responde SOLO con el código SQL SELECT, sin explicaciones ni bloques de código markdown:
-    """
-    
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            config=types.GenerateContentConfig(
-                temperature=0.0,
-                system_instruction="Genera código SQL SELECT puro. No incluyas ```sql ni texto extra."
-            ),
-            contents=prompt
-        )
-        
-        sql_clean = response.text.strip().replace('```sql', '').replace('```', '').split(';')[0]
-        return sql_clean, None
-
-    except Exception as e:
-        return None, str(e)
-
-# --- 4. INTERPRETACIÓN DE RESULTADOS ---
+# --- 4. INTERPRETACIÓN ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    if not client: return "Error: IA no configurada."
+    if not client: return "Error de configuración de IA."
     
-    # Manejo de casos sin datos
-    data_str = str(data[:15]) if data else "No se encontraron registros."
+    data_summary = str(data[:15]) if data else "Sin resultados."
+    prompt = f"Analista Pro: Explica estos datos: {data_summary} para la pregunta: {question}. Usa tablas Markdown y da un consejo de negocio."
     
-    prompt = f"""
-    Eres un Analista de Negocios Senior. Tu trabajo es explicar resultados financieros.
-    
-    Pregunta original: {question}
-    Columnas: {columns}
-    Datos encontrados: {data_str}
-    
-    Instrucciones:
-    1. Si hay datos, crea una tabla Markdown elegante.
-    2. Realiza un breve análisis estratégico (insights).
-    3. Si es una predicción, explica la base del cálculo (tendencia).
-    4. Si no hay datos, explica de forma proactiva qué podría estar pasando.
-    
-    Responde con un tono ejecutivo y profesional:
-    """
-    
-    try:
-        response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
-        return response.text
-    except Exception as e:
-        return f"Error al interpretar resultados: {e}"
+    for intento in range(3):
+        try:
+            response = client.models.generate_content(model='gemini-1.5-flash', contents=prompt)
+            return response.text
+        except Exception as e:
+            if "429" in str(e) and intento < 2:
+                time.sleep(10)
+                continue
+            return f"Error en interpretación: {e}"
