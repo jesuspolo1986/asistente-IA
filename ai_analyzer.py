@@ -1,10 +1,13 @@
 import google.generativeai as genai
+from google.generativeai.types import SafetySettingDict
 import os
 import time
 from datetime import datetime
 
-# --- 1. CONFIGURACIÓN ---
-API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAnfL9ZGSvmPI8iMfQPHuHtAjLWcC7mKsg") 
+# --- 1. CONFIGURACIÓN FORZADA A V1 (ESTABLE) ---
+API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAnfL9ZGSvmPI8iMfQPHuHtAjLWcC7mKsg")
+
+# Forzamos la configuración global
 genai.configure(api_key=API_KEY)
 
 # --- 2. ESQUEMA ---
@@ -20,26 +23,35 @@ CREATE TABLE DetalleVenta (id_detalle INTEGER PRIMARY KEY, id_venta INTEGER, id_
 
 # --- 3. GENERACIÓN DE SQL ---
 def generate_sql_query(question, correction_context=None):
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+    # ESPECIFICAMOS EL MODELO COMPLETO PARA EVITAR RUTAS DINÁMICAS
+    model = genai.GenerativeModel(model_name='models/gemini-1.5-flash')
     
-    prompt = f"Eres un experto en SQLite. Traduce a SQL SELECT: {question}. Esquema: {ESQUEMA_DB}. Hoy es: {fecha_hoy}. Responde SOLO el código SQL."
+    fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+    prompt = f"Expert SQLite Translator. Schema: {ESQUEMA_DB}. Today: {fecha_hoy}. Task: Translate '{question}' to SQL. Response: SQL ONLY."
 
-    for intento in range(3):
+    for intento in range(2):
         try:
+            # Usamos el método de generación estándar
             response = model.generate_content(prompt)
             sql = response.text.strip().replace('```sql', '').replace('```', '').split(';')[0].strip()
             return sql, None
         except Exception as e:
-            if "429" in str(e):
-                time.sleep(10)
-                continue
-            return None, str(e)
+            if "404" in str(e):
+                # Si falla, intentamos con la versión específica del modelo
+                try:
+                    model_alt = genai.GenerativeModel(model_name='gemini-1.5-flash')
+                    r2 = model_alt.generate_content(prompt)
+                    return r2.text.strip().replace('```sql', '').replace('```', '').split(';')[0].strip(), None
+                except: pass
+            time.sleep(2)
+            continue
+            
+    return None, f"Error persistente en Google API: {e}"
 
 # --- 4. INTERPRETACIÓN ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    prompt = f"Analiza estos datos de ventas: {data}. Columnas: {columns}. Pregunta del usuario: {question}. Responde con una tabla Markdown y un consejo de negocio."
+    model = genai.GenerativeModel(model_name='models/gemini-1.5-flash')
+    prompt = f"Analista: {data}. Columnas: {columns}. Pregunta: {question}. Responde con tabla Markdown."
     
     try:
         response = model.generate_content(prompt)
