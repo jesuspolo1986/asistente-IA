@@ -47,16 +47,15 @@ def generate_sql_query(question, correction_context=None):
     fechas = get_fechas_analisis()
     
     # REGLAS DE NEGOCIO INYECTADAS
+# --- REGLAS DE NEGOCIO DINÁMICAS (ADAPTABLES A CUALQUIER INDUSTRIA) ---
     LOGICA_NEGOCIO = """
-    --- REGLAS DE SEGMENTACIÓN (CRÍTICO) ---
-    1. 'Clientes de Alto Valor': Clientes cuyo SUM(Ventas.total) es mayor a 500.
-    2. 'Clientes en Riesgo': Clientes con menos de 3 registros en la tabla Ventas.
-    3. 'Sucursales': Los nombres exactos son 'Norte', 'Sur', 'Este', 'Oeste', 'Centro'. Si el usuario dice 'Sucursal Norte', busca 'Norte'.
-    4. 'Categorías': Los nombres son 'Carnes', 'Lácteos', 'Bebidas', 'Limpieza', 'Panadería'.
-    
-    --- INSTRUCCIÓN TÉCNICA ---
-    - Para 'Alto Valor', usa: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING SUM(total) > 500)
-    - Para 'Riesgo', usa: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING COUNT(id_venta) < 3)
+    1. 'Clientes de Alto Valor': Son aquellos cuyo gasto total acumulado es SUPERIOR al promedio de gasto de toda la base de datos multiplicado por 2. 
+       Lógica SQL: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING SUM(total) > (SELECT AVG(total) * 2 FROM Ventas))
+
+    2. 'Clientes en Riesgo': Clientes que tienen un número de compras inferior al promedio de compras por cliente.
+       Lógica SQL: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING COUNT(id_venta) < (SELECT COUNT(*) * 1.0 / COUNT(DISTINCT id_cliente) FROM Ventas))
+
+    3. 'Sucursales y Ubicaciones': Siempre usa JOIN con la tabla Sucursales. Si el usuario menciona un nombre (ej. 'Norte'), usa LIKE '%Norte%' para ser flexible con nombres compuestos como 'Norte Bogotá'.
     """
 
     prompt = f"""
