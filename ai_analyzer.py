@@ -1,26 +1,22 @@
-# ai_analyzer.py (VERSIÓN FINAL RESILIENTE)
+# ai_analyzer.py (VERSIÓN RESILIENTE 404)
 
 from google import genai
 from google.genai import types
 import os
 from datetime import datetime
-import re 
 import time 
 from db_manager import execute_dynamic_query 
 
 # --- 1. CONFIGURACIÓN ---
-# Prioriza la variable de entorno de Render, si no, usa tu nueva Key directamente
 API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAnfL9ZGSvmPI8iMfQPHuHtAjLWcC7mKsg") 
 
 client = None
 try:
-    # Inicialización limpia para el SDK google-genai
     client = genai.Client(api_key=API_KEY)
-    print("INFO: Cliente Gemini 1.5 Flash conectado correctamente.")
 except Exception as e:
-    print(f"ERROR DE CONFIGURACIÓN: {e}")
+    print(f"Error inicial: {e}")
 
-# --- 2. ESQUEMA DE LA BASE DE DATOS ---
+# --- 2. ESQUEMA ---
 ESQUEMA_DB = """
 CREATE TABLE Ciudades (id_ciudad INTEGER PRIMARY KEY, nombre_ciudad TEXT, pais TEXT);
 CREATE TABLE Categorias (id_categoria INTEGER PRIMARY KEY, nombre_categoria TEXT);
@@ -33,53 +29,32 @@ CREATE TABLE DetalleVenta (id_detalle INTEGER PRIMARY KEY, id_venta INTEGER, id_
 
 # --- 3. GENERACIÓN DE SQL ---
 def generate_sql_query(question, correction_context=None):
-    if not client: return None, "Cliente no inicializado"
+    if not client: return None, "Cliente no listo"
     
-    fecha_hoy = datetime.now().strftime("%Y-%m-%d")
-    LOGICA_NEGOCIO = """
-    1. 'Alto Valor': Ventas totales por cliente > (promedio general * 2).
-    2. 'Proyección': Agrupar por mes, calcular tendencia y sumar al último mes.
-    3. 'Nombres': Usar JOIN y LIKE para ciudades/sucursales.
-    """
+    prompt = f"Genera SQL SELECT para SQLite: {question}. Esquema: {ESQUEMA_DB}. Responde solo el SQL."
 
-    prompt = f"Como experto en SQLite, traduce: {question}. Esquema: {ESQUEMA_DB}. Hoy: {fecha_hoy}. Reglas: {LOGICA_NEGOCIO}"
-
-    for intento in range(3):
+    for i in range(3):
         try:
-            # Nombre de modelo simple para evitar Error 404
+            # Quitamos el system_instruction para maximizar compatibilidad
             response = client.models.generate_content(
-                model='gemini-1.5-flash',
-                config=types.GenerateContentConfig(
-                    temperature=0.0,
-                    system_instruction="Responde solo con el código SQL SELECT, sin texto adicional."
-                ),
+                model='gemini-1.5-flash', 
                 contents=prompt
             )
-            # Limpieza de la respuesta
             sql = response.text.strip().replace('```sql', '').replace('```', '').split(';')[0].strip()
             return sql, None
         except Exception as e:
-            if "429" in str(e) and intento < 2:
-                time.sleep(12) # Pausa por cuota
+            if "429" in str(e) and i < 2:
+                time.sleep(10)
                 continue
-            return None, f"Error en generación: {e}"
+            return None, str(e)
 
 # --- 4. INTERPRETACIÓN ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    if not client: return "Error: IA no disponible."
+    if not client: return "Error IA"
+    prompt = f"Analiza estos datos: {data}. Columnas: {columns}. Pregunta: {question}. Crea tabla Markdown y da un consejo."
     
-    data_resumen = str(data[:10]) if data else "No hay datos."
-    prompt = f"Analiza para el gerente: {question}. Datos: {data_resumen}. Columnas: {columns}. Presenta en tabla Markdown y da un consejo estratégico."
-    
-    for intento in range(3):
-        try:
-            response = client.models.generate_content(
-                model='gemini-1.5-flash',
-                contents=prompt
-            )
-            return response.text
-        except Exception as e:
-            if "429" in str(e) and intento < 2:
-                time.sleep(12)
-                continue
-            return f"Error en interpretación: {e}"
+    try:
+        response = client.models.generate_content(model='gemini-1.5-flash', contents=prompt)
+        return response.text
+    except Exception as e:
+        return f"Error final: {e}"
