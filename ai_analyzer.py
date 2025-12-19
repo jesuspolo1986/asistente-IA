@@ -1,38 +1,116 @@
-import requests
+# ai_analyzer.py (VERSIÓN PROFESIONAL CON SEGMENTACIÓN)
+
+from google import genai
+from google.genai import types
 import os
-import json
+from datetime import datetime, timedelta
+import re 
+from db_manager import execute_dynamic_query, main_db_setup 
 
-# Configuración
-API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDw_9BgIjd-7bOnxzA2BqVLDSEyfrYMj6o")
-# Forzamos la versión v1 (estable) en lugar de la v1beta
-URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+# --- 1. CONFIGURACIÓN ---
+API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_FALLBACK_API_KEY_HERE") 
 
-def call_gemini_direct(prompt):
-    headers = {'Content-Type': 'application/json'}
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
-    
-    response = requests.post(URL, headers=headers, json=data)
-    
-    if response.status_code == 200:
-        result = response.json()
-        return result['candidates'][0]['content']['parts'][0]['text']
+client = None
+try:
+    if API_KEY != "YOUR_FALLBACK_API_KEY_HERE":
+        client = genai.Client(api_key=API_KEY)
+        print("INFO: Cliente Gemini inicializado correctamente.")
     else:
-        raise Exception(f"Error de Google ({response.status_code}): {response.text}")
+        print("ADVERTENCIA: Usando clave de API de fallback.")
+except Exception as e:
+    print(f"ERROR CRÍTICO: {e}")
+    client = None
 
+# --- 2. ESQUEMA DE LA BASE DE DATOS ---
+ESQUEMA_DB = """
+CREATE TABLE Ciudades (id_ciudad INTEGER PRIMARY KEY, nombre_ciudad TEXT, pais TEXT);
+CREATE TABLE Categorias (id_categoria INTEGER PRIMARY KEY, nombre_categoria TEXT);
+CREATE TABLE Sucursales (id_sucursal INTEGER PRIMARY KEY, nombre_sucursal TEXT, id_ciudad INTEGER, FOREIGN KEY (id_ciudad) REFERENCES Ciudades (id_ciudad));
+CREATE TABLE Clientes (id_cliente INTEGER PRIMARY KEY, nombre TEXT, apellido TEXT, edad INTEGER, id_ciudad INTEGER, FOREIGN KEY (id_ciudad) REFERENCES Ciudades (id_ciudad));
+CREATE TABLE Productos (id_producto INTEGER PRIMARY KEY, nombre TEXT, precio REAL, id_categoria INTEGER, FOREIGN KEY (id_categoria) REFERENCES Categorias (id_categoria));
+CREATE TABLE Ventas (id_venta INTEGER PRIMARY KEY, id_cliente INTEGER, id_sucursal INTEGER, fecha_venta TEXT, total REAL, FOREIGN KEY (id_cliente) REFERENCES Clientes (id_cliente), FOREIGN KEY (id_sucursal) REFERENCES Sucursales (id_sucursal));
+CREATE TABLE DetalleVenta (id_detalle INTEGER PRIMARY KEY, id_venta INTEGER, id_producto INTEGER, cantidad INTEGER, subtotal REAL, FOREIGN KEY (id_venta) REFERENCES Ventas (id_venta), FOREIGN KEY (id_producto) REFERENCES Productos (id_producto));
+"""
+
+# --- 3. UTILIDADES ---
+def get_fechas_analisis():
+    now = datetime.now()
+    return {
+        "fecha_actual": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "mes_actual": now.strftime("%Y-%m"),
+    }
+
+# --- 4. GENERACIÓN DE SQL CON CAPA DE NEGOCIO ---
 def generate_sql_query(question, correction_context=None):
-    prompt = f"SQLITE SQL ONLY. No markdown. Schema: Ventas, Productos, Clientes, Ciudades. Question: {question}"
+    if not client: return None, "Error de Cliente"
+    
+    fechas = get_fechas_analisis()
+    
+    # REGLAS DE NEGOCIO INYECTADAS
+# --- REGLAS DE NEGOCIO DINÁMICAS (ADAPTABLES A CUALQUIER INDUSTRIA) ---
+    LOGICA_NEGOCIO = """
+    1. 'Clientes de Alto Valor': Son aquellos cuyo gasto total acumulado es SUPERIOR al promedio de gasto de toda la base de datos multiplicado por 2. 
+       Lógica SQL: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING SUM(total) > (SELECT AVG(total) * 2 FROM Ventas))
+
+    2. 'Clientes en Riesgo': Clientes que tienen un número de compras inferior al promedio de compras por cliente.
+       Lógica SQL: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING COUNT(id_venta) < (SELECT COUNT(*) * 1.0 / COUNT(DISTINCT id_cliente) FROM Ventas))
+
+    3. 'Sucursales y Ubicaciones': Siempre usa JOIN con la tabla Sucursales. Si el usuario menciona un nombre (ej. 'Norte'), usa LIKE '%Norte%' para ser flexible con nombres compuestos como 'Norte Bogotá'.
+    """
+
+    prompt = f"""
+    Eres un Analista de Datos Senior. Traduce la pregunta a SQL para SQLite.
+    
+    {LOGICA_NEGOCIO}
+
+    --- ESQUEMA ---
+    {ESQUEMA_DB}
+
+    --- CONTEXTO TEMPORAL ---
+    Fecha actual: {fechas['fecha_actual']}
+    
+    Pregunta: {question}
+    {f'ERROR ANTERIOR: {correction_context}' if correction_context else ''}
+    
+    Genera SOLO el código SQL SELECT:
+    """
+    
     try:
-        response_text = call_gemini_direct(prompt)
-        sql = response_text.strip().replace('```sql', '').replace('```', '').replace(';', '').strip()
-        return sql, None
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.0,
+                system_instruction="Responde estrictamente con SQL SELECT. No expliques."
+            )
+        )
+        
+        sql_query = re.search(r'SELECT.*', response.text.strip(), re.IGNORECASE | re.DOTALL)
+        return (sql_query.group(0).split(';')[0].strip(), None) if sql_query else (response.text, "Error de formato")
+
     except Exception as e:
         return None, str(e)
 
+# --- 5. INTERPRETACIÓN ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    prompt = f"Data: {data}. Question: {question}. Responde con una tabla breve en español."
+    if not client: return "Error de Cliente"
+    
+    data_summary = f"Columnas: {columns}\nDatos: {data[:20]}" # Enviamos top 20 para ahorrar tokens
+    if not data: data_summary = "No se encontraron resultados para esta consulta."
+
+    prompt = f"""
+    Eres un Analista de Negocios. Interpreta estos resultados de la base de datos.
+    Pregunta del usuario: {question}
+    Resultados: {data_summary}
+    
+    Instrucciones:
+    1. Si hay datos, preséntalos en una tabla Markdown elegante.
+    2. Responde de forma muy profesional, como un consultor.
+    3. Si no hay datos, explica que no hay registros que cumplan con los criterios de ese segmento.
+    """
+    
     try:
-        return call_gemini_direct(prompt)
-    except:
-        return "Consulta exitosa, pero no se pudo generar el resumen."
+        response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        return response.text
+    except Exception as e:
+        return f"Error en interpretación: {e}"
