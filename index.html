@@ -35,7 +35,7 @@
         textarea { 
             width: 100%; 
             padding: 15px; 
-            margin-bottom: 20px; 
+            margin-bottom: 10px; 
             border: 1px solid #ccc; 
             border-radius: 8px; 
             font-size: 16px; 
@@ -47,7 +47,15 @@
         textarea:focus {
             border-color: #007bff;
         }
-        button { 
+        
+        /* Contenedor de botones para incluir el micro */
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        #sendButton { 
             background-color: #28a745; 
             color: white; 
             padding: 15px 25px; 
@@ -56,17 +64,46 @@
             cursor: pointer; 
             font-size: 18px; 
             transition: background-color 0.3s, transform 0.2s; 
-            width: 100%; 
+            flex-grow: 1;
             font-weight: bold;
         }
-        button:hover { 
+        
+        #btn-micro {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            width: 60px;
+            cursor: pointer;
+            font-size: 24px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #sendButton:hover { 
             background-color: #218838; 
             transform: translateY(-2px);
         }
+
+        /* Efecto cuando el micro está escuchando */
+        .recording {
+            background-color: #dc3545 !important;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
         button:disabled {
-            background-color: #90a4ae;
+            background-color: #90a4ae !important;
             cursor: not-allowed;
         }
+
         #responseArea { 
             margin-top: 30px; 
             padding: 25px; 
@@ -77,99 +114,133 @@
             word-wrap: break-word; 
             font-size: 1em; 
         }
+
+        /* Estilo para tablas que genera la IA */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+
         .loading { 
             text-align: center; 
-            color: #ffc107; 
+            color: #f39c12; 
             font-weight: bold; 
         }
         .success { color: #1e7e34; }
         .error { color: #dc3545; }
         .info { font-size: 0.8em; color: #6c757d; text-align: center; margin-top: 20px; }
         hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
-        strong { font-weight: 600; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🛒 Analista Conversacional de Supermercado</h1>
-    <h2>API impulsada por Gemini (Finalizada y Desplegada)</h2>
+    <h2>API impulsada por Gemini (Con Voz)</h2>
 
-    <p>Ingresa una pregunta compleja de negocio para que la IA analice la base de datos de ventas, productos y clientes:</p>
+    <p>Ingresa una pregunta o usa el micrófono para dictar:</p>
 
-    <textarea id="questionInput" placeholder="Ejemplo: ¿Cuál fue la categoría de producto más vendida en términos de ingresos el mes pasado, y cuál es la edad promedio de los clientes que compraron ese producto en la Sucursal Norte?"></textarea>
+    <textarea id="questionInput" placeholder="Ejemplo: ¿Cuál es la categoría con más ventas en Bogotá?"></textarea>
 
-    <button id="sendButton" onclick="sendQuery()">Analizar Datos con IA</button>
-
-    <div id="responseArea">
-        <p class="info">La respuesta del analista (Gemini) aparecerá aquí.</p>
+    <div class="button-group">
+        <button id="btn-micro" onclick="activarVoz()" title="Hablar">🎤</button>
+        <button id="sendButton" onclick="sendQuery()">Analizar Datos con IA</button>
     </div>
 
-    <p class="info">Tu API URL: https://asistente-ia-ksrx.onrender.com/api/consulta</p>
+    <div id="responseArea">
+        <p class="info">La respuesta del analista aparecerá aquí.</p>
+    </div>
+
+    <p class="info">Endpoint Activo: https://asistente-ia-ksrx.onrender.com/api/consulta</p>
 </div>
 
 <script>
-    // ** URL DE TU API FINALIZADA **
     const API_ENDPOINT = "https://asistente-ia-ksrx.onrender.com/api/consulta";
     
-    // Elementos del DOM
     const questionInput = document.getElementById('questionInput');
     const responseArea = document.getElementById('responseArea');
     const sendButton = document.getElementById('sendButton');
+    const btnMicro = document.getElementById('btn-micro');
 
+    // --- FUNCIÓN DE VOZ ---
+    function activarVoz() {
+        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!Recognition) {
+            alert("Tu navegador no soporta el reconocimiento de voz. Usa Google Chrome.");
+            return;
+        }
+
+        const recognition = new Recognition();
+        recognition.lang = 'es-ES';
+        recognition.interimResults = false;
+
+        recognition.onstart = () => {
+            btnMicro.classList.add('recording');
+            btnMicro.innerHTML = "🛑";
+            questionInput.placeholder = "Escuchando...";
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            questionInput.value = transcript;
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Error de reconocimiento:", event.error);
+            alert("No se pudo reconocer la voz. Verifica los permisos del micrófono.");
+        };
+
+        recognition.onend = () => {
+            btnMicro.classList.remove('recording');
+            btnMicro.innerHTML = "🎤";
+            questionInput.placeholder = "Ejemplo: ¿Cuál es la categoría con más ventas en Bogotá?";
+        };
+
+        recognition.start();
+    }
+
+    // --- FUNCIÓN DE ENVÍO (Mantenida igual para asegurar conexión) ---
     async function sendQuery() {
         const question = questionInput.value.trim();
         
         if (!question) {
-            responseArea.innerHTML = '<p class="error">Por favor, escribe una pregunta antes de analizar.</p>';
+            responseArea.innerHTML = '<p class="error">Por favor, escribe o dicta una pregunta antes de analizar.</p>';
             return;
         }
 
-        // 1. Deshabilitar botón y mostrar carga
         sendButton.disabled = true;
-        responseArea.innerHTML = '<p class="loading">Cargando... La IA está generando el SQL, ejecutándolo y analizando la respuesta. Por favor, espere.</p>';
+        responseArea.innerHTML = '<p class="loading">⏳ La IA está analizando los datos... Por favor, espere.</p>';
 
         try {
-            // 2. Enviar la solicitud POST a tu API
             const response = await fetch(API_ENDPOINT, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ question: question })
             });
 
-            // 3. Leer la respuesta JSON
             const data = await response.json();
             
-            // 4. Mostrar el resultado
-            if (data.status === 'success') {
+            if (data.status === 'success' || data.status === 'failed') {
+                const headerStatus = data.status === 'success' ? 
+                    '<h3 class="success">✅ Análisis Exitoso</h3>' : 
+                    '<h3 class="error">❌ Análisis con Advertencias</h3>';
+
+                // Convertimos saltos de línea en <br> para que se vea bien en el HTML
+                const formattedResponse = data.response.replace(/\n/g, '<br>');
+
                 responseArea.innerHTML = `
-                    <h3 class="success">✅ Análisis Exitoso</h3>
-                    <p><strong>Pregunta Analizada:</strong> ${data.query}</p>
+                    ${headerStatus}
+                    <p><strong>Pregunta:</strong> ${data.query}</p>
                     <hr>
-                    <p>${data.response}</p>
+                    <div>${formattedResponse}</div>
                 `;
             } else {
-                // Manejo de errores de la lógica interna (ej. Falló al generar SQL, 429, etc.)
-                let errorMessage = 'Ocurrió un error inesperado al procesar la solicitud.';
-                
-                // Si la respuesta incluye texto de error conocido
-                if (data.response) {
-                    errorMessage = data.response.replace(/\n/g, '<br>'); // Formatear saltos de línea
-                }
-                
-                responseArea.innerHTML = `
-                    <h3 class="error">❌ Error en la Consulta</h3>
-                    <p class="error">${errorMessage}</p>
-                `;
+                responseArea.innerHTML = `<h3 class="error">❌ Error</h3><p>${data.error || 'Error desconocido'}</p>`;
             }
 
         } catch (error) {
-            // Manejo de errores de red (ej. Render está caído, error de CORS)
-            responseArea.innerHTML = `<h3 class="error">❌ Error de Conexión</h3><p>No se pudo conectar con el servidor de Render. Verifica si el servicio está "Live". Detalles: ${error.message}</p>`;
+            responseArea.innerHTML = `<h3 class="error">❌ Error de Conexión</h3><p>Detalles: ${error.message}</p>`;
         } finally {
-            // 5. Reactivar el botón
             sendButton.disabled = false;
         }
     }
