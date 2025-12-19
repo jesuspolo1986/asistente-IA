@@ -32,12 +32,13 @@
         .recording { background-color: #dc3545 !important; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-        /* AREA DE RESPUESTA FORMATEADA PARA PDF */
-        #responseArea { margin-top: 20px; padding: 25px; border: 1px solid var(--border); border-radius: 8px; background-color: rgba(0,0,0,0.02); }
+        /* AREA DE REPORTE */
+        #reportWrapper { background: white; border-radius: 8px; color: black; padding: 5px; }
+        #responseArea { padding: 20px; border-radius: 8px; background-color: #ffffff; line-height: 1.6; }
         
         #btn-pdf { width: 100%; background-color: var(--accent); color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; font-weight: bold; display: none; margin-top: 15px; }
 
-        .chart-container { margin-top: 20px; background: white; padding: 15px; border-radius: 8px; border: 1px solid var(--border); display: none; }
+        .chart-container { margin-top: 20px; background: white; padding: 15px; border-radius: 8px; display: none; width: 95%; margin-left: auto; margin-right: auto; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; color: black; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 0.9em; }
@@ -121,12 +122,19 @@
                     datasets: [{
                         label: 'Métricas Detectadas',
                         data: valores,
-                        backgroundColor: '#58a6ffcc',
-                        borderColor: '#58a6ff',
+                        backgroundColor: '#007bffaa',
+                        borderColor: '#007bff',
                         borderWidth: 1
                     }]
+                },
+                options: {
+                    animation: false, // Desactivado para capturar PDF correctamente
+                    responsive: true,
+                    scales: { y: { beginAtZero: true } }
                 }
             });
+        } else {
+            wrapper.style.display = 'none';
         }
     }
 
@@ -143,7 +151,7 @@
 
         sendButton.disabled = true;
         pdfBtn.style.display = 'none';
-        responseArea.innerHTML = '<p style="text-align: center; color: #f39c12;">⏳ Procesando datos y generando reporte...</p>';
+        responseArea.innerHTML = '<p style="text-align: center; color: #f39c12;">⏳ Analizando datos...</p>';
 
         try {
             const response = await fetch(API_ENDPOINT, {
@@ -156,17 +164,17 @@
             if (data.status === 'success') {
                 const fecha = new Date().toLocaleString();
                 responseArea.innerHTML = `
-                    <div style="color:black; background:white; padding:15px; border-radius:5px;">
-                        <h2 style="color:#007bff; border-bottom:1px solid #eee;">Reporte de Análisis IA</h2>
-                        <p style="font-size:0.8em; color:#666;">Generado el: ${fecha}</p>
+                    <div style="background:white; padding:10px; border-radius:5px;">
+                        <h2 style="color:#007bff; border-bottom:2px solid #007bff; padding-bottom:5px;">Reporte de Análisis IA</h2>
+                        <p style="font-size:0.8em; color:#666;">Fecha: ${fecha}</p>
                         <p><strong>Consulta:</strong> ${question}</p>
-                        <hr>
-                        <div style="margin-top:15px;">${data.response.replace(/\n/g, '<br>')}</div>
+                        <hr style="border:0; border-top:1px solid #eee;">
+                        <div style="margin-top:15px; color:#1c1e21;">${data.response.replace(/\n/g, '<br>')}</div>
                     </div>
                 `;
                 chatHistory = `Q: ${question} | A: ${data.response.substring(0,80)}...`;
                 extraerYGraficar(data.response);
-                pdfBtn.style.display = 'block';
+                setTimeout(() => { pdfBtn.style.display = 'block'; }, 500);
                 input.value = "";
             } else {
                 responseArea.innerHTML = `<p style="color:red;">Error: ${data.response}</p>`;
@@ -180,14 +188,21 @@
 
     function descargarInforme() {
         const elemento = document.getElementById('reportWrapper');
+        const pdfBtn = document.getElementById('btn-pdf');
+        
+        pdfBtn.style.visibility = 'hidden'; // Ocultar para la foto
+
         const opt = {
             margin: 0.5,
-            filename: 'Informe_Negocios_IA.pdf',
+            filename: 'Informe_Analisis_Negocio.pdf',
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, logging: false, useCORS: true },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
-        html2pdf().set(opt).from(elemento).save();
+
+        html2pdf().set(opt).from(elemento).save().then(() => {
+            pdfBtn.style.visibility = 'visible';
+        });
     }
 </script>
 </body>
