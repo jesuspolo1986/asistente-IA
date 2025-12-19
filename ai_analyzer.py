@@ -1,32 +1,33 @@
 import google.generativeai as genai
 import os
-from datetime import datetime
 
-# --- CONFIGURACIÓN ---
-API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAnfL9ZGSvmPI8iMfQPHuHtAjLWcC7mKsg")
-genai.configure(api_key=API_KEY)
-
-ESQUEMA_DB = "Tablas: Ciudades, Categorias, Sucursales, Clientes, Productos, Ventas, DetalleVenta."
+# Configuración directa como en la versión de segmentación
+API_KEY = os.environ.get("AIzaSyDw_9BgIjd-7bOnxzA2BqVLDSEyfrYMj6o")
+genai.configure(api_key="AIzaSyDw_9BgIjd-7bOnxzA2BqVLDSEyfrYMj6o")
 
 def generate_sql_query(question, correction_context=None):
-    # Usamos GEMINI-PRO: Es el modelo más estable para evitar errores 404
-    model = genai.GenerativeModel('gemini-pro')
+    # Usamos el modelo estándar que no da problemas de ruta
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
-    prompt = f"SQLITE SQL ONLY. No text. Question: {question}. Schema: {ESQUEMA_DB}"
+    prompt = f"""
+    Eres un experto en SQLite.
+    Esquema: Ventas, Productos, Clientes, Ciudades, Categorias, Sucursales, DetalleVenta.
+    Pregunta: {question}
+    Responde ÚNICAMENTE con el código SQL, sin bloques de texto ni comillas.
+    """
 
     try:
         response = model.generate_content(prompt)
         sql = response.text.strip().replace('```sql', '').replace('```', '').replace(';', '').strip()
-        print(f"DEBUG SQL GENERADO: {sql}")
         return sql, None
     except Exception as e:
-        return None, f"Error de API: {str(e)}"
+        return None, str(e)
 
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    model = genai.GenerativeModel('gemini-pro')
-    prompt = f"Data: {data}. Question: {question}. Answer with a table."
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    prompt = f"Analiza estos datos: {data}. Pregunta del usuario: {question}. Responde con una tabla breve en español."
     try:
         response = model.generate_content(prompt)
         return response.text
     except:
-        return "Consulta exitosa, pero error al resumir."
+        return "Consulta exitosa, pero no se pudo generar el resumen."
