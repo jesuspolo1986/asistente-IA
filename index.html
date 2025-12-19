@@ -4,212 +4,143 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analista Conversacional de Supermercado</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            margin: 0; 
-            padding: 20px;
-            background-color: #e9eef2; 
-            color: #333; 
+            margin: 0; padding: 20px; background-color: #e9eef2; color: #333; 
         }
         .container { 
-            max-width: 900px; 
-            margin: auto; 
-            background: #ffffff; 
-            padding: 40px; 
-            border-radius: 16px; 
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); 
+            max-width: 900px; margin: auto; background: #ffffff; padding: 40px; 
+            border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); 
         }
-        h1 { 
-            color: #007bff; 
-            text-align: center; 
-            margin-bottom: 10px; 
-            font-size: 2.2em;
-        }
-        h2 {
-            color: #555;
-            text-align: center;
-            font-weight: 300;
-            margin-bottom: 30px;
-        }
+        h1 { color: #007bff; text-align: center; font-size: 2.2em; }
         textarea { 
-            width: 100%; 
-            padding: 15px; 
-            margin-bottom: 10px; 
-            border: 1px solid #ccc; 
-            border-radius: 8px; 
-            font-size: 16px; 
-            resize: vertical; 
-            min-height: 120px; 
-            box-sizing: border-box; 
-            transition: border-color 0.3s;
+            width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid #ccc; 
+            border-radius: 8px; font-size: 16px; resize: vertical; min-height: 100px; box-sizing: border-box; 
         }
-        textarea:focus {
-            border-color: #007bff;
-        }
-        
-        /* Contenedor de botones para incluir el micro */
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
+        .button-group { display: flex; gap: 10px; margin-bottom: 20px; }
         #sendButton { 
-            background-color: #28a745; 
-            color: white; 
-            padding: 15px 25px; 
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            font-size: 18px; 
-            transition: background-color 0.3s, transform 0.2s; 
-            flex-grow: 1;
-            font-weight: bold;
+            background-color: #28a745; color: white; padding: 15px; border: none; 
+            border-radius: 8px; cursor: pointer; font-size: 18px; flex-grow: 1; font-weight: bold;
+        }
+        #btn-micro { background-color: #6c757d; color: white; border: none; border-radius: 8px; width: 60px; cursor: pointer; font-size: 24px; }
+        .recording { background-color: #dc3545 !important; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        
+        #responseArea { 
+            margin-top: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; 
+            background-color: #f7f7f7; white-space: pre-wrap; 
         }
         
-        #btn-micro {
-            background-color: #6c757d;
-            color: white;
-            border: none;
+        /* CONTENEDOR DEL GRÁFICO */
+        .chart-container {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
             border-radius: 8px;
-            width: 60px;
-            cursor: pointer;
-            font-size: 24px;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            border: 1px solid #ddd;
+            display: none; /* Se muestra solo si hay datos */
         }
 
-        #sendButton:hover { 
-            background-color: #218838; 
-            transform: translateY(-2px);
-        }
-
-        /* Efecto cuando el micro está escuchando */
-        .recording {
-            background-color: #dc3545 !important;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-
-        button:disabled {
-            background-color: #90a4ae !important;
-            cursor: not-allowed;
-        }
-
-        #responseArea { 
-            margin-top: 30px; 
-            padding: 25px; 
-            border: 1px solid #ddd; 
-            border-radius: 8px; 
-            background-color: #f7f7f7; 
-            white-space: pre-wrap; 
-            word-wrap: break-word; 
-            font-size: 1em; 
-        }
-
-        /* Estilo para tablas que genera la IA */
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background-color: #007bff; color: white; }
-
-        .loading { 
-            text-align: center; 
-            color: #f39c12; 
-            font-weight: bold; 
-        }
+        .loading { text-align: center; color: #f39c12; font-weight: bold; }
         .success { color: #1e7e34; }
         .error { color: #dc3545; }
-        .info { font-size: 0.8em; color: #6c757d; text-align: center; margin-top: 20px; }
-        hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🛒 Analista Conversacional de Supermercado</h1>
-    <h2>API impulsada por Gemini (Con Voz)</h2>
+    <h1>🛒 Analista con Gráficos</h1>
+    <p>Haz una pregunta numérica (ej: "Ventas por categoría" o "Stock de productos"):</p>
 
-    <p>Ingresa una pregunta o usa el micrófono para dictar:</p>
-
-    <textarea id="questionInput" placeholder="Ejemplo: ¿Cuál es la categoría con más ventas en Bogotá?"></textarea>
+    <textarea id="questionInput" placeholder="Escribe o usa el micro..."></textarea>
 
     <div class="button-group">
-        <button id="btn-micro" onclick="activarVoz()" title="Hablar">🎤</button>
-        <button id="sendButton" onclick="sendQuery()">Analizar Datos con IA</button>
+        <button id="btn-micro" onclick="activarVoz()">🎤</button>
+        <button id="sendButton" onclick="sendQuery()">Analizar y Graficar</button>
     </div>
 
     <div id="responseArea">
-        <p class="info">La respuesta del analista aparecerá aquí.</p>
+        <p style="text-align: center; color: #888;">La respuesta aparecerá aquí.</p>
     </div>
 
-    <p class="info">Endpoint Activo: https://asistente-ia-ksrx.onrender.com/api/consulta</p>
+    <div id="chartWrapper" class="chart-container">
+        <canvas id="myChart"></canvas>
+    </div>
 </div>
 
 <script>
     const API_ENDPOINT = "https://asistente-ia-ksrx.onrender.com/api/consulta";
-    
-    const questionInput = document.getElementById('questionInput');
-    const responseArea = document.getElementById('responseArea');
-    const sendButton = document.getElementById('sendButton');
-    const btnMicro = document.getElementById('btn-micro');
+    let myChartInstance = null;
 
     // --- FUNCIÓN DE VOZ ---
     function activarVoz() {
         const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        
-        if (!Recognition) {
-            alert("Tu navegador no soporta el reconocimiento de voz. Usa Google Chrome.");
-            return;
-        }
-
-        const recognition = new Recognition();
-        recognition.lang = 'es-ES';
-        recognition.interimResults = false;
-
-        recognition.onstart = () => {
-            btnMicro.classList.add('recording');
-            btnMicro.innerHTML = "🛑";
-            questionInput.placeholder = "Escuchando...";
-        };
-
-        recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            questionInput.value = transcript;
-        };
-
-        recognition.onerror = (event) => {
-            console.error("Error de reconocimiento:", event.error);
-            alert("No se pudo reconocer la voz. Verifica los permisos del micrófono.");
-        };
-
-        recognition.onend = () => {
-            btnMicro.classList.remove('recording');
-            btnMicro.innerHTML = "🎤";
-            questionInput.placeholder = "Ejemplo: ¿Cuál es la categoría con más ventas en Bogotá?";
-        };
-
-        recognition.start();
+        if (!Recognition) return alert("Navegador no compatible");
+        const rec = new Recognition();
+        rec.lang = 'es-ES';
+        rec.onstart = () => document.getElementById('btn-micro').classList.add('recording');
+        rec.onresult = (e) => document.getElementById('questionInput').value = e.results[0][0].transcript;
+        rec.onend = () => document.getElementById('btn-micro').classList.remove('recording');
+        rec.start();
     }
 
-    // --- FUNCIÓN DE ENVÍO (Mantenida igual para asegurar conexión) ---
-    async function sendQuery() {
-        const question = questionInput.value.trim();
+    // --- FUNCIÓN PARA EXTRAER DATOS Y GRAFICAR ---
+    function extraerYGraficar(texto) {
+        const wrapper = document.getElementById('chartWrapper');
+        const ctx = document.getElementById('myChart').getContext('2d');
         
-        if (!question) {
-            responseArea.innerHTML = '<p class="error">Por favor, escribe o dicta una pregunta antes de analizar.</p>';
-            return;
+        // Intentar encontrar una tabla o lista de datos (Formato: Nombre | Numero)
+        const lineas = texto.split('\n');
+        let etiquetas = [];
+        let valores = [];
+
+        lineas.forEach(linea => {
+            // Buscamos patrones de: Texto seguido de un número (separado por | o tab)
+            const match = linea.match(/([a-zA-Záéíóú\s]+)[|:]\s*([\d,.]+)/);
+            if (match) {
+                etiquetas.push(match[1].trim());
+                valores.push(parseFloat(match[2].replace(',', '')));
+            }
+        });
+
+        if (etiquetas.length > 0 && valores.length > 0) {
+            wrapper.style.display = 'block';
+            if (myChartInstance) myChartInstance.destroy(); // Limpiar gráfico anterior
+
+            myChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: etiquetas,
+                    datasets: [{
+                        label: 'Análisis de Datos',
+                        data: valores,
+                        backgroundColor: '#007bff99',
+                        borderColor: '#007bff',
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        } else {
+            wrapper.style.display = 'none';
         }
+    }
+
+    async function sendQuery() {
+        const question = document.getElementById('questionInput').value.trim();
+        const responseArea = document.getElementById('responseArea');
+        const sendButton = document.getElementById('sendButton');
+
+        if (!question) return;
 
         sendButton.disabled = true;
-        responseArea.innerHTML = '<p class="loading">⏳ La IA está analizando los datos... Por favor, espere.</p>';
+        responseArea.innerHTML = '<p class="loading">⌛ Analizando datos...</p>';
+        document.getElementById('chartWrapper').style.display = 'none';
 
         try {
             const response = await fetch(API_ENDPOINT, {
@@ -217,34 +148,21 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ question: question })
             });
-
             const data = await response.json();
             
-            if (data.status === 'success' || data.status === 'failed') {
-                const headerStatus = data.status === 'success' ? 
-                    '<h3 class="success">✅ Análisis Exitoso</h3>' : 
-                    '<h3 class="error">❌ Análisis con Advertencias</h3>';
-
-                // Convertimos saltos de línea en <br> para que se vea bien en el HTML
-                const formattedResponse = data.response.replace(/\n/g, '<br>');
-
-                responseArea.innerHTML = `
-                    ${headerStatus}
-                    <p><strong>Pregunta:</strong> ${data.query}</p>
-                    <hr>
-                    <div>${formattedResponse}</div>
-                `;
+            if (data.status === 'success') {
+                responseArea.innerHTML = `<h3 class="success">✅ Resultado</h3><p>${data.response.replace(/\n/g, '<br>')}</p>`;
+                // LLAMAMOS A LA FUNCIÓN DE GRÁFICOS
+                extraerYGraficar(data.response);
             } else {
-                responseArea.innerHTML = `<h3 class="error">❌ Error</h3><p>${data.error || 'Error desconocido'}</p>`;
+                responseArea.innerHTML = `<p class="error">Error: ${data.response}</p>`;
             }
-
-        } catch (error) {
-            responseArea.innerHTML = `<h3 class="error">❌ Error de Conexión</h3><p>Detalles: ${error.message}</p>`;
+        } catch (e) {
+            responseArea.innerHTML = `<p class="error">Error de conexión.</p>`;
         } finally {
             sendButton.disabled = false;
         }
     }
 </script>
-
 </body>
 </html>
