@@ -3,69 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analista Conversacional de Supermercado</title>
+    <title>AI Supermarket Analyzer Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            margin: 0; padding: 20px; background-color: #e9eef2; color: #333; 
+        :root {
+            --bg: #e9eef2; --card: #ffffff; --text: #333; --accent: #007bff; --border: #ccc;
         }
-        .container { 
-            max-width: 900px; margin: auto; background: #ffffff; padding: 40px; 
-            border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); 
+        /* Variables Modo Oscuro */
+        body.dark-mode {
+            --bg: #0d1117; --card: #161b22; --text: #c9d1d9; --accent: #58a6ff; --border: #30363d;
         }
-        h1 { color: #007bff; text-align: center; font-size: 2.2em; }
-        textarea { 
-            width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid #ccc; 
-            border-radius: 8px; font-size: 16px; resize: vertical; min-height: 100px; box-sizing: border-box; 
-        }
+
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background-color: var(--bg); color: var(--text); transition: all 0.3s; }
+        .container { max-width: 900px; margin: auto; background: var(--card); padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid var(--border); }
+        
+        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { color: var(--accent); margin: 0; font-size: 1.8em; }
+        
+        /* Switch Modo Oscuro */
+        .theme-switch { cursor: pointer; padding: 10px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); font-size: 1.2em; }
+
+        textarea { width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--bg); color: var(--text); box-sizing: border-box; }
+        
         .button-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        #sendButton { 
-            background-color: #28a745; color: white; padding: 15px; border: none; 
-            border-radius: 8px; cursor: pointer; font-size: 18px; flex-grow: 1; font-weight: bold;
-        }
+        #sendButton { background-color: #28a745; color: white; border: none; border-radius: 8px; padding: 15px; cursor: pointer; font-size: 18px; flex-grow: 1; font-weight: bold; }
         #btn-micro { background-color: #6c757d; color: white; border: none; border-radius: 8px; width: 60px; cursor: pointer; font-size: 24px; }
+        
         .recording { background-color: #dc3545 !important; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-        
-        #responseArea { 
-            margin-top: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; 
-            background-color: #f7f7f7; white-space: pre-wrap; 
-        }
-        
-        /* CONTENEDOR DEL GRÁFICO */
-        .chart-container {
-            margin-top: 20px;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            display: none; /* Se muestra solo si hay datos */
-        }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #007bff; color: white; }
-        .loading { text-align: center; color: #f39c12; font-weight: bold; }
-        .success { color: #1e7e34; }
-        .error { color: #dc3545; }
+        #responseArea { margin-top: 20px; padding: 20px; border: 1px solid var(--border); border-radius: 8px; background-color: rgba(0,0,0,0.03); line-height: 1.6; }
+        .chart-container { margin-top: 20px; background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); display: none; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid var(--border); padding: 10px; text-align: left; }
+        th { background-color: var(--accent); color: white; }
     </style>
 </head>
-<body>
+<body class="dark-mode"> <div class="container">
+    <div class="header-box">
+        <h1>🛒 AI Market Analyst</h1>
+        <button class="theme-switch" onclick="toggleTheme()" id="themeBtn">☀️</button>
+    </div>
 
-<div class="container">
-    <h1>🛒 Analista con Gráficos</h1>
-    <p>Haz una pregunta numérica (ej: "Ventas por categoría" o "Stock de productos"):</p>
-
-    <textarea id="questionInput" placeholder="Escribe o usa el micro..."></textarea>
+    <textarea id="questionInput" placeholder="Haz una pregunta o usa el micro..."></textarea>
 
     <div class="button-group">
         <button id="btn-micro" onclick="activarVoz()">🎤</button>
-        <button id="sendButton" onclick="sendQuery()">Analizar y Graficar</button>
+        <button id="sendButton" onclick="sendQuery()">Analizar Datos</button>
     </div>
 
     <div id="responseArea">
-        <p style="text-align: center; color: #888;">La respuesta aparecerá aquí.</p>
+        <p style="text-align: center; opacity: 0.6;">Historial de chat vacío. Los resultados aparecerán aquí.</p>
     </div>
 
     <div id="chartWrapper" class="chart-container">
@@ -76,8 +65,15 @@
 <script>
     const API_ENDPOINT = "https://asistente-ia-ksrx.onrender.com/api/consulta";
     let myChartInstance = null;
+    let chatHistory = "";
 
-    // --- FUNCIÓN DE VOZ ---
+    function toggleTheme() {
+        const body = document.body;
+        const btn = document.getElementById('themeBtn');
+        body.classList.toggle('dark-mode');
+        btn.innerHTML = body.classList.contains('dark-mode') ? "☀️" : "🌙";
+    }
+
     function activarVoz() {
         const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!Recognition) return alert("Navegador no compatible");
@@ -89,18 +85,13 @@
         rec.start();
     }
 
-    // --- FUNCIÓN PARA EXTRAER DATOS Y GRAFICAR ---
     function extraerYGraficar(texto) {
         const wrapper = document.getElementById('chartWrapper');
         const ctx = document.getElementById('myChart').getContext('2d');
-        
-        // Intentar encontrar una tabla o lista de datos (Formato: Nombre | Numero)
         const lineas = texto.split('\n');
-        let etiquetas = [];
-        let valores = [];
+        let etiquetas = []; let valores = [];
 
         lineas.forEach(linea => {
-            // Buscamos patrones de: Texto seguido de un número (separado por | o tab)
             const match = linea.match(/([a-zA-Záéíóú\s]+)[|:]\s*([\d,.]+)/);
             if (match) {
                 etiquetas.push(match[1].trim());
@@ -110,55 +101,56 @@
 
         if (etiquetas.length > 0 && valores.length > 0) {
             wrapper.style.display = 'block';
-            if (myChartInstance) myChartInstance.destroy(); // Limpiar gráfico anterior
-
+            if (myChartInstance) myChartInstance.destroy();
             myChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: etiquetas,
                     datasets: [{
-                        label: 'Análisis de Datos',
+                        label: 'Métrica de Negocio',
                         data: valores,
-                        backgroundColor: '#007bff99',
-                        borderColor: '#007bff',
+                        backgroundColor: '#58a6ffcc',
+                        borderColor: '#58a6ff',
                         borderWidth: 1
                     }]
                 },
-                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+                options: { scales: { y: { beginAtZero: true } } }
             });
-        } else {
-            wrapper.style.display = 'none';
         }
     }
 
     async function sendQuery() {
-        const question = document.getElementById('questionInput').value.trim();
+        const input = document.getElementById('questionInput');
+        const question = input.value.trim();
         const responseArea = document.getElementById('responseArea');
         const sendButton = document.getElementById('sendButton');
 
         if (!question) return;
 
+        // Implementación de Memoria
+        const queryFinal = chatHistory === "" ? question : `Historial: ${chatHistory}\nActual: ${question}`;
+
         sendButton.disabled = true;
-        responseArea.innerHTML = '<p class="loading">⌛ Analizando datos...</p>';
-        document.getElementById('chartWrapper').style.display = 'none';
+        responseArea.innerHTML = '<p style="text-align: center; color: #f39c12;">⌛ IA pensando con memoria de contexto...</p>';
 
         try {
             const response = await fetch(API_ENDPOINT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: question })
+                body: JSON.stringify({ question: queryFinal })
             });
             const data = await response.json();
             
             if (data.status === 'success') {
-                responseArea.innerHTML = `<h3 class="success">✅ Resultado</h3><p>${data.response.replace(/\n/g, '<br>')}</p>`;
-                // LLAMAMOS A LA FUNCIÓN DE GRÁFICOS
+                responseArea.innerHTML = `<h3>✅ Análisis</h3><p>${data.response.replace(/\n/g, '<br>')}</p>`;
+                chatHistory = `Q: ${question} | A: ${data.response.substring(0,100)}`;
                 extraerYGraficar(data.response);
+                input.value = "";
             } else {
-                responseArea.innerHTML = `<p class="error">Error: ${data.response}</p>`;
+                responseArea.innerHTML = `<p style="color:red;">Error: ${data.response}</p>`;
             }
         } catch (e) {
-            responseArea.innerHTML = `<p class="error">Error de conexión.</p>`;
+            responseArea.innerHTML = `<p style="color:red;">Error de conexión con Render.</p>`;
         } finally {
             sendButton.disabled = false;
         }
