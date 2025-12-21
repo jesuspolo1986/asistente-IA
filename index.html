@@ -187,45 +187,56 @@
     }
 
     function descargarInforme() {
-        const elemento = document.getElementById('reportWrapper');
-        const chartCanvas = document.getElementById('myChart');
-        const pdfBtn = document.getElementById('btn-pdf');
+    const elemento = document.getElementById('reportWrapper');
+    const chartCanvas = document.getElementById('myChart');
+    const pdfBtn = document.getElementById('btn-pdf');
+    
+    // 1. Ocultar el botón y asegurar fondo blanco para la captura
+    pdfBtn.style.visibility = 'hidden';
+    const originalBg = elemento.style.backgroundColor;
+    elemento.style.backgroundColor = "white";
+
+    // 2. Convertir el Canvas a imagen con una promesa para asegurar que existe
+    let tempImage = null;
+    if (chartCanvas && chartCanvas.style.display !== 'none') {
+        tempImage = new Image();
+        tempImage.src = chartCanvas.toDataURL('image/png', 1.0);
+        tempImage.style.width = "100%";
+        tempImage.style.maxWidth = "700px";
+        tempImage.style.display = "block";
+        tempImage.style.margin = "20px auto";
         
-        pdfBtn.style.visibility = 'hidden';
+        // Insertamos la imagen y ocultamos el canvas
+        chartCanvas.parentNode.insertBefore(tempImage, chartCanvas);
+        chartCanvas.style.display = 'none';
+    }
 
-        let tempImage = null;
-        if (chartCanvas && chartCanvas.style.display !== 'none') {
-            tempImage = new Image();
-            tempImage.src = chartCanvas.toDataURL('image/png');
-            tempImage.style.width = "90%"; // Un poco más pequeño para márgenes
-            tempImage.style.display = "block";
-            tempImage.style.margin = "20px auto"; // Centrado
-            tempImage.id = "tempChartImage";
-            chartCanvas.parentNode.insertBefore(tempImage, chartCanvas);
-            chartCanvas.style.display = 'none';
-        }
+    // 3. Configuración para EVITAR PÁGINA EN BLANCO
+    const opt = {
+        margin: [0.2, 0.2], // Márgenes más pequeños
+        filename: 'Informe_Analisis_Negocio.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+            scale: 2, 
+            useCORS: true, 
+            logging: false,
+            scrollY: 0, // Evita desplazamientos que causan hojas en blanco
+            windowWidth: document.documentElement.offsetWidth
+        },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait', compress: true },
+        pagebreak: { mode: 'avoid-all' } // Evita que la librería cree páginas vacías por error
+    };
 
-        const opt = {
-            margin: 0.5,
-            filename: 'Informe_Analisis_IA.pdf',
-            image: { type: 'jpeg', quality: 1 },
-            html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                logging: false,
-                delay: 500 
-            },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
-
+    // 4. Pequeño delay para que el navegador procese la inserción de la imagen
+    setTimeout(() => {
         html2pdf().set(opt).from(elemento).save().then(() => {
+            // Restaurar todo a la normalidad
             if (tempImage) {
                 chartCanvas.style.display = 'block';
                 tempImage.remove();
             }
+            elemento.style.backgroundColor = originalBg;
             pdfBtn.style.visibility = 'visible';
         });
-    }
-</script>
-</body>
-</html>
+    }, 300); // 300ms son suficientes para que la imagen "exista" en el DOM
+}
