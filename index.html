@@ -128,7 +128,7 @@
                     }]
                 },
                 options: {
-                    animation: false, // Desactivado para capturar PDF correctamente
+                    animation: false, 
                     responsive: true,
                     scales: { y: { beginAtZero: true } }
                 }
@@ -188,19 +188,41 @@
 
     function descargarInforme() {
         const elemento = document.getElementById('reportWrapper');
+        const chartCanvas = document.getElementById('myChart');
         const pdfBtn = document.getElementById('btn-pdf');
         
-        pdfBtn.style.visibility = 'hidden'; // Ocultar para la foto
+        pdfBtn.style.visibility = 'hidden';
+
+        let tempImage = null;
+        if (chartCanvas && chartCanvas.style.display !== 'none') {
+            tempImage = new Image();
+            tempImage.src = chartCanvas.toDataURL('image/png');
+            tempImage.style.width = "90%"; // Un poco más pequeño para márgenes
+            tempImage.style.display = "block";
+            tempImage.style.margin = "20px auto"; // Centrado
+            tempImage.id = "tempChartImage";
+            chartCanvas.parentNode.insertBefore(tempImage, chartCanvas);
+            chartCanvas.style.display = 'none';
+        }
 
         const opt = {
             margin: 0.5,
-            filename: 'Informe_Analisis_Negocio.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, logging: false },
+            filename: 'Informe_Analisis_IA.pdf',
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { 
+                scale: 2, 
+                useCORS: true, 
+                logging: false,
+                delay: 500 
+            },
             jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
 
         html2pdf().set(opt).from(elemento).save().then(() => {
+            if (tempImage) {
+                chartCanvas.style.display = 'block';
+                tempImage.remove();
+            }
             pdfBtn.style.visibility = 'visible';
         });
     }
