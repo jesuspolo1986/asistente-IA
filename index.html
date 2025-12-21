@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Market Analyst Pro | Business Intelligence</title>
+    <title>AI Market Analyst Pro | BI & Excel</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
@@ -23,6 +23,10 @@
         
         .theme-switch { cursor: pointer; padding: 8px; border-radius: 20%; border: 1px solid var(--border); background: var(--card); font-size: 1.1em; }
 
+        /* SECCIÓN CARGA DE EXCEL */
+        .upload-section { margin-bottom: 20px; border: 2px dashed var(--accent); padding: 15px; border-radius: 10px; text-align: center; background: rgba(0,123,255,0.05); }
+        .upload-section label { display: block; margin-bottom: 10px; font-weight: bold; cursor: pointer; color: var(--accent); }
+
         textarea { width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--bg); color: var(--text); box-sizing: border-box; min-height: 80px; }
         
         .button-group { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -32,17 +36,13 @@
         .recording { background-color: #dc3545 !important; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-        /* AREA DE REPORTE */
-        #reportWrapper { background: white; border-radius: 8px; color: black; padding: 5px; }
-        #responseArea { padding: 20px; border-radius: 8px; background-color: #ffffff; line-height: 1.6; }
+        /* REPORTE Y PDF */
+        #reportWrapper { background: white; border-radius: 8px; color: black; padding: 10px; }
+        #responseArea { padding: 20px; border-radius: 8px; background-color: #ffffff; line-height: 1.6; color: #1c1e21; }
         
-        #btn-pdf { width: 100%; background-color: var(--accent); color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; font-weight: bold; display: none; margin-top: 15px; }
+        #btn-pdf { width: 100%; background-color: #007bff; color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; font-weight: bold; display: none; margin-top: 15px; }
 
         .chart-container { margin-top: 20px; background: white; padding: 15px; border-radius: 8px; display: none; width: 95%; margin-left: auto; margin-right: auto; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; color: black; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 0.9em; }
-        th { background-color: #f8f9fa; }
         
         .footer-info { font-size: 0.75em; text-align: center; margin-top: 20px; opacity: 0.6; }
     </style>
@@ -51,11 +51,16 @@
 
 <div class="container">
     <div class="header-box">
-        <h1>📊 BI Analysis System</h1>
+        <h1>📊 AI Analyst Pro</h1>
         <button class="theme-switch" onclick="toggleTheme()" id="themeBtn">☀️</button>
     </div>
 
-    <textarea id="questionInput" placeholder="Dicta o escribe tu consulta de negocio..."></textarea>
+    <div class="upload-section">
+        <label for="excelFile">📂 Analizar Archivo (Excel o CSV)</label>
+        <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" onchange="subirArchivo()">
+    </div>
+
+    <textarea id="questionInput" placeholder="Haz una pregunta sobre tu base de datos o el archivo subido..."></textarea>
 
     <div class="button-group">
         <button id="btn-micro" onclick="activarVoz()" title="Usar Micrófono">🎤</button>
@@ -64,20 +69,20 @@
 
     <div id="reportWrapper">
         <div id="responseArea">
-            <p style="text-align: center; opacity: 0.5;">Esperando consulta...</p>
+            <p style="text-align: center; opacity: 0.5;">Esperando datos o consulta...</p>
         </div>
         <div id="chartWrapper" class="chart-container">
             <canvas id="myChart"></canvas>
         </div>
     </div>
 
-    <button id="btn-pdf" onclick="descargarInforme()">📥 Descargar Informe Ejecutivo (PDF)</button>
+    <button id="btn-pdf" onclick="descargarInforme()">📥 Descargar Informe en PDF</button>
 
-    <p class="footer-info">Powered by Gemini AI Engine | Data: Supermercado_DB_v3</p>
+    <p class="footer-info">Powered by Gemini AI | Business Intelligence Engine</p>
 </div>
 
 <script>
-    const API_ENDPOINT = "https://asistente-ia-ksrx.onrender.com/api/consulta";
+    const BASE_URL = "https://asistente-ia-ksrx.onrender.com";
     let myChartInstance = null;
     let chatHistory = "";
 
@@ -87,9 +92,10 @@
         document.getElementById('themeBtn').innerHTML = body.classList.contains('dark-mode') ? "☀️" : "🌙";
     }
 
+    // --- FUNCIÓN: VOZ ---
     function activarVoz() {
         const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!Recognition) return alert("Navegador no compatible");
+        if (!Recognition) return alert("Navegador no compatible con voz");
         const rec = new Recognition();
         rec.lang = 'es-ES';
         rec.onstart = () => document.getElementById('btn-micro').classList.add('recording');
@@ -98,6 +104,86 @@
         rec.start();
     }
 
+    // --- FUNCIÓN: SUBIR EXCEL ---
+    async function subirArchivo() {
+        const fileInput = document.getElementById('excelFile');
+        const responseArea = document.getElementById('responseArea');
+        if (fileInput.files.length === 0) return;
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        responseArea.innerHTML = '<p style="text-align: center;">⏳ Leyendo archivo y analizando con IA...</p>';
+
+        try {
+            const response = await fetch(`${BASE_URL}/api/upload_excel`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                responseArea.innerHTML = `
+                    <div style="background:white; color:black; padding:15px; border-radius:5px; border-left: 5px solid #28a745;">
+                        <strong>Análisis de Archivo:</strong><br><br>${data.response.replace(/\n/g, '<br>')}
+                    </div>
+                `;
+                document.getElementById('btn-pdf').style.display = 'block';
+            } else {
+                responseArea.innerHTML = `<p style="color:red;">Error: ${data.response}</p>`;
+            }
+        } catch (e) {
+            responseArea.innerHTML = `<p style="color:red;">Error de conexión al subir archivo.</p>`;
+        }
+    }
+
+    // --- FUNCIÓN: CONSULTA GENERAL ---
+    async function sendQuery() {
+        const input = document.getElementById('questionInput');
+        const question = input.value.trim();
+        const responseArea = document.getElementById('responseArea');
+        const sendButton = document.getElementById('sendButton');
+        const pdfBtn = document.getElementById('btn-pdf');
+
+        if (!question) return;
+
+        sendButton.disabled = true;
+        pdfBtn.style.display = 'none';
+        responseArea.innerHTML = '<p style="text-align: center;">⏳ Consultando a la IA...</p>';
+
+        try {
+            const response = await fetch(`${BASE_URL}/api/consulta`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: question })
+            });
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                const fecha = new Date().toLocaleString();
+                responseArea.innerHTML = `
+                    <div style="background:white; padding:10px; border-radius:5px;">
+                        <h2 style="color:#007bff; border-bottom:2px solid #007bff; padding-bottom:5px; margin-top:0;">Reporte de Análisis IA</h2>
+                        <p style="font-size:0.8em; color:#666;">Fecha: ${fecha}</p>
+                        <p><strong>Pregunta:</strong> ${question}</p>
+                        <hr style="border:0; border-top:1px solid #eee;">
+                        <div style="color:#1c1e21;">${data.response.replace(/\n/g, '<br>')}</div>
+                    </div>
+                `;
+                extraerYGraficar(data.response);
+                setTimeout(() => { pdfBtn.style.display = 'block'; }, 600);
+                input.value = "";
+            } else {
+                responseArea.innerHTML = `<p style="color:red;">Error: ${data.response}</p>`;
+            }
+        } catch (e) {
+            responseArea.innerHTML = `<p style="color:red;">Error de conexión.</p>`;
+        } finally {
+            sendButton.disabled = false;
+        }
+    }
+
+    // --- FUNCIÓN: GRÁFICOS ---
     function extraerYGraficar(texto) {
         const wrapper = document.getElementById('chartWrapper');
         const ctx = document.getElementById('myChart').getContext('2d');
@@ -120,72 +206,21 @@
                 data: {
                     labels: etiquetas,
                     datasets: [{
-                        label: 'Métricas Detectadas',
+                        label: 'Métricas',
                         data: valores,
                         backgroundColor: '#007bffaa',
                         borderColor: '#007bff',
                         borderWidth: 1
                     }]
                 },
-                options: {
-                    animation: false, 
-                    responsive: true,
-                    scales: { y: { beginAtZero: true } }
-                }
+                options: { animation: false, responsive: true }
             });
         } else {
             wrapper.style.display = 'none';
         }
     }
 
-    async function sendQuery() {
-        const input = document.getElementById('questionInput');
-        const question = input.value.trim();
-        const responseArea = document.getElementById('responseArea');
-        const sendButton = document.getElementById('sendButton');
-        const pdfBtn = document.getElementById('btn-pdf');
-
-        if (!question) return;
-
-        const queryFinal = chatHistory === "" ? question : `Historial: ${chatHistory}\nActual: ${question}`;
-
-        sendButton.disabled = true;
-        pdfBtn.style.display = 'none';
-        responseArea.innerHTML = '<p style="text-align: center; color: #f39c12;">⏳ Analizando datos...</p>';
-
-        try {
-            const response = await fetch(API_ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: queryFinal })
-            });
-            const data = await response.json();
-            
-            if (data.status === 'success') {
-                const fecha = new Date().toLocaleString();
-                responseArea.innerHTML = `
-                    <div style="background:white; padding:10px; border-radius:5px;">
-                        <h2 style="color:#007bff; border-bottom:2px solid #007bff; padding-bottom:5px;">Reporte de Análisis IA</h2>
-                        <p style="font-size:0.8em; color:#666;">Fecha: ${fecha}</p>
-                        <p><strong>Consulta:</strong> ${question}</p>
-                        <hr style="border:0; border-top:1px solid #eee;">
-                        <div style="margin-top:15px; color:#1c1e21;">${data.response.replace(/\n/g, '<br>')}</div>
-                    </div>
-                `;
-                chatHistory = `Q: ${question} | A: ${data.response.substring(0,80)}...`;
-                extraerYGraficar(data.response);
-                setTimeout(() => { pdfBtn.style.display = 'block'; }, 500);
-                input.value = "";
-            } else {
-                responseArea.innerHTML = `<p style="color:red;">Error: ${data.response}</p>`;
-            }
-        } catch (e) {
-            responseArea.innerHTML = `<p style="color:red;">Error de conexión.</p>`;
-        } finally {
-            sendButton.disabled = false;
-        }
-    }
-
+    // --- FUNCIÓN: PDF (CORREGIDA) ---
     function descargarInforme() {
         const elemento = document.getElementById('reportWrapper');
         const chartCanvas = document.getElementById('myChart');
@@ -196,35 +231,32 @@
         let tempImage = null;
         if (chartCanvas && chartCanvas.style.display !== 'none') {
             tempImage = new Image();
-            tempImage.src = chartCanvas.toDataURL('image/png');
-            tempImage.style.width = "90%"; // Un poco más pequeño para márgenes
+            tempImage.src = chartCanvas.toDataURL('image/png', 1.0);
+            tempImage.style.width = "90%";
             tempImage.style.display = "block";
-            tempImage.style.margin = "20px auto"; // Centrado
-            tempImage.id = "tempChartImage";
+            tempImage.style.margin = "20px auto";
             chartCanvas.parentNode.insertBefore(tempImage, chartCanvas);
             chartCanvas.style.display = 'none';
         }
 
         const opt = {
-            margin: 0.5,
-            filename: 'Informe_Analisis_IA.pdf',
-            image: { type: 'jpeg', quality: 1 },
-            html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                logging: false,
-                delay: 500 
-            },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            margin: [0.3, 0.3],
+            filename: 'Reporte_IA_Analyst.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+            pagebreak: { mode: 'avoid-all' }
         };
 
-        html2pdf().set(opt).from(elemento).save().then(() => {
-            if (tempImage) {
-                chartCanvas.style.display = 'block';
-                tempImage.remove();
-            }
-            pdfBtn.style.visibility = 'visible';
-        });
+        setTimeout(() => {
+            html2pdf().set(opt).from(elemento).save().then(() => {
+                if (tempImage) {
+                    chartCanvas.style.display = 'block';
+                    tempImage.remove();
+                }
+                pdfBtn.style.visibility = 'visible';
+            });
+        }, 400);
     }
 </script>
 </body>

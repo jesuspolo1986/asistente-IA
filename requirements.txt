@@ -7,3 +7,5 @@ gunicorn # Servidor HTTP para producción (Render lo usa)
 # psycopg2-binary
 faker
 flask-cors
+pandas
+openpyxl
