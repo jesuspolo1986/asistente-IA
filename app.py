@@ -3,7 +3,7 @@
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from db_manager import create_connection, create_tables 
-import supermercado  # Importamos tu lógica de Gemini
+import supermercado  # Importamos tu lógica
 import os
 import pandas as pd
 import io
@@ -43,7 +43,6 @@ def handle_query():
         return jsonify({"status": "error", "error": "Pregunta vacía"}), 400
 
     try:
-        # Usamos la función que ya tienes en supermercado.py
         response_text = supermercado.run_chat_analysis_api(CONN, question)
         status = "success" if not (response_text.startswith("ERROR") or response_text.startswith("ALERTA")) else "failed"
         
@@ -81,9 +80,8 @@ def upload_excel():
             "podría hacerte el usuario sobre estos datos para analizar el negocio."
         )
         
-        # 3. LLAMADA CORREGIDA: Usamos el modelo que ya está configurado en supermercado.py
-        # Accedemos a supermercado.model porque ahí es donde hiciste genai.GenerativeModel
-        response = supermercado.model.generate_content(prompt)
+        # 3. LLAMADA CORREGIDA: Accedemos a través de supermercado -> ai_analyzer -> model
+        response = supermercado.ai_analyzer.model.generate_content(prompt)
         
         return jsonify({
             "status": "success", 
