@@ -1,10 +1,9 @@
-google-genai==0.1.0      # Nueva librería oficial para Gemini (reemplaza google-generativeai)
-Flask==3.0.0             # Framework web
-gunicorn==21.2.0         # Servidor WSGI para producción
-psycopg2-binary==2.9.9   # Driver PostgreSQL
-faker==19.13.0           # Generador de datos falsos
-flask-cors==4.0.0        # Soporte CORS para frontend
-pandas==2.2.2            # Procesamiento de datos
-openpyxl==3.1.2          # Lectura de Excel
-sqlalchemy==2.0.23       # ORM y motor de conexión
-python-dotenv==1.0.1     # Opcional: manejo de variables de entorno en local
+google-generativeai==0.8.3
+Flask==3.0.3
+gunicorn==22.0.0
+psycopg2-binary==2.9.9
+faker==25.2.0
+flask-cors==4.0.1
+pandas==2.2.2
+openpyxl==3.1.2
+sqlalchemy==2.0.30
