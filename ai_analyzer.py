@@ -1,35 +1,31 @@
-# ai_analyzer.py (VERSIÓN PROFESIONAL CON SEGMENTACIÓN)
-
 from google import genai
 from google.genai import types
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import re 
-from db_manager import execute_dynamic_query, main_db_setup 
 
 # --- 1. CONFIGURACIÓN ---
-API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_FALLBACK_API_KEY_HERE") 
+# Usamos 1.5-flash para máxima estabilidad en Render
+API_KEY = os.environ.get("GEMINI_API_KEY") 
+MODEL_NAME = 'gemini-1.5-flash'
 
 client = None
-try:
-    if API_KEY != "YOUR_FALLBACK_API_KEY_HERE":
+if API_KEY:
+    try:
         client = genai.Client(api_key=API_KEY)
-        print("INFO: Cliente Gemini inicializado correctamente.")
-    else:
-        print("ADVERTENCIA: Usando clave de API de fallback.")
-except Exception as e:
-    print(f"ERROR CRÍTICO: {e}")
-    client = None
+        print(f"INFO: Cliente Gemini ({MODEL_NAME}) inicializado.")
+    except Exception as e:
+        print(f"ERROR: {e}")
 
-# --- 2. ESQUEMA DE LA BASE DE DATOS ---
+# --- 2. ESQUEMA DE LA BASE DE DATOS (Actualizado para Postgres) ---
 ESQUEMA_DB = """
-CREATE TABLE Ciudades (id_ciudad INTEGER PRIMARY KEY, nombre_ciudad TEXT, pais TEXT);
-CREATE TABLE Categorias (id_categoria INTEGER PRIMARY KEY, nombre_categoria TEXT);
-CREATE TABLE Sucursales (id_sucursal INTEGER PRIMARY KEY, nombre_sucursal TEXT, id_ciudad INTEGER, FOREIGN KEY (id_ciudad) REFERENCES Ciudades (id_ciudad));
-CREATE TABLE Clientes (id_cliente INTEGER PRIMARY KEY, nombre TEXT, apellido TEXT, edad INTEGER, id_ciudad INTEGER, FOREIGN KEY (id_ciudad) REFERENCES Ciudades (id_ciudad));
-CREATE TABLE Productos (id_producto INTEGER PRIMARY KEY, nombre TEXT, precio REAL, id_categoria INTEGER, FOREIGN KEY (id_categoria) REFERENCES Categorias (id_categoria));
-CREATE TABLE Ventas (id_venta INTEGER PRIMARY KEY, id_cliente INTEGER, id_sucursal INTEGER, fecha_venta TEXT, total REAL, FOREIGN KEY (id_cliente) REFERENCES Clientes (id_cliente), FOREIGN KEY (id_sucursal) REFERENCES Sucursales (id_sucursal));
-CREATE TABLE DetalleVenta (id_detalle INTEGER PRIMARY KEY, id_venta INTEGER, id_producto INTEGER, cantidad INTEGER, subtotal REAL, FOREIGN KEY (id_venta) REFERENCES Ventas (id_venta), FOREIGN KEY (id_producto) REFERENCES Productos (id_producto));
+Ciudades (id_ciudad INT PRIMARY KEY, nombre_ciudad TEXT, pais TEXT);
+Categorias (id_categoria INT PRIMARY KEY, nombre_categoria TEXT);
+Sucursales (id_sucursal INT PRIMARY KEY, nombre_sucursal TEXT, id_ciudad INT REFERENCES Ciudades(id_ciudad));
+Clientes (id_cliente INT PRIMARY KEY, nombre TEXT, apellido TEXT, edad INT, id_ciudad INT REFERENCES Ciudades(id_ciudad), email TEXT);
+Productos (id_producto SERIAL PRIMARY KEY, nombre TEXT, precio DECIMAL, stock INT, id_categoria INT REFERENCES Categorias(id_categoria));
+Ventas (id_venta SERIAL PRIMARY KEY, id_cliente INT REFERENCES Clientes(id_cliente), id_sucursal INT REFERENCES Sucursales(id_sucursal), fecha_venta TIMESTAMP, total DECIMAL);
+DetalleVenta (id_detalle SERIAL PRIMARY KEY, id_venta INT REFERENCES Ventas(id_venta), id_producto INT REFERENCES Productos(id_producto), cantidad INT, subtotal DECIMAL);
 """
 
 # --- 3. UTILIDADES ---
@@ -40,77 +36,83 @@ def get_fechas_analisis():
         "mes_actual": now.strftime("%Y-%m"),
     }
 
-# --- 4. GENERACIÓN DE SQL CON CAPA DE NEGOCIO ---
+# --- 4. GENERACIÓN DE SQL ---
 def generate_sql_query(question, correction_context=None):
-    if not client: return None, "Error de Cliente"
+    if not client: return None, "Error de Cliente Gemini"
     
     fechas = get_fechas_analisis()
     
-    # REGLAS DE NEGOCIO INYECTADAS
-# --- REGLAS DE NEGOCIO DINÁMICAS (ADAPTABLES A CUALQUIER INDUSTRIA) ---
-    LOGICA_NEGOCIO = """
-    1. 'Clientes de Alto Valor': Son aquellos cuyo gasto total acumulado es SUPERIOR al promedio de gasto de toda la base de datos multiplicado por 2. 
-       Lógica SQL: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING SUM(total) > (SELECT AVG(total) * 2 FROM Ventas))
-
-    2. 'Clientes en Riesgo': Clientes que tienen un número de compras inferior al promedio de compras por cliente.
-       Lógica SQL: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING COUNT(id_venta) < (SELECT COUNT(*) * 1.0 / COUNT(DISTINCT id_cliente) FROM Ventas))
-
-    3. 'Sucursales y Ubicaciones': Siempre usa JOIN con la tabla Sucursales. Si el usuario menciona un nombre (ej. 'Norte'), usa LIKE '%Norte%' para ser flexible con nombres compuestos como 'Norte Bogotá'.
-    """
-
+    # Ajustamos el prompt para especificar POSTGRESQL
     prompt = f"""
-    Eres un Analista de Datos Senior. Traduce la pregunta a SQL para SQLite.
-    
-    {LOGICA_NEGOCIO}
+    Eres un Analista de Datos Senior experto en POSTGRESQL.
+    Traduce la pregunta a una consulta SQL válida para PostgreSQL.
+
+    --- REGLAS DE NEGOCIO ---
+    1. 'Clientes de Alto Valor': Aquellos con gasto total > promedio * 2.
+    2. Usa siempre JOINs explícitos.
+    3. Para comparaciones de texto con nombres, usa siempre ILIKE en lugar de LIKE para que no importe mayúsculas/minúsculas.
+    4. Si se pide 'hoy' o fechas recientes, usa la fecha actual proporcionada.
 
     --- ESQUEMA ---
     {ESQUEMA_DB}
 
-    --- CONTEXTO TEMPORAL ---
+    --- CONTEXTO ---
     Fecha actual: {fechas['fecha_actual']}
     
     Pregunta: {question}
-    {f'ERROR ANTERIOR: {correction_context}' if correction_context else ''}
+    {f'ERROR A CORREGIR: {correction_context}' if correction_context else ''}
     
-    Genera SOLO el código SQL SELECT:
+    Genera únicamente el código SQL SELECT sin explicaciones ni bloques de código markdown:
     """
     
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=MODEL_NAME,
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                system_instruction="Responde estrictamente con SQL SELECT. No expliques."
+                system_instruction="Generar solo SQL puro para PostgreSQL. No usar markdown."
             )
         )
         
-        sql_query = re.search(r'SELECT.*', response.text.strip(), re.IGNORECASE | re.DOTALL)
-        return (sql_query.group(0).split(';')[0].strip(), None) if sql_query else (response.text, "Error de formato")
+        # Limpieza del SQL generado
+        sql_text = response.text.strip()
+        sql_query = re.search(r'SELECT.*', sql_text, re.IGNORECASE | re.DOTALL)
+        
+        if sql_query:
+            clean_sql = sql_query.group(0).replace('```sql', '').replace('```', '').split(';')[0].strip()
+            return clean_sql, None
+        return sql_text, "Error de formato SQL"
 
     except Exception as e:
         return None, str(e)
 
 # --- 5. INTERPRETACIÓN ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    if not client: return "Error de Cliente"
+    if not client: return "Error de Cliente Gemini"
     
-    data_summary = f"Columnas: {columns}\nDatos: {data[:20]}" # Enviamos top 20 para ahorrar tokens
-    if not data: data_summary = "No se encontraron resultados para esta consulta."
+    data_summary = f"Columnas: {columns}\nDatos: {data[:25]}" 
+    if not data: data_summary = "La consulta no devolvió resultados."
 
     prompt = f"""
-    Eres un Analista de Negocios. Interpreta estos resultados de la base de datos.
-    Pregunta del usuario: {question}
-    Resultados: {data_summary}
+    Eres un Consultor Estratégico de Negocios. Interpreta los resultados de la base de datos de un supermercado.
     
-    Instrucciones:
-    1. Si hay datos, preséntalos en una tabla Markdown elegante.
-    2. Responde de forma muy profesional, como un consultor.
-    3. Si no hay datos, explica que no hay registros que cumplan con los criterios de ese segmento.
+    Pregunta del usuario: {question}
+    Resultados obtenidos: {data_summary}
+    SQL ejecutado: {sql_query}
+    
+    Instrucciones de formato:
+    1. Si hay datos, presenta una tabla Markdown profesional.
+    2. Incluye un análisis de 2 o 3 puntos clave (insights).
+    3. Usa un tono ejecutivo y amable.
+    4. No menciones IDs técnicos, usa los nombres de ciudades o productos.
     """
     
     try:
-        response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        response = client.models.generate_content(
+            model=MODEL_NAME, 
+            contents=prompt
+        )
         return response.text
     except Exception as e:
         return f"Error en interpretación: {e}"
