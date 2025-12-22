@@ -1,34 +1,33 @@
 import google.generativeai as genai
 import os
+import re
 from datetime import datetime
-import re 
 
-# --- 1. CONFIGURACIÓN ESTABLE ---
+# --- 1. CONFIGURACIÓN MANUAL DE API ---
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
+# Forzamos la configuración para evitar el error 404 de v1beta
 if API_KEY:
     genai.configure(api_key=API_KEY)
-    # Usamos la inicialización clásica que no falla con el 404 de v1beta
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    print("INFO: Cliente Gemini 1.5-Flash inicializado correctamente.")
+    # Inicializamos el modelo de forma explícita
+    model = genai.GenerativeModel(model_name='gemini-1.5-flash')
+    print("INFO: Sistema de IA reconectado exitosamente.")
 else:
     model = None
-    print("ERROR: No se encontró la GEMINI_API_KEY")
+    print("ERROR: Clave API no detectada.")
 
 # --- 2. ESQUEMA DE LA BASE DE DATOS ---
 ESQUEMA_DB = """
-Ciudades (id_ciudad INT PRIMARY KEY, nombre_ciudad TEXT);
-Categorias (id_categoria INT PRIMARY KEY, nombre_categoria TEXT);
-Sucursales (id_sucursal INT PRIMARY KEY, nombre_sucursal TEXT);
-Clientes (id_cliente INT PRIMARY KEY, nombre TEXT, apellido TEXT);
-Productos (id_producto SERIAL PRIMARY KEY, nombre TEXT, precio DECIMAL);
-Ventas (id_venta SERIAL PRIMARY KEY, id_cliente INT, fecha_venta TIMESTAMP, total DECIMAL);
-
--- Tabla para archivos subidos
+-- Tabla Principal de Excel (Donde están tus 65 registros)
 ventas_externas (
-    fecha_venta TIMESTAMP, cliente TEXT, producto TEXT, 
-    categoria TEXT, cantidad INT, precio_unitario DECIMAL, 
-    total DECIMAL, sucursal TEXT
+    fecha_venta TIMESTAMP, 
+    cliente TEXT, 
+    producto TEXT, 
+    categoria TEXT, 
+    cantidad INT, 
+    precio_unitario DECIMAL, 
+    total DECIMAL, 
+    sucursal TEXT
 );
 """
 
@@ -36,54 +35,35 @@ ventas_externas (
 def generate_sql_query(question, correction_context=None):
     if not model: return None, "IA no configurada"
     
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
     prompt = f"""
-    Eres un Analista Senior de PostgreSQL. 
-    Traduce la pregunta a una consulta SQL SELECT válida usando este esquema:
-    {ESQUEMA_DB}
-    
-    Contexto: Fecha de hoy {now}. 
-    Si la pregunta refiere a datos externos o nuevos, usa 'ventas_externas'.
-    Usa ILIKE para búsquedas de texto.
-    
+    Eres un Analista PostgreSQL. Genera SOLO el código SQL para esta pregunta:
     Pregunta: {question}
-    {f'Corrección previa: {correction_context}' if correction_context else ''}
-    
-    Responde SOLO con el código SQL:
+    Esquema: {ESQUEMA_DB}
+    Importante: Usa ILIKE para textos. Responde solo con el SELECT.
     """
     
     try:
-        # Método de generación estable
+        # Usamos generate_content que es la llamada más estable
         response = model.generate_content(prompt)
         sql_raw = response.text.strip()
         
-        # Limpieza de etiquetas markdown
-        sql_clean = re.sub(r'```sql|```', '', sql_raw).strip()
-        sql_match = re.search(r'SELECT.*', sql_clean, re.IGNORECASE | re.DOTALL)
-        
-        if sql_match:
-            return sql_match.group(0).split(';')[0].strip(), None
-        return sql_clean, "No se detectó un SELECT válido"
-        
+        # Limpieza de código markdown
+        sql_query = re.search(r'SELECT.*', sql_raw, re.IGNORECASE | re.DOTALL)
+        if sql_query:
+            return sql_query.group(0).replace('```sql', '').replace('```', '').split(';')[0].strip(), None
+        return sql_raw, None
     except Exception as e:
         return None, f"Error en IA: {str(e)}"
 
 # --- 4. INTERPRETACIÓN ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    if not model: return "Error: IA no disponible."
+    if not model: return "IA desconectada."
     
-    resumen = f"Columnas: {columns}\nDatos: {data[:10]}"
-    
-    prompt = f"""
-    Eres un Consultor de Negocios. Interpreta estos resultados:
-    Pregunta: {question}
-    Resultados: {resumen}
-    Crea una tabla Markdown y da una conclusión breve.
-    """
+    data_summary = f"Resultados: {data[:10]}"
+    prompt = f"Actúa como analista. Resume estos datos en una tabla markdown: {data_summary}. Pregunta original: {question}"
     
     try:
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        return f"Datos obtenidos: {data}. Error al interpretar: {e}"
+        return f"Error al interpretar: {e}"
