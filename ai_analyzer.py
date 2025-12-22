@@ -78,7 +78,7 @@ def generate_sql_query(question, correction_context=None):
     
     try:
         response = client.models.generate_content(
-            model='gemini-1.5-flash', # Actualizado a la versión más reciente
+            model='models/gemini-1.5-flash', # Actualizado a la versión más reciente
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0,
@@ -120,7 +120,7 @@ def generate_ai_response(question, columns, data, sql_query, db_error):
     """
     
     try:
-        response = client.models.generate_content(model='gemini-1.5-flash', contents=prompt)
+        response = client.models.generate_content(model='models/gemini-1.5-flash', contents=prompt)
         return response.text
     except Exception as e:
         return f"Error en interpretación: {e}"
