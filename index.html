@@ -9,10 +9,10 @@
     
     <style>
         :root {
-            --bg: #f0f2f5; --card: #ffffff; --text: #1c1e21; --accent: #007bff; --border: #ddd;
+            --bg: #f0f2f5; --card: #ffffff; --text: #1c1e21; --accent: #007bff; --border: #ddd; --kpi-bg: #e7f3ff;
         }
         body.dark-mode {
-            --bg: #0d1117; --card: #161b22; --text: #c9d1d9; --accent: #58a6ff; --border: #30363d;
+            --bg: #0d1117; --card: #161b22; --text: #c9d1d9; --accent: #58a6ff; --border: #30363d; --kpi-bg: #1f2937;
         }
 
         body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background-color: var(--bg); color: var(--text); transition: background 0.3s; }
@@ -23,6 +23,17 @@
         
         .theme-switch { cursor: pointer; padding: 8px; border-radius: 20%; border: 1px solid var(--border); background: var(--card); font-size: 1.1em; }
 
+        /* KPI CARDS */
+        .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; display: none; }
+        .kpi-card { background: var(--kpi-bg); padding: 15px; border-radius: 10px; border-left: 5px solid var(--accent); text-align: center; }
+        .kpi-title { font-size: 0.75rem; text-transform: uppercase; opacity: 0.8; display: block; margin-bottom: 5px; color: var(--text); }
+        .kpi-value { font-size: 1.2rem; font-weight: bold; color: var(--accent); }
+
+        /* HISTORIAL */
+        .history-section { margin-bottom: 15px; }
+        .history-tag { display: inline-block; background: var(--border); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; margin: 3px; cursor: pointer; transition: 0.2s; opacity: 0.8; }
+        .history-tag:hover { background: var(--accent); color: white; opacity: 1; }
+
         textarea { width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--bg); color: var(--text); box-sizing: border-box; min-height: 80px; }
         
         .button-group { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -32,7 +43,6 @@
         .recording { background-color: #dc3545 !important; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-        /* AREA DE REPORTE */
         #reportWrapper { background: white; border-radius: 8px; color: black; padding: 5px; }
         #responseArea { padding: 20px; border-radius: 8px; background-color: #ffffff; line-height: 1.6; }
         
@@ -47,7 +57,7 @@
         .footer-info { font-size: 0.75em; text-align: center; margin-top: 20px; opacity: 0.6; }
     </style>
 </head>
-<body class="dark-mode">
+<body class="dark-mode" onload="renderizarHistorial()">
 
 <div class="container">
     <div class="header-box">
@@ -55,11 +65,24 @@
         <button class="theme-switch" onclick="toggleTheme()" id="themeBtn">☀️</button>
     </div>
 
+    <div class="history-section" id="historialContainer"></div>
+
     <textarea id="questionInput" placeholder="Dicta o escribe tu consulta de negocio..."></textarea>
 
     <div class="button-group">
         <button id="btn-micro" onclick="activarVoz()" title="Usar Micrófono">🎤</button>
         <button id="sendButton" onclick="sendQuery()">Ejecutar Análisis</button>
+    </div>
+
+    <div class="kpi-container" id="kpiBox">
+        <div class="kpi-card">
+            <span class="kpi-title">Métrica Principal</span>
+            <span id="kpiValue1" class="kpi-value">$0</span>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-title">Variación/Ref</span>
+            <span id="kpiValue2" class="kpi-value">-</span>
+        </div>
     </div>
 
     <div id="reportWrapper">
@@ -87,6 +110,31 @@
         document.getElementById('themeBtn').innerHTML = body.classList.contains('dark-mode') ? "☀️" : "🌙";
     }
 
+    // --- LÓGICA DE HISTORIAL ---
+    function guardarEnHistorial(pregunta) {
+        let historial = JSON.parse(localStorage.getItem('analyst_history')) || [];
+        if (!historial.includes(pregunta)) {
+            historial.unshift(pregunta);
+            if (historial.length > 5) historial.pop();
+            localStorage.setItem('analyst_history', JSON.stringify(historial));
+        }
+        renderizarHistorial();
+    }
+
+    function renderizarHistorial() {
+        const container = document.getElementById('historialContainer');
+        const historial = JSON.parse(localStorage.getItem('analyst_history')) || [];
+        container.innerHTML = historial.map(p => 
+            `<span class="history-tag" onclick="usarHistorial('${p}')">${p}</span>`
+        ).join('');
+    }
+
+    function usarHistorial(p) {
+        document.getElementById('questionInput').value = p;
+        sendQuery();
+    }
+
+    // --- LÓGICA DE VOZ ---
     function activarVoz() {
         const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!Recognition) return alert("Navegador no compatible");
@@ -98,8 +146,10 @@
         rec.start();
     }
 
+    // --- EXTRACCIÓN DE DATOS Y KPIs ---
     function extraerYGraficar(texto) {
         const wrapper = document.getElementById('chartWrapper');
+        const kpiBox = document.getElementById('kpiBox');
         const ctx = document.getElementById('myChart').getContext('2d');
         const lineas = texto.split('\n');
         let etiquetas = []; let valores = [];
@@ -108,21 +158,34 @@
             const match = linea.match(/([a-zA-Záéíóú\s]+)[|:]\s*([\d,.]+)/);
             if (match) {
                 etiquetas.push(match[1].trim());
-                valores.push(parseFloat(match[2].replace(',', '')));
+                let val = parseFloat(match[2].replace(/\./g, '').replace(',', '.')); // Mejor manejo de miles/decimales
+                valores.push(val);
             }
         });
 
         if (etiquetas.length > 0 && valores.length > 0) {
+            // Actualizar KPIs con los valores más relevantes (máximo y total)
+            kpiBox.style.display = 'grid';
+            const total = valores.reduce((a, b) => a + b, 0);
+            document.getElementById('kpiValue1').innerText = valores[0].toLocaleString('es-ES');
+            document.getElementById('kpiValue2').innerText = etiquetas[0];
+
             wrapper.style.display = 'block';
             if (myChartInstance) myChartInstance.destroy();
+
+            // Decidir tipo de gráfico: Si hay menos de 4 categorías, usar Dona
+            const chartType = etiquetas.length <= 4 ? 'doughnut' : 'bar';
+
             myChartInstance = new Chart(ctx, {
-                type: 'bar',
+                type: chartType,
                 data: {
                     labels: etiquetas,
                     datasets: [{
-                        label: 'Métricas Detectadas',
+                        label: 'Métricas de Negocio',
                         data: valores,
-                        backgroundColor: '#007bffaa',
+                        backgroundColor: [
+                            '#007bffaa', '#28a745aa', '#ffc107aa', '#dc3545aa', '#6610f2aa'
+                        ],
                         borderColor: '#007bff',
                         borderWidth: 1
                     }]
@@ -130,11 +193,13 @@
                 options: {
                     animation: false, 
                     responsive: true,
-                    scales: { y: { beginAtZero: true } }
+                    plugins: { legend: { display: chartType === 'doughnut' } },
+                    scales: chartType === 'bar' ? { y: { beginAtZero: true } } : {}
                 }
             });
         } else {
             wrapper.style.display = 'none';
+            kpiBox.style.display = 'none';
         }
     }
 
@@ -147,17 +212,17 @@
 
         if (!question) return;
 
-        const queryFinal = chatHistory === "" ? question : `Historial: ${chatHistory}\nActual: ${question}`;
+        guardarEnHistorial(question);
 
         sendButton.disabled = true;
         pdfBtn.style.display = 'none';
-        responseArea.innerHTML = '<p style="text-align: center; color: #f39c12;">⏳ Analizando datos...</p>';
+        responseArea.innerHTML = '<p style="text-align: center; color: #f39c12;">⏳ Procesando inteligencia empresarial...</p>';
 
         try {
             const response = await fetch(API_ENDPOINT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: queryFinal })
+                body: JSON.stringify({ question: question })
             });
             const data = await response.json();
             
@@ -165,14 +230,12 @@
                 const fecha = new Date().toLocaleString();
                 responseArea.innerHTML = `
                     <div style="background:white; padding:10px; border-radius:5px;">
-                        <h2 style="color:#007bff; border-bottom:2px solid #007bff; padding-bottom:5px;">Reporte de Análisis IA</h2>
-                        <p style="font-size:0.8em; color:#666;">Fecha: ${fecha}</p>
-                        <p><strong>Consulta:</strong> ${question}</p>
+                        <h2 style="color:#007bff; border-bottom:2px solid #007bff; padding-bottom:5px;">Reporte Ejecutivo</h2>
+                        <p style="font-size:0.8em; color:#666;">Generado el: ${fecha}</p>
                         <hr style="border:0; border-top:1px solid #eee;">
                         <div style="margin-top:15px; color:#1c1e21;">${data.response.replace(/\n/g, '<br>')}</div>
                     </div>
                 `;
-                chatHistory = `Q: ${question} | A: ${data.response.substring(0,80)}...`;
                 extraerYGraficar(data.response);
                 setTimeout(() => { pdfBtn.style.display = 'block'; }, 500);
                 input.value = "";
@@ -180,7 +243,7 @@
                 responseArea.innerHTML = `<p style="color:red;">Error: ${data.response}</p>`;
             }
         } catch (e) {
-            responseArea.innerHTML = `<p style="color:red;">Error de conexión.</p>`;
+            responseArea.innerHTML = `<p style="color:red;">Error de conexión con el motor IA.</p>`;
         } finally {
             sendButton.disabled = false;
         }
@@ -188,41 +251,36 @@
 
     function descargarInforme() {
         const elemento = document.getElementById('reportWrapper');
+        const kpiCopy = document.getElementById('kpiBox').cloneNode(true);
         const chartCanvas = document.getElementById('myChart');
         const pdfBtn = document.getElementById('btn-pdf');
         
         pdfBtn.style.visibility = 'hidden';
 
+        // Preparar clon para PDF
+        const pdfContent = document.createElement('div');
+        kpiCopy.style.display = 'grid'; // Asegurar que sea visible en el clon
+        pdfContent.appendChild(kpiCopy);
+        pdfContent.appendChild(elemento.cloneNode(true));
+
         let tempImage = null;
         if (chartCanvas && chartCanvas.style.display !== 'none') {
             tempImage = new Image();
             tempImage.src = chartCanvas.toDataURL('image/png');
-            tempImage.style.width = "90%"; // Un poco más pequeño para márgenes
-            tempImage.style.display = "block";
-            tempImage.style.margin = "20px auto"; // Centrado
-            tempImage.id = "tempChartImage";
-            chartCanvas.parentNode.insertBefore(tempImage, chartCanvas);
-            chartCanvas.style.display = 'none';
+            tempImage.style.width = "100%";
+            tempImage.style.marginTop = "20px";
+            pdfContent.appendChild(tempImage);
         }
 
         const opt = {
-            margin: 0.5,
-            filename: 'Informe_Analisis_IA.pdf',
-            image: { type: 'jpeg', quality: 1 },
-            html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                logging: false,
-                delay: 500 
-            },
+            margin: [0.5, 0.5],
+            filename: 'Analisis_Pro_Report.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
             jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
 
-        html2pdf().set(opt).from(elemento).save().then(() => {
-            if (tempImage) {
-                chartCanvas.style.display = 'block';
-                tempImage.remove();
-            }
+        html2pdf().set(opt).from(pdfContent).save().then(() => {
             pdfBtn.style.visibility = 'visible';
         });
     }
