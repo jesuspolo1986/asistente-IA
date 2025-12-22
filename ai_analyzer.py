@@ -5,19 +5,20 @@ from datetime import datetime
 import re 
 
 # --- 1. CONFIGURACIÓN ---
-# Usamos 1.5-flash para máxima estabilidad en Render
 API_KEY = os.environ.get("GEMINI_API_KEY") 
-MODEL_NAME = 'gemini-1.5-flash'
+# Usamos el identificador estándar. La SDK se encarga del resto.
+MODEL_NAME = 'gemini-1.5-flash' 
 
 client = None
 if API_KEY:
     try:
+        # Inicialización optimizada para la SDK google-genai
         client = genai.Client(api_key=API_KEY)
-        print(f"INFO: Cliente Gemini ({MODEL_NAME}) inicializado.")
+        print(f"INFO: Cliente Gemini ({MODEL_NAME}) configurado correctamente.")
     except Exception as e:
-        print(f"ERROR: {e}")
+        print(f"ERROR al inicializar Gemini: {e}")
 
-# --- 2. ESQUEMA DE LA BASE DE DATOS (Actualizado para Postgres) ---
+# --- 2. ESQUEMA DE LA BASE DE DATOS ---
 ESQUEMA_DB = """
 Ciudades (id_ciudad INT PRIMARY KEY, nombre_ciudad TEXT, pais TEXT);
 Categorias (id_categoria INT PRIMARY KEY, nombre_categoria TEXT);
@@ -38,31 +39,27 @@ def get_fechas_analisis():
 
 # --- 4. GENERACIÓN DE SQL ---
 def generate_sql_query(question, correction_context=None):
-    if not client: return None, "Error de Cliente Gemini"
+    if not client: return None, "Error: Cliente Gemini no inicializado"
     
     fechas = get_fechas_analisis()
     
-    # Ajustamos el prompt para especificar POSTGRESQL
     prompt = f"""
     Eres un Analista de Datos Senior experto en POSTGRESQL.
     Traduce la pregunta a una consulta SQL válida para PostgreSQL.
 
-    --- REGLAS DE NEGOCIO ---
-    1. 'Clientes de Alto Valor': Aquellos con gasto total > promedio * 2.
-    2. Usa siempre JOINs explícitos.
-    3. Para comparaciones de texto con nombres, usa siempre ILIKE en lugar de LIKE para que no importe mayúsculas/minúsculas.
-    4. Si se pide 'hoy' o fechas recientes, usa la fecha actual proporcionada.
+    --- REGLAS ---
+    1. Usa ILIKE para búsquedas de texto (evita errores de mayúsculas).
+    2. Retorna únicamente el código SQL, sin bloques de código ```sql ni explicaciones.
+    3. Si el usuario pregunta por "clientes de alto valor", busca aquellos con ventas totales superiores al promedio.
 
     --- ESQUEMA ---
     {ESQUEMA_DB}
 
-    --- CONTEXTO ---
+    --- CONTEXTO TEMPORAL ---
     Fecha actual: {fechas['fecha_actual']}
     
     Pregunta: {question}
-    {f'ERROR A CORREGIR: {correction_context}' if correction_context else ''}
-    
-    Genera únicamente el código SQL SELECT sin explicaciones ni bloques de código markdown:
+    {f'CORRECCIÓN REQUERIDA: {correction_context}' if correction_context else ''}
     """
     
     try:
@@ -71,41 +68,42 @@ def generate_sql_query(question, correction_context=None):
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                system_instruction="Generar solo SQL puro para PostgreSQL. No usar markdown."
+                system_instruction="Generar solo código SQL SELECT puro para PostgreSQL."
             )
         )
         
-        # Limpieza del SQL generado
-        sql_text = response.text.strip()
-        sql_query = re.search(r'SELECT.*', sql_text, re.IGNORECASE | re.DOTALL)
+        # Limpieza profunda de la respuesta
+        raw_sql = response.text.strip()
+        # Eliminar bloques de código markdown si la IA los incluye
+        clean_sql = re.sub(r'```(?:sql)?|```', '', raw_sql).strip()
+        # Extraer solo el SELECT en caso de que haya texto basura
+        sql_match = re.search(r'SELECT.*', clean_sql, re.IGNORECASE | re.DOTALL)
         
-        if sql_query:
-            clean_sql = sql_query.group(0).replace('```sql', '').replace('```', '').split(';')[0].strip()
-            return clean_sql, None
-        return sql_text, "Error de formato SQL"
+        if sql_match:
+            final_sql = sql_match.group(0).split(';')[0].strip()
+            return final_sql, None
+        return clean_sql, "Error de formato en la respuesta SQL"
 
     except Exception as e:
-        return None, str(e)
+        return None, f"Error en generate_sql_query: {str(e)}"
 
 # --- 5. INTERPRETACIÓN ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    if not client: return "Error de Cliente Gemini"
+    if not client: return "Error: Cliente Gemini no disponible."
     
     data_summary = f"Columnas: {columns}\nDatos: {data[:25]}" 
-    if not data: data_summary = "La consulta no devolvió resultados."
+    if not data: data_summary = "No se encontraron registros en la base de datos."
 
     prompt = f"""
-    Eres un Consultor Estratégico de Negocios. Interpreta los resultados de la base de datos de un supermercado.
+    Eres un Consultor Estratégico. Interpreta estos resultados de PostgreSQL.
+    Pregunta: {question}
+    SQL: {sql_query}
+    Datos: {data_summary}
     
-    Pregunta del usuario: {question}
-    Resultados obtenidos: {data_summary}
-    SQL ejecutado: {sql_query}
-    
-    Instrucciones de formato:
-    1. Si hay datos, presenta una tabla Markdown profesional.
-    2. Incluye un análisis de 2 o 3 puntos clave (insights).
-    3. Usa un tono ejecutivo y amable.
-    4. No menciones IDs técnicos, usa los nombres de ciudades o productos.
+    Instrucciones:
+    1. Responde con una tabla Markdown si hay datos.
+    2. Da una conclusión ejecutiva breve.
+    3. No menciones errores técnicos al usuario.
     """
     
     try:
@@ -115,4 +113,4 @@ def generate_ai_response(question, columns, data, sql_query, db_error):
         )
         return response.text
     except Exception as e:
-        return f"Error en interpretación: {e}"
+        return f"Error al generar interpretación: {e}"
