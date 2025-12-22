@@ -28,7 +28,24 @@ else:
 @app.route('/', methods=['GET'])
 def serve_frontend():
     return send_from_directory('.', 'index.html')
+from flask import request, redirect, flash
+from data_uploader import procesar_y_cargar_excel
 
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return "No hay archivo"
+    file = request.files['file']
+    if file.filename == '':
+        return "Archivo no seleccionado"
+    
+    if file:
+        file_path = os.path.join("uploads", file.filename)
+        if not os.path.exists("uploads"): os.makedirs("uploads")
+        file.save(file_path)
+        
+        success, message = procesar_y_cargar_excel(file_path)
+        return f"<h3>{message}</h3><a href='/'>Volver al Analista</a>"
 @app.route('/api/consulta', methods=['POST'])
 def handle_query():
     # Siempre verificamos si la conexión está activa

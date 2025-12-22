@@ -3,278 +3,238 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Market Analyst Pro | Business Intelligence</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
+    <title>AI Pro Analyst - Inteligencia de Negocios</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --bg: #f0f2f5; --card: #ffffff; --text: #1c1e21; --accent: #007bff; --border: #ddd; --kpi-bg: #e7f3ff;
+            --primary-color: #1e3a8a;
+            --secondary-color: #10b981;
+            --bg-color: #f8fafc;
+            --text-color: #1e293b;
         }
-        body.dark-mode {
-            --bg: #0d1117; --card: #161b22; --text: #c9d1d9; --accent: #58a6ff; --border: #30363d; --kpi-bg: #1f2937;
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background-color: var(--bg); color: var(--text); transition: background 0.3s; }
-        .container { max-width: 900px; margin: auto; background: var(--card); padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid var(--border); }
-        
-        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
-        h1 { color: var(--accent); margin: 0; font-size: 1.5em; text-transform: uppercase; letter-spacing: 1px; }
-        
-        .theme-switch { cursor: pointer; padding: 8px; border-radius: 20%; border: 1px solid var(--border); background: var(--card); font-size: 1.1em; }
+        header {
+            width: 100%;
+            background: var(--primary-color);
+            color: white;
+            padding: 1rem 0;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
 
-        /* KPI CARDS */
-        .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; display: none; }
-        .kpi-card { background: var(--kpi-bg); padding: 15px; border-radius: 10px; border-left: 5px solid var(--accent); text-align: center; transition: transform 0.2s; }
-        .kpi-card:hover { transform: translateY(-3px); }
-        .kpi-title { font-size: 0.75rem; text-transform: uppercase; opacity: 0.8; display: block; margin-bottom: 5px; color: var(--text); }
-        .kpi-value { font-size: 1.2rem; font-weight: bold; color: var(--accent); }
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            margin: 20px auto;
+        }
 
-        /* HISTORIAL */
-        .history-section { margin-bottom: 15px; min-height: 40px; }
-        .history-tag { display: inline-block; background: var(--border); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; margin: 3px; cursor: pointer; transition: 0.2s; opacity: 0.8; color: var(--text); }
-        .history-tag:hover { background: var(--accent); color: white; opacity: 1; }
+        /* Sección de Carga de Archivos */
+        .upload-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s ease;
+        }
 
-        /* LOADING SKELETON */
-        .skeleton { height: 20px; background: linear-gradient(90deg, var(--bg) 25%, var(--border) 50%, var(--bg) 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 4px; margin: 10px 0; }
-        @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .upload-card:hover {
+            border-color: var(--secondary-color);
+        }
 
-        textarea { width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--bg); color: var(--text); box-sizing: border-box; min-height: 80px; resize: none; }
-        
-        .button-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        #sendButton { background-color: #28a745; color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; font-size: 16px; flex-grow: 1; font-weight: 600; transition: 0.2s; }
-        #sendButton:hover { background-color: #218838; }
-        #sendButton:disabled { background-color: #ccc; cursor: not-allowed; }
-        #btn-micro { background-color: #6c757d; color: white; border: none; border-radius: 8px; width: 55px; cursor: pointer; font-size: 20px; }
-        
-        .recording { background-color: #dc3545 !important; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .upload-form {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
 
-        #reportWrapper { background: white; border-radius: 8px; color: black; padding: 5px; }
-        #responseArea { padding: 20px; border-radius: 8px; background-color: #ffffff; line-height: 1.6; }
-        
-        #btn-pdf { width: 100%; background-color: var(--accent); color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; font-weight: bold; display: none; margin-top: 15px; }
+        input[type="file"] {
+            padding: 8px;
+            background: #f1f5f9;
+            border-radius: 6px;
+            flex-grow: 1;
+        }
 
-        .chart-container { margin-top: 20px; background: white; padding: 15px; border-radius: 8px; display: none; width: 95%; margin: 20px auto; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; color: black; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 0.9em; }
-        th { background-color: #f8f9fa; }
-        
-        .footer-info { font-size: 0.75em; text-align: center; margin-top: 20px; opacity: 0.6; }
+        .btn-upload {
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* Área de Chat y Análisis */
+        .chat-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 500px;
+        }
+
+        .analysis-output {
+            flex-grow: 1;
+            padding: 25px;
+            overflow-y: auto;
+            border-bottom: 1px solid #e2e8f0;
+            background-image: linear-gradient(to bottom, #ffffff, #f9fafb);
+        }
+
+        .input-area {
+            padding: 20px;
+            background: #f1f5f9;
+            display: flex;
+            gap: 10px;
+        }
+
+        textarea {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            resize: none;
+            font-size: 16px;
+        }
+
+        .btn-analyze {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+
+        .btn-analyze:disabled {
+            opacity: 0.5;
+        }
+
+        /* Estilo para las tablas que genera la IA */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 0.9em;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        table thead tr {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            text-align: left;
+        }
+
+        table th, table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #dddddd;
+        }
+
+        table tbody tr:nth-of-type(even) {
+            background-color: #f3f4f6;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #64748b;
+        }
     </style>
 </head>
-<body class="dark-mode" onload="renderizarHistorial()">
+<body>
 
-<div class="container">
-    <div class="header-box">
-        <h1>📊 AI Pro Analyst</h1>
-        <button class="theme-switch" onclick="toggleTheme()" id="themeBtn">☀️</button>
-    </div>
+    <header>
+        <h1><i class="fas fa-chart-line"></i> AI Pro Analyst</h1>
+        <p>Tu consultor estratégico automatizado</p>
+    </header>
 
-    <div class="history-section" id="historialContainer"></div>
-
-    <textarea id="questionInput" placeholder="Escribe tu consulta de negocio (ej: Ventas por categoría)..."></textarea>
-
-    <div class="button-group">
-        <button id="btn-micro" onclick="activarVoz()" title="Usar Micrófono">🎤</button>
-        <button id="sendButton" onclick="sendQuery()">Ejecutar Análisis</button>
-    </div>
-
-    <div class="kpi-container" id="kpiBox">
-        <div class="kpi-card">
-            <span class="kpi-title">Métrica Principal</span>
-            <span id="kpiValue1" class="kpi-value">--</span>
-        </div>
-        <div class="kpi-card">
-            <span class="kpi-title">Líder de Segmento</span>
-            <span id="kpiValue2" class="kpi-value">--</span>
-        </div>
-    </div>
-
-    <div id="reportWrapper">
-        <div id="responseArea">
-            <p style="text-align: center; opacity: 0.5;">Listo para analizar tus datos comerciales.</p>
-        </div>
-        <div id="chartWrapper" class="chart-container">
-            <canvas id="myChart"></canvas>
-        </div>
-    </div>
-
-    <button id="btn-pdf" onclick="descargarInforme()">📥 Descargar Informe PDF</button>
-
-    <p class="footer-info">Sistema de Inteligencia de Negocios | 2025 AI Analyst Project</p>
-</div>
-
-<script>
-    const API_ENDPOINT = "https://asistente-ia-ksrx.onrender.com/api/consulta";
-    let myChartInstance = null;
-
-    function toggleTheme() {
-        const body = document.body;
-        body.classList.toggle('dark-mode');
-        document.getElementById('themeBtn').innerHTML = body.classList.contains('dark-mode') ? "☀️" : "🌙";
-    }
-
-    function guardarEnHistorial(pregunta) {
-        let historial = JSON.parse(localStorage.getItem('analyst_history')) || [];
-        if (!historial.includes(pregunta)) {
-            historial.unshift(pregunta);
-            if (historial.length > 5) historial.pop();
-            localStorage.setItem('analyst_history', JSON.stringify(historial));
-        }
-        renderizarHistorial();
-    }
-
-    function renderizarHistorial() {
-        const container = document.getElementById('historialContainer');
-        const historial = JSON.parse(localStorage.getItem('analyst_history')) || [];
-        container.innerHTML = historial.map(p => 
-            `<span class="history-tag" onclick="usarHistorial('${p}')">${p}</span>`
-        ).join('');
-    }
-
-    function usarHistorial(p) {
-        document.getElementById('questionInput').value = p;
-        sendQuery();
-    }
-
-    function activarVoz() {
-        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!Recognition) return alert("Navegador no compatible con reconocimiento de voz.");
-        const rec = new Recognition();
-        rec.lang = 'es-ES';
-        rec.onstart = () => document.getElementById('btn-micro').classList.add('recording');
-        rec.onresult = (e) => document.getElementById('questionInput').value = e.results[0][0].transcript;
-        rec.onend = () => document.getElementById('btn-micro').classList.remove('recording');
-        rec.start();
-    }
-
-    function extraerYGraficar(texto) {
-        const wrapper = document.getElementById('chartWrapper');
-        const kpiBox = document.getElementById('kpiBox');
-        const ctx = document.getElementById('myChart').getContext('2d');
-        const lineas = texto.split('\n');
-        let etiquetas = []; let valores = [];
-
-        lineas.forEach(linea => {
-            const match = linea.match(/([a-zA-Záéíóú\s]+)[|:]\s*([\d,.]+)/);
-            if (match) {
-                etiquetas.push(match[1].trim());
-                let val = parseFloat(match[2].replace(/\./g, '').replace(',', '.'));
-                valores.push(val);
-            }
-        });
-
-        if (etiquetas.length > 0 && valores.length > 0) {
-            kpiBox.style.display = 'grid';
-            document.getElementById('kpiValue1').innerText = valores[0].toLocaleString('es-ES', { style: 'currency', currency: 'USD' });
-            document.getElementById('kpiValue2').innerText = etiquetas[0];
-
-            wrapper.style.display = 'block';
-            if (myChartInstance) myChartInstance.destroy();
-
-            const isDoughnut = etiquetas.length <= 4;
-
-            myChartInstance = new Chart(ctx, {
-                type: isDoughnut ? 'doughnut' : 'bar',
-                data: {
-                    labels: etiquetas,
-                    datasets: [{
-                        label: 'Volumen detectado',
-                        data: valores,
-                        backgroundColor: ['#58a6ffaa', '#2ea043aa', '#f0883eaa', '#f85149aa', '#8957e5aa'],
-                        borderColor: '#30363d',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    animation: { duration: 1000 },
-                    plugins: { 
-                        legend: { display: isDoughnut, position: 'bottom' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(item) {
-                                    let sum = item.dataset.data.reduce((a, b) => a + b, 0);
-                                    let pct = (item.raw * 100 / sum).toFixed(1) + "%";
-                                    return `${item.label}: ${item.raw.toLocaleString()} (${pct})`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    }
-
-    async function sendQuery() {
-        const input = document.getElementById('questionInput');
-        const question = input.value.trim();
-        const responseArea = document.getElementById('responseArea');
-        const sendButton = document.getElementById('sendButton');
-        const pdfBtn = document.getElementById('btn-pdf');
-
-        if (!question) return;
-
-        guardarEnHistorial(question);
-        sendButton.disabled = true;
-        pdfBtn.style.display = 'none';
+    <div class="container">
         
-        // Efecto Skeleton durante la carga
-        responseArea.innerHTML = `
-            <div class="skeleton"></div>
-            <div class="skeleton" style="width:80%"></div>
-            <div class="skeleton" style="width:90%"></div>
-            <p style="text-align: center; color: var(--accent);">Analizando datos en tiempo real...</p>
-        `;
+        <div class="upload-card">
+            <h3><i class="fas fa-file-excel"></i> Cargar Datos de Ventas</h3>
+            <p style="font-size: 0.85em; color: #64748b;">Sincroniza tus archivos Excel o CSV para que la IA los analice.</p>
+            <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
+                <input type="file" name="file" accept=".csv, .xlsx" required>
+                <button type="submit" class="btn-upload">
+                    <i class="fas fa-sync"></i> Sincronizar Datos
+                </button>
+            </form>
+        </div>
 
-        try {
-            const response = await fetch(API_ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: question })
-            });
-            const data = await response.json();
-            
-            if (data.status === 'success') {
-                const fecha = new Date().toLocaleString();
-                responseArea.innerHTML = `
-                    <div style="background:white; padding:15px; border-radius:8px;">
-                        <h2 style="color:#007bff; border-bottom:2px solid #007bff; padding-bottom:10px; margin-top:0;">Reporte de Inteligencia</h2>
-                        <p style="font-size:0.85em; color:#666;">Generado: ${fecha}</p>
-                        <div style="margin-top:20px; color:#1c1e21; font-size:1.05em;">${data.response.replace(/\n/g, '<br>')}</div>
-                    </div>
-                `;
-                extraerYGraficar(data.response);
-                setTimeout(() => { pdfBtn.style.display = 'block'; }, 600);
-            } else {
-                responseArea.innerHTML = `<p style="color:#f85149;">⚠️ ${data.response}</p>`;
+        <div class="chat-container">
+            <div id="output" class="analysis-output">
+                <div style="text-align: center; color: #94a3b8; margin-top: 100px;">
+                    <i class="fas fa-robot fa-3x" style="margin-bottom: 15px;"></i>
+                    <p>Esperando tu consulta empresarial...<br>Ejemplo: "¿Cuál es mi producto estrella y cuánto vendió?"</p>
+                </div>
+            </div>
+
+            <div id="loading" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> La IA está consultando la base de datos y preparando tu informe...
+            </div>
+
+            <form id="analysis-form" class="input-area">
+                <textarea id="question" rows="2" placeholder="Haz una pregunta sobre tus datos..." required></textarea>
+                <button type="submit" id="submit-btn" class="btn-analyze">
+                    Ejecutar Análisis <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('analysis-form');
+        const output = document.getElementById('output');
+        const loading = document.getElementById('loading');
+        const submitBtn = document.getElementById('submit-btn');
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const question = document.getElementById('question').value;
+
+            // UI State
+            loading.style.display = 'block';
+            submitBtn.disabled = true;
+            output.innerHTML = '';
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+                
+                const data = await response.json();
+                
+                // Limpiar pantalla y mostrar respuesta
+                output.innerHTML = `<div class="ai-response">${data.answer}</div>`;
+            } catch (error) {
+                output.innerHTML = `<p style="color:red">Error: No se pudo conectar con el analista.</p>`;
+            } finally {
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
             }
-        } catch (e) {
-            responseArea.innerHTML = `<p style="color:#f85149;">Error crítico de conexión con el motor IA.</p>`;
-        } finally {
-            sendButton.disabled = false;
-        }
-    }
-
-    function descargarInforme() {
-        const element = document.getElementById('reportWrapper');
-        const pdfBtn = document.getElementById('btn-pdf');
-        pdfBtn.style.display = 'none';
-
-        const opt = {
-            margin: 0.4,
-            filename: 'Analisis_Negocio_Pro.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
-
-        html2pdf().set(opt).from(element).save().then(() => {
-            pdfBtn.style.display = 'block';
-        });
-    }
-</script>
+    </script>
 </body>
 </html>
