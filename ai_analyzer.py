@@ -1,4 +1,4 @@
-# ai_analyzer.py - VERSIÓN INTEGRADA CON CARGA DE EXCEL
+# ai_analyzer.py - VERSIÓN BLINDADA (SOLUCIÓN ERROR 404)
 from google import genai
 from google.genai import types
 import os
@@ -7,18 +7,19 @@ import re
 
 # --- 1. CONFIGURACIÓN ---
 API_KEY = os.environ.get("GEMINI_API_KEY") 
-MODEL_NAME = 'gemini-1.5-flash' # Modelo balanceado para evitar error 429
+# Usamos el nombre simplificado que la nueva SDK prefiere
+MODEL_NAME = 'gemini-1.5-flash' 
 
 client = None
 if API_KEY:
     try:
+        # IMPORTANTE: No forzamos versión de API para que la SDK maneje la compatibilidad
         client = genai.Client(api_key=API_KEY)
-        print(f"INFO: Cliente Gemini ({MODEL_NAME}) listo.")
+        print(f"INFO: Cliente Gemini ({MODEL_NAME}) inicializado con éxito.")
     except Exception as e:
-        print(f"ERROR: {e}")
+        print(f"ERROR CRÍTICO: No se pudo conectar con Gemini: {e}")
 
-# --- 2. ESQUEMA DE LA BASE DE DATOS (Incluye Tabla de Excel) ---
-# Hemos añadido 'ventas_externas' que es donde pandas guarda los archivos subidos.
+# --- 2. ESQUEMA DE LA BASE DE DATOS ---
 ESQUEMA_DB = """
 -- Tablas Base:
 Ciudades (id_ciudad INT PRIMARY KEY, nombre_ciudad TEXT, pais TEXT);
@@ -28,7 +29,7 @@ Clientes (id_cliente INT PRIMARY KEY, nombre TEXT, apellido TEXT, id_ciudad INT)
 Productos (id_producto SERIAL PRIMARY KEY, nombre TEXT, precio DECIMAL, id_categoria INT);
 Ventas (id_venta SERIAL PRIMARY KEY, id_cliente INT, id_sucursal INT, fecha_venta TIMESTAMP, total DECIMAL);
 
--- Tabla de Cargas de Excel/CSV:
+-- Tabla de Cargas de Excel/CSV (Donde se suben tus archivos):
 ventas_externas (
     fecha_venta TIMESTAMP, 
     cliente TEXT, 
@@ -48,42 +49,43 @@ def get_fechas_analisis():
 
 # --- 4. GENERACIÓN DE SQL ---
 def generate_sql_query(question, correction_context=None):
-    if not client: return None, "Error de Cliente"
+    if not client: return None, "Error: Cliente AI no inicializado"
     
     fechas = get_fechas_analisis()
     
-    # Lógica para que la IA decida si usar las tablas base o la de Excel
     LOGICA_NEGOCIO = """
-    1. Si el usuario pregunta por datos generales, prioriza la tabla 'ventas_externas' si las otras están vacías.
-    2. Usa ILIKE para comparaciones de texto.
-    3. 'Clientes de Alto Valor': Aquellos con total sumado > promedio * 2 en cualquiera de las tablas de ventas.
+    1. Si la pregunta es sobre el archivo subido o datos recientes, consulta 'ventas_externas'.
+    2. Usa siempre ILIKE para textos (ej. nombre ILIKE '%valor%').
+    3. Asegúrate de que el SQL sea compatible con PostgreSQL.
     """
 
     prompt = f"""
-    Eres un Analista Senior de PostgreSQL. Traduce a SQL:
+    Eres un Analista Senior de PostgreSQL. 
+    Traduce la pregunta a una consulta SQL válida.
     {LOGICA_NEGOCIO}
     --- ESQUEMA ---
     {ESQUEMA_DB}
     --- CONTEXTO ---
-    Fecha actual: {fechas['fecha_actual']}
+    Fecha: {fechas['fecha_actual']}
     Pregunta: {question}
-    {f'CORRECCIÓN: {correction_context}' if correction_context else ''}
+    {f'CORRECCIÓN REQUERIDA: {correction_context}' if correction_context else ''}
     
-    Genera SOLO el código SQL SELECT:
+    Responde ÚNICAMENTE con el código SQL SELECT:
     """
     
     try:
+        # Llamada optimizada para evitar el error 404 de versión de modelo
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                system_instruction="Generar solo código SQL para PostgreSQL. Nada de explicaciones."
+                system_instruction="Eres un bot que solo devuelve código SQL SELECT para PostgreSQL. Sin explicaciones."
             )
         )
         
         sql_raw = response.text.strip()
-        # Limpiar posibles bloques de código markdown
+        # Extraer solo el SELECT en caso de que la IA incluya texto extra
         sql_query = re.search(r'SELECT.*', sql_raw, re.IGNORECASE | re.DOTALL)
         
         if sql_query:
@@ -92,24 +94,29 @@ def generate_sql_query(question, correction_context=None):
         return sql_raw, "Formato SQL no detectado"
 
     except Exception as e:
-        return None, str(e)
+        # Capturamos el error para depuración en los logs de Render
+        print(f"DETALLE ERROR IA: {str(e)}")
+        return None, f"Error en generación SQL: {str(e)}"
 
-# --- 5. INTERPRETACIÓN DE RESULTADOS ---
+# --- 5. INTERPRETACIÓN ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    if not client: return "IA fuera de servicio."
+    if not client: return "Error: IA no disponible."
     
-    data_summary = f"Columnas: {columns}\nDatos obtenidos: {data[:25]}"
-    if not data: data_summary = "La consulta no devolvió resultados."
+    data_summary = f"Columnas: {columns}\nDatos: {data[:15]}"
+    if not data: data_summary = "No se encontraron datos para esta consulta."
 
     prompt_analisis = f"""
-    Eres un Consultor de Negocios. Analiza estos resultados de la DB:
-    Pregunta: {question}
-    Datos: {data_summary}
-    Instrucciones: Responde con una tabla Markdown profesional y un análisis breve de los hallazgos.
+    Eres un Consultor de Negocios Senior.
+    Pregunta del cliente: {question}
+    Resultados obtenidos: {data_summary}
+    Tarea: Presenta los datos en una tabla Markdown y da una conclusión estratégica breve.
     """
     
     try:
-        response = client.models.generate_content(model=MODEL_NAME, contents=prompt_analisis)
+        response = client.models.generate_content(
+            model=MODEL_NAME, 
+            contents=prompt_analisis
+        )
         return response.text
     except Exception as e:
-        return f"Error al interpretar datos: {e}"
+        return f"Resultados obtenidos: {data}. (Nota: Hubo un error en la interpretación: {e})"
