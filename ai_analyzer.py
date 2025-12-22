@@ -1,4 +1,4 @@
-# ai_analyzer.py (VERSIÓN HÍBRIDA GARANTIZADA)
+# ai_analyzer.py (VERSIÓN 1.5 FLASH - OPTIMIZADA)
 
 from google import genai
 from google.genai import types
@@ -6,17 +6,18 @@ import os
 from datetime import datetime
 import re 
 
-# --- 1. CONFIGURACIÓN (Usando el modelo que sí te funciona) ---
+# --- 1. CONFIGURACIÓN ---
 API_KEY = os.environ.get("GEMINI_API_KEY") 
-MODEL_NAME = 'gemini-2.0-flash' # Cambiado a 2.0/2.5 según tu versión funcional
+# Volvemos al 1.5 que tiene límites de cuota más amplios en el plan gratuito
+MODEL_NAME = 'gemini-1.5-flash' 
 
 client = None
 if API_KEY:
     try:
         client = genai.Client(api_key=API_KEY)
-        print(f"INFO: Cliente Gemini ({MODEL_NAME}) inicializado correctamente.")
+        print(f"INFO: Cliente Gemini ({MODEL_NAME}) inicializado.")
     except Exception as e:
-        print(f"ERROR CRÍTICO: {e}")
+        print(f"ERROR: {e}")
 
 # --- 2. ESQUEMA DE LA BASE DE DATOS (PostgreSQL para Render) ---
 ESQUEMA_DB = """
@@ -40,38 +41,34 @@ def generate_sql_query(question, correction_context=None):
     
     fechas = get_fechas_analisis()
     
-    # Inyectamos tu LOGICA_NEGOCIO que tanto te gusta
     LOGICA_NEGOCIO = """
     1. 'Clientes de Alto Valor': Gasto total > promedio * 2.
     2. 'Clientes en Riesgo': Compras < promedio de compras.
-    3. Siempre usa ILIKE para nombres de ciudades o sucursales.
+    3. Usa ILIKE para nombres de ciudades o sucursales.
     """
 
     prompt = f"""
-    Eres un Analista de Datos Senior. Traduce la pregunta a SQL para POSTGRESQL.
-    
+    Eres un Analista Senior. Traduce a SQL para POSTGRESQL.
     {LOGICA_NEGOCIO}
     --- ESQUEMA ---
     {ESQUEMA_DB}
     --- CONTEXTO ---
-    Fecha actual: {fechas['fecha_actual']}
+    Fecha: {fechas['fecha_actual']}
     Pregunta: {question}
-    {f'ERROR ANTERIOR: {correction_context}' if correction_context else ''}
-    
+    {f'CORREGIR: {correction_context}' if correction_context else ''}
     Genera SOLO el código SQL SELECT:
     """
     
     try:
         response = client.models.generate_content(
-            model=MODEL_NAME, # Aquí usa el 2.0/2.5 que funciona
+            model=MODEL_NAME, 
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                system_instruction="Responde estrictamente con SQL SELECT para PostgreSQL. No expliques."
+                system_instruction="Generar solo SQL SELECT para PostgreSQL puro."
             )
         )
         
-        # Limpieza robusta
         sql_raw = response.text.strip()
         sql_query = re.search(r'SELECT.*', sql_raw, re.IGNORECASE | re.DOTALL)
         
@@ -90,10 +87,10 @@ def generate_ai_response(question, columns, data, sql_query, db_error):
     data_summary = f"Columnas: {columns}\nDatos: {data[:20]}"
     
     prompt = f"""
-    Eres un Analista de Negocios. Interpreta estos resultados de la base de datos.
+    Eres un Analista de Negocios. Interpreta estos resultados.
     Pregunta: {question}
     Resultados: {data_summary}
-    Instrucciones: Tabla Markdown elegante y respuesta profesional.
+    Responde con Tabla Markdown y análisis ejecutivo.
     """
     
     try:
