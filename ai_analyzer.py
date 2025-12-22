@@ -1,16 +1,15 @@
-import google.generativeai as genai
+import google.genai as genai
 import os
 import re
 from datetime import datetime
 
-# --- 1. CONFIGURACIÓN BASADA EN TU PRUEBA ---
+# --- 1. CONFIGURACIÓN ---
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if API_KEY:
-    genai.configure(api_key=API_KEY)
-    # Usamos el nombre exacto de tu lista que es ultra rápido
-    MODEL_NAME = 'gemini-2.0-flash' 
-    model = genai.GenerativeModel(MODEL_NAME)
+    client = genai.Client(api_key=API_KEY)
+    MODEL_NAME = "models/gemini-2.0-flash"   # rápido y económico
+    model = client.models.get(MODEL_NAME)
     print(f"INFO: Sistema vinculado al modelo: {MODEL_NAME}")
 else:
     model = None
@@ -18,7 +17,6 @@ else:
 
 # --- 2. ESQUEMA DE DATOS ---
 ESQUEMA_DB = """
--- Datos del Excel cargado (65 registros)
 ventas_externas (
     fecha_venta TIMESTAMP, cliente TEXT, producto TEXT, 
     categoria TEXT, cantidad INT, precio_unitario DECIMAL, 
@@ -28,35 +26,38 @@ ventas_externas (
 
 # --- 3. GENERACIÓN DE SQL ---
 def generate_sql_query(question, correction_context=None):
-    if not model: return None, "IA no configurada."
+    if not model: 
+        return None, "IA no configurada."
     
     prompt = f"""
-    Eres un experto en PostgreSQL. Genera SOLO el código SQL SELECT.
-    Esquema: {ESQUEMA_DB}
-    Pregunta: {question}
-    Instrucción: Usa ILIKE para textos y responde solo con el código.
-    """
-    
+Eres un experto en PostgreSQL. Genera SOLO el código SQL SELECT.
+Esquema: {ESQUEMA_DB}
+Pregunta: {question}
+Instrucción: Usa ILIKE para textos y responde solo con el código.
+"""
     try:
-        # Llamada directa y limpia
         response = model.generate_content(prompt)
-        sql_raw = response.text.strip()
+        sql_raw = (response.text or "").strip()
         
-        # Limpiar posibles etiquetas markdown
-        sql_match = re.search(r'SELECT.*', sql_raw, re.IGNORECASE | re.DOTALL)
+        sql_match = re.search(r'(SELECT|WITH).*', sql_raw, re.IGNORECASE | re.DOTALL)
         if sql_match:
-            return sql_match.group(0).replace('```sql', '').replace('```', '').split(';')[0].strip(), None
+            clean_sql = sql_match.group(0).replace('```sql', '').replace('```', '').split(';')[0].strip()
+            return clean_sql, None
         return sql_raw, None
     except Exception as e:
         return None, f"Error en IA: {str(e)}"
 
 # --- 4. INTERPRETACIÓN ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    if not model: return "IA desconectada."
+    if not model: 
+        return "IA desconectada."
     
-    data_summary = f"Columnas: {columns}\nDatos: {data[:15]}"
-    prompt = f"Actúa como consultor. Resume estos datos en una tabla Markdown: {data_summary}. Pregunta: {question}"
-    
+    data_summary = f"Columnas: {columns}\nDatos: {data[:10]}" if data else "Sin resultados."
+    prompt = f"""
+Actúa como consultor. Resume estos datos en una tabla Markdown elegante.
+Pregunta: {question}
+Datos: {data_summary}
+"""
     try:
         response = model.generate_content(prompt)
         return response.text
