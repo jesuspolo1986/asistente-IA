@@ -1,26 +1,24 @@
+# ai_analyzer.py (VERSIÓN HÍBRIDA GARANTIZADA)
+
 from google import genai
 from google.genai import types
 import os
 from datetime import datetime
 import re 
 
-# --- 1. CONFIGURACIÓN ---
+# --- 1. CONFIGURACIÓN (Usando el modelo que sí te funciona) ---
 API_KEY = os.environ.get("GEMINI_API_KEY") 
-
-# IMPORTANTE: En la nueva SDK 'google-genai', usamos solo el nombre.
-# Si sigue dando 404, la SDK está intentando usar v1beta internamente.
-MODEL_NAME = 'gemini-1.5-flash' 
+MODEL_NAME = 'gemini-2.0-flash' # Cambiado a 2.0/2.5 según tu versión funcional
 
 client = None
 if API_KEY:
     try:
-        # Inicializamos sin parámetros extra para que use la API v1 (Estable) por defecto
         client = genai.Client(api_key=API_KEY)
-        print(f"INFO: Cliente Gemini ({MODEL_NAME}) listo.")
+        print(f"INFO: Cliente Gemini ({MODEL_NAME}) inicializado correctamente.")
     except Exception as e:
-        print(f"ERROR: {e}")
+        print(f"ERROR CRÍTICO: {e}")
 
-# --- 2. ESQUEMA ---
+# --- 2. ESQUEMA DE LA BASE DE DATOS (PostgreSQL para Render) ---
 ESQUEMA_DB = """
 Ciudades (id_ciudad INT PRIMARY KEY, nombre_ciudad TEXT, pais TEXT);
 Categorias (id_categoria INT PRIMARY KEY, nombre_categoria TEXT);
@@ -31,58 +29,75 @@ Ventas (id_venta SERIAL PRIMARY KEY, id_cliente INT REFERENCES Clientes(id_clien
 DetalleVenta (id_detalle SERIAL PRIMARY KEY, id_venta INT REFERENCES Ventas(id_venta), id_producto INT REFERENCES Productos(id_producto), cantidad INT, subtotal DECIMAL);
 """
 
+# --- 3. UTILIDADES ---
 def get_fechas_analisis():
     now = datetime.now()
     return {"fecha_actual": now.strftime("%Y-%m-%d %H:%M:%S")}
 
 # --- 4. GENERACIÓN DE SQL ---
 def generate_sql_query(question, correction_context=None):
-    if not client: return None, "Error: Cliente no inicializado"
+    if not client: return None, "Error de Cliente"
     
     fechas = get_fechas_analisis()
+    
+    # Inyectamos tu LOGICA_NEGOCIO que tanto te gusta
+    LOGICA_NEGOCIO = """
+    1. 'Clientes de Alto Valor': Gasto total > promedio * 2.
+    2. 'Clientes en Riesgo': Compras < promedio de compras.
+    3. Siempre usa ILIKE para nombres de ciudades o sucursales.
+    """
+
     prompt = f"""
-    Eres un Analista Senior de PostgreSQL. 
-    Traduce a SQL: {question}
-    Esquema: {ESQUEMA_DB}
-    Fecha: {fechas['fecha_actual']}
-    {f'Error previo: {correction_context}' if correction_context else ''}
-    Genera solo el código SQL SELECT.
+    Eres un Analista de Datos Senior. Traduce la pregunta a SQL para POSTGRESQL.
+    
+    {LOGICA_NEGOCIO}
+    --- ESQUEMA ---
+    {ESQUEMA_DB}
+    --- CONTEXTO ---
+    Fecha actual: {fechas['fecha_actual']}
+    Pregunta: {question}
+    {f'ERROR ANTERIOR: {correction_context}' if correction_context else ''}
+    
+    Genera SOLO el código SQL SELECT:
     """
     
     try:
-        # CAMBIO CRÍTICO: Usamos el modelo tal cual, la SDK v1.0+ 
-        # debería mapearlo a la versión estable de la API.
         response = client.models.generate_content(
-            model=MODEL_NAME,
+            model=MODEL_NAME, # Aquí usa el 2.0/2.5 que funciona
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                system_instruction="Generar solo SQL puro para PostgreSQL."
+                system_instruction="Responde estrictamente con SQL SELECT para PostgreSQL. No expliques."
             )
         )
         
-        sql_text = response.text.strip()
-        sql_text = re.sub(r'```(?:sql)?|```', '', sql_text).strip()
-        sql_match = re.search(r'SELECT.*', sql_text, re.IGNORECASE | re.DOTALL)
+        # Limpieza robusta
+        sql_raw = response.text.strip()
+        sql_query = re.search(r'SELECT.*', sql_raw, re.IGNORECASE | re.DOTALL)
         
-        if sql_match:
-            return sql_match.group(0).split(';')[0].strip(), None
-        return sql_text, "Formato SQL inválido"
+        if sql_query:
+            clean_sql = sql_query.group(0).replace('```sql', '').replace('```', '').split(';')[0].strip()
+            return clean_sql, None
+        return sql_raw, "Error de formato"
 
     except Exception as e:
-        # Capturamos el error exacto para diagnosticar
-        return None, f"Error en generate_sql_query: {str(e)}"
+        return None, str(e)
 
 # --- 5. INTERPRETACIÓN ---
 def generate_ai_response(question, columns, data, sql_query, db_error):
-    if not client: return "Error: IA Offline."
+    if not client: return "Error de Cliente"
     
     data_summary = f"Columnas: {columns}\nDatos: {data[:20]}"
-    prompt_analisis = f"Analiza estos datos de supermercado para responder: {question}\nDatos: {data_summary}"
+    
+    prompt = f"""
+    Eres un Analista de Negocios. Interpreta estos resultados de la base de datos.
+    Pregunta: {question}
+    Resultados: {data_summary}
+    Instrucciones: Tabla Markdown elegante y respuesta profesional.
+    """
     
     try:
-        # Usamos la misma llamada simplificada
-        response = client.models.generate_content(model=MODEL_NAME, contents=prompt_analisis)
+        response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
         return response.text
     except Exception as e:
         return f"Error en interpretación: {e}"
