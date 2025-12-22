@@ -25,19 +25,26 @@
 
         /* KPI CARDS */
         .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; display: none; }
-        .kpi-card { background: var(--kpi-bg); padding: 15px; border-radius: 10px; border-left: 5px solid var(--accent); text-align: center; }
+        .kpi-card { background: var(--kpi-bg); padding: 15px; border-radius: 10px; border-left: 5px solid var(--accent); text-align: center; transition: transform 0.2s; }
+        .kpi-card:hover { transform: translateY(-3px); }
         .kpi-title { font-size: 0.75rem; text-transform: uppercase; opacity: 0.8; display: block; margin-bottom: 5px; color: var(--text); }
         .kpi-value { font-size: 1.2rem; font-weight: bold; color: var(--accent); }
 
         /* HISTORIAL */
-        .history-section { margin-bottom: 15px; }
-        .history-tag { display: inline-block; background: var(--border); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; margin: 3px; cursor: pointer; transition: 0.2s; opacity: 0.8; }
+        .history-section { margin-bottom: 15px; min-height: 40px; }
+        .history-tag { display: inline-block; background: var(--border); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; margin: 3px; cursor: pointer; transition: 0.2s; opacity: 0.8; color: var(--text); }
         .history-tag:hover { background: var(--accent); color: white; opacity: 1; }
 
-        textarea { width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--bg); color: var(--text); box-sizing: border-box; min-height: 80px; }
+        /* LOADING SKELETON */
+        .skeleton { height: 20px; background: linear-gradient(90deg, var(--bg) 25%, var(--border) 50%, var(--bg) 75%); background-size: 200% 100%; animation: loading 1.5s infinite; border-radius: 4px; margin: 10px 0; }
+        @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        textarea { width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--bg); color: var(--text); box-sizing: border-box; min-height: 80px; resize: none; }
         
         .button-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        #sendButton { background-color: #28a745; color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; font-size: 16px; flex-grow: 1; font-weight: 600; }
+        #sendButton { background-color: #28a745; color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; font-size: 16px; flex-grow: 1; font-weight: 600; transition: 0.2s; }
+        #sendButton:hover { background-color: #218838; }
+        #sendButton:disabled { background-color: #ccc; cursor: not-allowed; }
         #btn-micro { background-color: #6c757d; color: white; border: none; border-radius: 8px; width: 55px; cursor: pointer; font-size: 20px; }
         
         .recording { background-color: #dc3545 !important; animation: pulse 1.5s infinite; }
@@ -48,7 +55,7 @@
         
         #btn-pdf { width: 100%; background-color: var(--accent); color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; font-weight: bold; display: none; margin-top: 15px; }
 
-        .chart-container { margin-top: 20px; background: white; padding: 15px; border-radius: 8px; display: none; width: 95%; margin-left: auto; margin-right: auto; }
+        .chart-container { margin-top: 20px; background: white; padding: 15px; border-radius: 8px; display: none; width: 95%; margin: 20px auto; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; color: black; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 0.9em; }
@@ -61,13 +68,13 @@
 
 <div class="container">
     <div class="header-box">
-        <h1>📊 BI Analysis System</h1>
+        <h1>📊 AI Pro Analyst</h1>
         <button class="theme-switch" onclick="toggleTheme()" id="themeBtn">☀️</button>
     </div>
 
     <div class="history-section" id="historialContainer"></div>
 
-    <textarea id="questionInput" placeholder="Dicta o escribe tu consulta de negocio..."></textarea>
+    <textarea id="questionInput" placeholder="Escribe tu consulta de negocio (ej: Ventas por categoría)..."></textarea>
 
     <div class="button-group">
         <button id="btn-micro" onclick="activarVoz()" title="Usar Micrófono">🎤</button>
@@ -77,32 +84,31 @@
     <div class="kpi-container" id="kpiBox">
         <div class="kpi-card">
             <span class="kpi-title">Métrica Principal</span>
-            <span id="kpiValue1" class="kpi-value">$0</span>
+            <span id="kpiValue1" class="kpi-value">--</span>
         </div>
         <div class="kpi-card">
-            <span class="kpi-title">Variación/Ref</span>
-            <span id="kpiValue2" class="kpi-value">-</span>
+            <span class="kpi-title">Líder de Segmento</span>
+            <span id="kpiValue2" class="kpi-value">--</span>
         </div>
     </div>
 
     <div id="reportWrapper">
         <div id="responseArea">
-            <p style="text-align: center; opacity: 0.5;">Esperando consulta...</p>
+            <p style="text-align: center; opacity: 0.5;">Listo para analizar tus datos comerciales.</p>
         </div>
         <div id="chartWrapper" class="chart-container">
             <canvas id="myChart"></canvas>
         </div>
     </div>
 
-    <button id="btn-pdf" onclick="descargarInforme()">📥 Descargar Informe Ejecutivo (PDF)</button>
+    <button id="btn-pdf" onclick="descargarInforme()">📥 Descargar Informe PDF</button>
 
-    <p class="footer-info">Powered by Gemini AI Engine | Data: Supermercado_DB_v3</p>
+    <p class="footer-info">Sistema de Inteligencia de Negocios | 2025 AI Analyst Project</p>
 </div>
 
 <script>
     const API_ENDPOINT = "https://asistente-ia-ksrx.onrender.com/api/consulta";
     let myChartInstance = null;
-    let chatHistory = "";
 
     function toggleTheme() {
         const body = document.body;
@@ -110,7 +116,6 @@
         document.getElementById('themeBtn').innerHTML = body.classList.contains('dark-mode') ? "☀️" : "🌙";
     }
 
-    // --- LÓGICA DE HISTORIAL ---
     function guardarEnHistorial(pregunta) {
         let historial = JSON.parse(localStorage.getItem('analyst_history')) || [];
         if (!historial.includes(pregunta)) {
@@ -134,10 +139,9 @@
         sendQuery();
     }
 
-    // --- LÓGICA DE VOZ ---
     function activarVoz() {
         const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!Recognition) return alert("Navegador no compatible");
+        if (!Recognition) return alert("Navegador no compatible con reconocimiento de voz.");
         const rec = new Recognition();
         rec.lang = 'es-ES';
         rec.onstart = () => document.getElementById('btn-micro').classList.add('recording');
@@ -146,7 +150,6 @@
         rec.start();
     }
 
-    // --- EXTRACCIÓN DE DATOS Y KPIs ---
     function extraerYGraficar(texto) {
         const wrapper = document.getElementById('chartWrapper');
         const kpiBox = document.getElementById('kpiBox');
@@ -158,48 +161,50 @@
             const match = linea.match(/([a-zA-Záéíóú\s]+)[|:]\s*([\d,.]+)/);
             if (match) {
                 etiquetas.push(match[1].trim());
-                let val = parseFloat(match[2].replace(/\./g, '').replace(',', '.')); // Mejor manejo de miles/decimales
+                let val = parseFloat(match[2].replace(/\./g, '').replace(',', '.'));
                 valores.push(val);
             }
         });
 
         if (etiquetas.length > 0 && valores.length > 0) {
-            // Actualizar KPIs con los valores más relevantes (máximo y total)
             kpiBox.style.display = 'grid';
-            const total = valores.reduce((a, b) => a + b, 0);
-            document.getElementById('kpiValue1').innerText = valores[0].toLocaleString('es-ES');
+            document.getElementById('kpiValue1').innerText = valores[0].toLocaleString('es-ES', { style: 'currency', currency: 'USD' });
             document.getElementById('kpiValue2').innerText = etiquetas[0];
 
             wrapper.style.display = 'block';
             if (myChartInstance) myChartInstance.destroy();
 
-            // Decidir tipo de gráfico: Si hay menos de 4 categorías, usar Dona
-            const chartType = etiquetas.length <= 4 ? 'doughnut' : 'bar';
+            const isDoughnut = etiquetas.length <= 4;
 
             myChartInstance = new Chart(ctx, {
-                type: chartType,
+                type: isDoughnut ? 'doughnut' : 'bar',
                 data: {
                     labels: etiquetas,
                     datasets: [{
-                        label: 'Métricas de Negocio',
+                        label: 'Volumen detectado',
                         data: valores,
-                        backgroundColor: [
-                            '#007bffaa', '#28a745aa', '#ffc107aa', '#dc3545aa', '#6610f2aa'
-                        ],
-                        borderColor: '#007bff',
+                        backgroundColor: ['#58a6ffaa', '#2ea043aa', '#f0883eaa', '#f85149aa', '#8957e5aa'],
+                        borderColor: '#30363d',
                         borderWidth: 1
                     }]
                 },
                 options: {
-                    animation: false, 
                     responsive: true,
-                    plugins: { legend: { display: chartType === 'doughnut' } },
-                    scales: chartType === 'bar' ? { y: { beginAtZero: true } } : {}
+                    animation: { duration: 1000 },
+                    plugins: { 
+                        legend: { display: isDoughnut, position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(item) {
+                                    let sum = item.dataset.data.reduce((a, b) => a + b, 0);
+                                    let pct = (item.raw * 100 / sum).toFixed(1) + "%";
+                                    return `${item.label}: ${item.raw.toLocaleString()} (${pct})`;
+                                }
+                            }
+                        }
+                    }
                 }
             });
-        } else {
-            wrapper.style.display = 'none';
-            kpiBox.style.display = 'none';
         }
     }
 
@@ -213,10 +218,16 @@
         if (!question) return;
 
         guardarEnHistorial(question);
-
         sendButton.disabled = true;
         pdfBtn.style.display = 'none';
-        responseArea.innerHTML = '<p style="text-align: center; color: #f39c12;">⏳ Procesando inteligencia empresarial...</p>';
+        
+        // Efecto Skeleton durante la carga
+        responseArea.innerHTML = `
+            <div class="skeleton"></div>
+            <div class="skeleton" style="width:80%"></div>
+            <div class="skeleton" style="width:90%"></div>
+            <p style="text-align: center; color: var(--accent);">Analizando datos en tiempo real...</p>
+        `;
 
         try {
             const response = await fetch(API_ENDPOINT, {
@@ -229,59 +240,39 @@
             if (data.status === 'success') {
                 const fecha = new Date().toLocaleString();
                 responseArea.innerHTML = `
-                    <div style="background:white; padding:10px; border-radius:5px;">
-                        <h2 style="color:#007bff; border-bottom:2px solid #007bff; padding-bottom:5px;">Reporte Ejecutivo</h2>
-                        <p style="font-size:0.8em; color:#666;">Generado el: ${fecha}</p>
-                        <hr style="border:0; border-top:1px solid #eee;">
-                        <div style="margin-top:15px; color:#1c1e21;">${data.response.replace(/\n/g, '<br>')}</div>
+                    <div style="background:white; padding:15px; border-radius:8px;">
+                        <h2 style="color:#007bff; border-bottom:2px solid #007bff; padding-bottom:10px; margin-top:0;">Reporte de Inteligencia</h2>
+                        <p style="font-size:0.85em; color:#666;">Generado: ${fecha}</p>
+                        <div style="margin-top:20px; color:#1c1e21; font-size:1.05em;">${data.response.replace(/\n/g, '<br>')}</div>
                     </div>
                 `;
                 extraerYGraficar(data.response);
-                setTimeout(() => { pdfBtn.style.display = 'block'; }, 500);
-                input.value = "";
+                setTimeout(() => { pdfBtn.style.display = 'block'; }, 600);
             } else {
-                responseArea.innerHTML = `<p style="color:red;">Error: ${data.response}</p>`;
+                responseArea.innerHTML = `<p style="color:#f85149;">⚠️ ${data.response}</p>`;
             }
         } catch (e) {
-            responseArea.innerHTML = `<p style="color:red;">Error de conexión con el motor IA.</p>`;
+            responseArea.innerHTML = `<p style="color:#f85149;">Error crítico de conexión con el motor IA.</p>`;
         } finally {
             sendButton.disabled = false;
         }
     }
 
     function descargarInforme() {
-        const elemento = document.getElementById('reportWrapper');
-        const kpiCopy = document.getElementById('kpiBox').cloneNode(true);
-        const chartCanvas = document.getElementById('myChart');
+        const element = document.getElementById('reportWrapper');
         const pdfBtn = document.getElementById('btn-pdf');
-        
-        pdfBtn.style.visibility = 'hidden';
-
-        // Preparar clon para PDF
-        const pdfContent = document.createElement('div');
-        kpiCopy.style.display = 'grid'; // Asegurar que sea visible en el clon
-        pdfContent.appendChild(kpiCopy);
-        pdfContent.appendChild(elemento.cloneNode(true));
-
-        let tempImage = null;
-        if (chartCanvas && chartCanvas.style.display !== 'none') {
-            tempImage = new Image();
-            tempImage.src = chartCanvas.toDataURL('image/png');
-            tempImage.style.width = "100%";
-            tempImage.style.marginTop = "20px";
-            pdfContent.appendChild(tempImage);
-        }
+        pdfBtn.style.display = 'none';
 
         const opt = {
-            margin: [0.5, 0.5],
-            filename: 'Analisis_Pro_Report.pdf',
+            margin: 0.4,
+            filename: 'Analisis_Negocio_Pro.pdf',
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
             jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
 
-        html2pdf().set(opt).from(pdfContent).save().then(() => {
-            pdfBtn.style.visibility = 'visible';
+        html2pdf().set(opt).from(element).save().then(() => {
+            pdfBtn.style.display = 'block';
         });
     }
 </script>
