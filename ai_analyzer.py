@@ -1,10 +1,11 @@
-# ai_analyzer.py (VERSIÓN PROFESIONAL CON DICCIONARIO DE SINÓNIMOS)
+# ai_analyzer.py (VERSIÓN PROFESIONAL CON SEGMENTACIÓN)
 
 from google import genai
 from google.genai import types
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import re 
+from db_manager import execute_dynamic_query, main_db_setup 
 
 # --- 1. CONFIGURACIÓN ---
 API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_FALLBACK_API_KEY_HERE") 
@@ -39,61 +40,53 @@ def get_fechas_analisis():
         "mes_actual": now.strftime("%Y-%m"),
     }
 
-# --- 4. GENERACIÓN DE SQL CON DICCIONARIO DE SINÓNIMOS ---
+# --- 4. GENERACIÓN DE SQL CON CAPA DE NEGOCIO ---
 def generate_sql_query(question, correction_context=None):
     if not client: return None, "Error de Cliente"
     
     fechas = get_fechas_analisis()
     
-    # DICCIONARIO DE SINÓNIMOS Y REGLAS DE NEGOCIO
+    # REGLAS DE NEGOCIO INYECTADAS
+# --- REGLAS DE NEGOCIO DINÁMICAS (ADAPTABLES A CUALQUIER INDUSTRIA) ---
     LOGICA_NEGOCIO = """
-    DICCIONARIO DE SINÓNIMOS (Mapeo de lenguaje natural a Columnas):
-    1. 'Precio', 'Costo', 'Caro', 'Barato', 'Valor unitario' -> Usa siempre: Productos.precio
-    2. 'Gasto total', 'Monto', 'Ingresos', 'Venta total' -> Usa siempre: Ventas.total
-    3. 'Cuántos', 'Unidades', 'Volumen', 'Stock vendido' -> Usa siempre: DetalleVenta.cantidad
-    4. 'Categoría', 'Tipo de producto', 'Línea' -> Usa siempre: Categorias.nombre_categoria
-    5. 'Ubicación', 'Lugar', 'Donde' -> Usa siempre: Ciudades.nombre_ciudad o Sucursales.nombre_sucursal
+    1. 'Clientes de Alto Valor': Son aquellos cuyo gasto total acumulado es SUPERIOR al promedio de gasto de toda la base de datos multiplicado por 2. 
+       Lógica SQL: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING SUM(total) > (SELECT AVG(total) * 2 FROM Ventas))
 
-    REGLAS DE SEGMENTACIÓN:
-    - 'Clientes de Alto Valor': SUM(Ventas.total) > (SELECT AVG(total) * 2 FROM Ventas).
-    - 'Productos estrella': Los más vendidos en DetalleVenta.
-    - Búsqueda de nombres: Usa siempre LIKE '%texto%' para nombres de ciudades, productos o clientes.
+    2. 'Clientes en Riesgo': Clientes que tienen un número de compras inferior al promedio de compras por cliente.
+       Lógica SQL: WHERE id_cliente IN (SELECT id_cliente FROM Ventas GROUP BY id_cliente HAVING COUNT(id_venta) < (SELECT COUNT(*) * 1.0 / COUNT(DISTINCT id_cliente) FROM Ventas))
+
+    3. 'Sucursales y Ubicaciones': Siempre usa JOIN con la tabla Sucursales. Si el usuario menciona un nombre (ej. 'Norte'), usa LIKE '%Norte%' para ser flexible con nombres compuestos como 'Norte Bogotá'.
     """
 
     prompt = f"""
-    Eres un Analista de Datos Senior experto en SQLite. Traduce la pregunta a SQL.
+    Eres un Analista de Datos Senior. Traduce la pregunta a SQL para SQLite.
     
     {LOGICA_NEGOCIO}
 
-    --- ESQUEMA DE TABLAS ---
+    --- ESQUEMA ---
     {ESQUEMA_DB}
 
-    --- CONTEXTO ---
+    --- CONTEXTO TEMPORAL ---
     Fecha actual: {fechas['fecha_actual']}
-    Pregunta: {question}
-    {f'ERROR A CORREGIR: {correction_context}' if correction_context else ''}
     
-    Instrucción: Genera estrictamente el código SQL SELECT. Si la pregunta requiere unir tablas, usa JOIN.
+    Pregunta: {question}
+    {f'ERROR ANTERIOR: {correction_context}' if correction_context else ''}
+    
+    Genera SOLO el código SQL SELECT:
     """
     
     try:
         response = client.models.generate_content(
-            model='models/gemini-1.5-flash', # Actualizado a la versión más reciente
+            model='gemini-2.5-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                system_instruction="Responde solo con la consulta SQL. Sin explicaciones ni bloques de código markdown."
+                system_instruction="Responde estrictamente con SQL SELECT. No expliques."
             )
         )
         
-        # Limpieza de la respuesta para obtener solo el SELECT
-        clean_text = response.text.strip().replace('```sql', '').replace('```', '')
-        sql_match = re.search(r'SELECT.*', clean_text, re.IGNORECASE | re.DOTALL)
-        
-        if sql_match:
-            query = sql_match.group(0).split(';')[0].strip()
-            return query, None
-        return clean_text, "Error de formato SQL"
+        sql_query = re.search(r'SELECT.*', response.text.strip(), re.IGNORECASE | re.DOTALL)
+        return (sql_query.group(0).split(';')[0].strip(), None) if sql_query else (response.text, "Error de formato")
 
     except Exception as e:
         return None, str(e)
@@ -102,25 +95,22 @@ def generate_sql_query(question, correction_context=None):
 def generate_ai_response(question, columns, data, sql_query, db_error):
     if not client: return "Error de Cliente"
     
-    data_summary = f"Columnas: {columns}\nDatos: {data[:20]}" 
-    if not data: data_summary = "No se encontraron resultados."
+    data_summary = f"Columnas: {columns}\nDatos: {data[:20]}" # Enviamos top 20 para ahorrar tokens
+    if not data: data_summary = "No se encontraron resultados para esta consulta."
 
     prompt = f"""
-    Eres un Analista de Negocios Senior. Interpreta estos datos para un informe ejecutivo.
-    
-    Pregunta: {question}
-    SQL Ejecutado: {sql_query}
+    Eres un Analista de Negocios. Interpreta estos resultados de la base de datos.
+    Pregunta del usuario: {question}
     Resultados: {data_summary}
     
-    Reglas de respuesta:
-    1. Usa un tono muy profesional y ejecutivo.
-    2. Si hay datos numéricos, relaciónalos con la pregunta (ej. 'El producto más caro es...').
-    3. Si el resultado es una lista de categorías o ciudades con montos, nómbralos en la interpretación.
-    4. Usa Markdown para tablas y negritas.
+    Instrucciones:
+    1. Si hay datos, preséntalos en una tabla Markdown elegante.
+    2. Responde de forma muy profesional, como un consultor.
+    3. Si no hay datos, explica que no hay registros que cumplan con los criterios de ese segmento.
     """
     
     try:
-        response = client.models.generate_content(model='models/gemini-1.5-flash', contents=prompt)
+        response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         return response.text
     except Exception as e:
         return f"Error en interpretación: {e}"
