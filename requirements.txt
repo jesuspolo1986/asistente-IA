@@ -19,4 +19,4 @@ faker==25.2.0
 flask-cors==4.0.1
 pandas==2.2.2
 openpyxl==3.1.2
-python-dotenv==1.0.1   # opcional, útil para manejar variables de entorno en local
+python-dotenv==1.0.1
