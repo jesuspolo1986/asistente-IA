@@ -1,9 +1,10 @@
 import os
+import asyncio
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 # Importaciones de tus módulos personalizados
-from db_manager import get_db_connection, create_tables, execute_dynamic_query
+from db_manager import create_tables, execute_dynamic_query
 from data_uploader import procesar_y_cargar_excel
 import ai_analyzer  # Debe estar actualizado con google-genai
 
@@ -16,7 +17,10 @@ if not os.path.exists("uploads"):
     os.makedirs("uploads")
 
 print("INFO: Iniciando infraestructura en Render...")
-create_tables()
+
+# Inicializamos tablas de manera asincrónica
+loop = asyncio.get_event_loop()
+loop.run_until_complete(create_tables())
 
 # --- RUTAS DE NAVEGACIÓN ---
 @app.route('/', methods=['GET'])
@@ -37,7 +41,7 @@ def upload_file():
         file_path = os.path.join("uploads", file.filename)
         file.save(file_path)
         
-        # Procesar Excel con SQLAlchemy
+        # Procesar Excel con SQLAlchemy (puede ser síncrono)
         success, message = procesar_y_cargar_excel(file_path)
         
         # Eliminar archivo temporal
@@ -67,8 +71,15 @@ def handle_query():
         if error_ai:
             return jsonify({"answer": f"⚠️ Error de IA: {error_ai}"})
 
-        # 2. Ejecutar SQL en la BD
-        columns, results, db_error = execute_dynamic_query(sql_query)
+        # 2. Ejecutar SQL en la BD (async)
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(execute_dynamic_query(sql_query))
+
+        if isinstance(result, tuple) and len(result) == 3:
+            columns, results, db_error = result
+        else:
+            columns, results, db_error = [], [], None
+
         if db_error:
             return jsonify({"answer": f"❌ Error de Base de Datos: {db_error}"})
 
