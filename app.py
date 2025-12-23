@@ -1,11 +1,11 @@
 import os
-from flask import Flask, jsonify, request, send_from_directory, redirect
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 # Importaciones de tus módulos personalizados
-from db_manager import get_db_connection, create_tables 
+from db_manager import get_db_connection, create_tables, execute_dynamic_query
 from data_uploader import procesar_y_cargar_excel
-import ai_analyzer # Asegúrate de que este es el nombre de tu archivo de IA
+import ai_analyzer  # Debe estar actualizado con google-genai
 
 app = Flask(__name__)
 CORS(app)
@@ -16,16 +16,14 @@ if not os.path.exists("uploads"):
     os.makedirs("uploads")
 
 print("INFO: Iniciando infraestructura en Render...")
-create_tables() 
+create_tables()
 
 # --- RUTAS DE NAVEGACIÓN ---
-
 @app.route('/', methods=['GET'])
 def serve_frontend():
     return send_from_directory('.', 'index.html')
 
 # --- RUTA DE CARGA DE EXCEL ---
-
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -39,14 +37,13 @@ def upload_file():
         file_path = os.path.join("uploads", file.filename)
         file.save(file_path)
         
-        # Llamamos al procesador de Excel que usa SQLAlchemy
+        # Procesar Excel con SQLAlchemy
         success, message = procesar_y_cargar_excel(file_path)
         
-        # Eliminamos el archivo temporal después de procesarlo para no llenar el disco
+        # Eliminar archivo temporal
         if os.path.exists(file_path):
             os.remove(file_path)
             
-        # Retornamos un mensaje sencillo y un botón para volver
         color = "green" if success else "red"
         return f"""
         <div style="font-family:sans-serif; text-align:center; margin-top:50px;">
@@ -56,8 +53,6 @@ def upload_file():
         """
 
 # --- RUTA DEL ANALISTA (CHAT) ---
-# Cambiamos /api/consulta a /ask para que coincida con tu index.html
-
 @app.route('/ask', methods=['POST'])
 def handle_query():
     try:
@@ -67,17 +62,13 @@ def handle_query():
         if not question:
             return jsonify({"answer": "Por favor, escribe una pregunta válida."}), 400
 
-        # 1. Generar SQL usando el ai_analyzer
+        # 1. Generar SQL con IA
         sql_query, error_ai = ai_analyzer.generate_sql_query(question)
-        
         if error_ai:
             return jsonify({"answer": f"⚠️ Error de IA: {error_ai}"})
 
-        # 2. Ejecutar SQL en la base de datos
-        # Usamos una conexión fresca para cada consulta (mejor para Render)
-        from db_manager import execute_dynamic_query
+        # 2. Ejecutar SQL en la BD
         columns, results, db_error = execute_dynamic_query(sql_query)
-
         if db_error:
             return jsonify({"answer": f"❌ Error de Base de Datos: {db_error}"})
 
