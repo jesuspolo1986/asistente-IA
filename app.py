@@ -42,8 +42,7 @@ def upload():
         else:
             # Si el error persiste, podrías probar con skiprows=1 o 2 
             # si el archivo tiene muchas filas vacías al inicio
-            df = pd.read_excel(BytesIO(file.read()))
-
+           df = pd.read_excel(BytesIO(file.read()), skiprows=5)
         # 2. Limpieza de columnas "Unnamed" y basura
         df = df.loc[:, ~df.columns.str.contains('^Unnamed', case=False, na=False)]
         df.columns = [c.strip().replace(' ', '_').lower() for c in df.columns]
