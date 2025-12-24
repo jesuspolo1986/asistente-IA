@@ -36,34 +36,31 @@ def upload():
     
     file = request.files['file']
     try:
-        # 1. Leer el archivo (usamos header=0 para buscar los títulos)
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(file)
-        else:
-            # Si el error persiste, podrías probar con skiprows=1 o 2 
-            # si el archivo tiene muchas filas vacías al inicio
-           df = pd.read_excel(BytesIO(file.read()), skiprows=5)
-        # 2. Limpieza de columnas "Unnamed" y basura
-        df = df.loc[:, ~df.columns.str.contains('^Unnamed', case=False, na=False)]
-        df.columns = [c.strip().replace(' ', '_').lower() for c in df.columns]
-        
-        # Eliminamos filas que estén totalmente vacías
-        df = df.dropna(how='all')
+        # 1. Leer desde la fila 11 (índice 10 en Python) 
+        # donde están "APELLIDOS Y NOMBRES", "Promedio", etc.
+        df = pd.read_excel(BytesIO(file.read()), skiprows=10)
 
-        # 3. Carga Flexible a la DB
+        # 2. Limpieza de columnas vacías provocadas por celdas combinadas
+        # Solo nos quedamos con las columnas que tienen nombres legibles
+        df = df.loc[:, ~df.columns.str.contains('^Unnamed', case=False, na=False)]
+        
+        # 3. Eliminar filas vacías (como la fila 16 de tu imagen que está en blanco)
+        df = df.dropna(subset=[df.columns[0]]) # Si no hay nombre, se elimina la fila
+
+        # 4. Normalizar nombres de columnas
+        df.columns = [str(c).strip().replace('\n', ' ').lower() for c in df.columns]
+
+        # 5. Carga a la base de datos
         db_url = os.environ.get("DATABASE_URL")
         engine = create_engine(db_url)
-        
-        # 'replace' borrará la tabla de ventas vieja y creará una 
-        # con las columnas reales de tu Excel (Alumno, Nota, etc.)
-        df.to_sql('datos_negocio', engine, if_exists='replace', index=False)
+        df.to_sql('planila_notas', engine, if_exists='replace', index=False)
 
         return jsonify({
-            "reply": f"✅ ¡Sincronización Exitosa! Se detectaron las columnas: {', '.join(df.columns)}. Se cargaron {len(df)} registros."
+            "reply": f"✅ ¡Sincronización Exitosa! Se detectó la planilla de: {df.columns[0].upper()}. Se cargaron {len(df)} alumnos correctamente."
         })
     
     except Exception as e:
-        return jsonify({"error": f"Error técnico: {str(e)}"}), 500
+        return jsonify({"error": f"Error en el formato: {str(e)}"}), 500
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
