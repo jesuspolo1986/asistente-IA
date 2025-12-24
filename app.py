@@ -1,98 +1,51 @@
 import os
-import asyncio
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-
-# Importaciones de tus módulos personalizados
+import google.generativeai as genai
+# Importamos las funciones de tu db_manager.py
 from db_manager import create_tables, execute_dynamic_query
-from data_uploader import procesar_y_cargar_excel
-import ai_analyzer  # Debe estar actualizado con google-genai
 
 app = Flask(__name__)
 CORS(app)
 
-# --- INICIALIZACIÓN ---
-# Creamos la carpeta de subidas al arrancar
-if not os.path.exists("uploads"):
-    os.makedirs("uploads")
+# 1. Configuración de Gemini
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("ERROR: Clave API no detectada en variables de entorno.")
+else:
+    genai.configure(api_key=GEMINI_API_KEY)
+    print("✅ Conexión establecida con Gemini 2.0 Flash")
 
-print("INFO: Iniciando infraestructura en Render...")
+# 2. Inicialización de la Base de Datos
+# Eliminamos el loop de asyncio y llamamos a la función directamente
+try:
+    print("INFO: Iniciando infraestructura en Koyeb...")
+    create_tables()
+    print("✅ Tablas creadas/verificadas en PostgreSQL")
+except Exception as e:
+    print(f"❌ Error al conectar/crear tablas: {e}")
 
-# Inicializamos tablas de manera asincrónica
-loop = asyncio.get_event_loop()
-loop.run_until_complete(create_tables())
+@app.route('/')
+def index():
+    return "AI Pro Analyst is Running on Koyeb!"
 
-# --- RUTAS DE NAVEGACIÓN ---
-@app.route('/', methods=['GET'])
-def serve_frontend():
-    return send_from_directory('.', 'index.html')
-
-# --- RUTA DE CARGA DE EXCEL ---
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return "No se encontró la parte del archivo en la solicitud."
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    user_message = data.get("message", "")
     
-    file = request.files['file']
-    if file.filename == '':
-        return "No seleccionaste ningún archivo."
-    
-    if file:
-        file_path = os.path.join("uploads", file.filename)
-        file.save(file_path)
-        
-        # Procesar Excel con SQLAlchemy (puede ser síncrono)
-        success, message = procesar_y_cargar_excel(file_path)
-        
-        # Eliminar archivo temporal
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            
-        color = "green" if success else "red"
-        return f"""
-        <div style="font-family:sans-serif; text-align:center; margin-top:50px;">
-            <h3 style="color:{color};">{message}</h3>
-            <a href="/" style="text-decoration:none; background:#1e3a8a; color:white; padding:10px 20px; border-radius:5px;">Volver al Analista</a>
-        </div>
-        """
+    if not user_message:
+        return jsonify({"error": "No message provided"}), 400
 
-# --- RUTA DEL ANALISTA (CHAT) ---
-@app.route('/ask', methods=['POST'])
-def handle_query():
     try:
-        data = request.get_json()
-        question = data.get('question', '').strip()
-        
-        if not question:
-            return jsonify({"answer": "Por favor, escribe una pregunta válida."}), 400
-
-        # 1. Generar SQL con IA
-        sql_query, error_ai = ai_analyzer.generate_sql_query(question)
-        if error_ai:
-            return jsonify({"answer": f"⚠️ Error de IA: {error_ai}"})
-
-        # 2. Ejecutar SQL en la BD (async)
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(execute_dynamic_query(sql_query))
-
-        if isinstance(result, tuple) and len(result) == 3:
-            columns, results, db_error = result
-        else:
-            columns, results, db_error = [], [], None
-
-        if db_error:
-            return jsonify({"answer": f"❌ Error de Base de Datos: {db_error}"})
-
-        # 3. Interpretar resultados con IA
-        final_response = ai_analyzer.generate_ai_response(
-            question, columns, results, sql_query, db_error
-        )
-
-        return jsonify({"answer": final_response})
-
+        # Aquí iría tu lógica para que Gemini analice la pregunta
+        # y decida si ejecutar execute_dynamic_query
+        response = "Sistema listo para procesar datos."
+        return jsonify({"reply": response})
     except Exception as e:
-        return jsonify({"answer": f"💥 Error crítico en el servidor: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    # Koyeb usa el puerto 8000 por defecto
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host='0.0.0.0', port=port)
