@@ -36,31 +36,46 @@ def upload():
     
     file = request.files['file']
     try:
-        # 1. Leer desde la fila 11 (índice 10 en Python) 
-        # donde están "APELLIDOS Y NOMBRES", "Promedio", etc.
-        df = pd.read_excel(BytesIO(file.read()), skiprows=10)
+        # 1. Cargamos el Excel sin saltar filas inicialmente para analizarlo
+        data = file.read()
+        df_raw = pd.read_excel(BytesIO(data))
 
-        # 2. Limpieza de columnas vacías provocadas por celdas combinadas
-        # Solo nos quedamos con las columnas que tienen nombres legibles
+        # 2. BUSCADOR AUTOMÁTICO: Encontramos la fila donde están los nombres
+        # Buscamos en todas las celdas la palabra "APELLIDOS"
+        row_idx = None
+        for i, row in df_raw.iterrows():
+            if row.astype(str).str.contains('APELLIDOS', case=False, na=False).any():
+                row_idx = i
+                break
+        
+        if row_idx is not None:
+            # Re-leer el archivo saltando exactamente hasta esa fila
+            df = pd.read_excel(BytesIO(data), skiprows=row_idx + 1)
+        else:
+            # Si no lo encuentra, usamos un salto estándar de seguridad
+            df = pd.read_excel(BytesIO(data), skiprows=10)
+
+        # 3. Limpiar columnas vacías (Unnamed)
         df = df.loc[:, ~df.columns.str.contains('^Unnamed', case=False, na=False)]
         
-        # 3. Eliminar filas vacías (como la fila 16 de tu imagen que está en blanco)
-        df = df.dropna(subset=[df.columns[0]]) # Si no hay nombre, se elimina la fila
-
-        # 4. Normalizar nombres de columnas
+        # 4. Limpiar nombres de columnas
         df.columns = [str(c).strip().replace('\n', ' ').lower() for c in df.columns]
 
-        # 5. Carga a la base de datos
+        # 5. Filtrar filas: Solo nos interesan las que tienen un nombre de alumno
+        # Usamos la primera columna (que debería ser nombres) para limpiar
+        df = df.dropna(subset=[df.columns[0]])
+
+        # 6. Carga a la base de datos
         db_url = os.environ.get("DATABASE_URL")
         engine = create_engine(db_url)
         df.to_sql('planila_notas', engine, if_exists='replace', index=False)
 
         return jsonify({
-            "reply": f"✅ ¡Sincronización Exitosa! Se detectó la planilla de: {df.columns[0].upper()}. Se cargaron {len(df)} alumnos correctamente."
+            "reply": f"✅ ¡Sincronización Lograda! Columnas: {', '.join(df.columns[:3])}... Se cargaron {len(df)} registros."
         })
     
     except Exception as e:
-        return jsonify({"error": f"Error en el formato: {str(e)}"}), 500
+        return jsonify({"error": f"Error detectado: {str(e)}"}), 500
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
