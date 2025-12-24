@@ -84,45 +84,37 @@ def chat():
     db_url = os.environ.get("DATABASE_URL")
     engine = create_engine(db_url)
 
-    # 1. Obtener los nombres de las columnas para que la IA sepa qué preguntar
-    with engine.connect() as conn:
-        from sqlalchemy import text
-        # Consultamos los nombres de las columnas de la tabla que creamos hoy
-        columns_info = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'planila_notas'")).fetchall()
-        columnas = [row[0] for row in columns_info]
-
-    # 2. Configurar el Prompt para Gemini
-    prompt = f"""
-    Eres un Analista de Datos experto. Tu base de datos tiene una tabla llamada 'planila_notas' con estas columnas: {', '.join(columnas)}.
-    
-    Tarea:
-    1. El usuario hará una pregunta: "{user_question}"
-    2. Genera ÚNICAMENTE la consulta SQL necesaria para responderla (sin explicaciones, sin bloques de código).
-    3. Si la pregunta pide un nombre, usa la columna 'apellidos_y_nombres'.
-    4. Si pide promedios, usa la columna 'promedio'.
-    """
-
     try:
-        # Pedirle a Gemini la consulta SQL
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # 1. Obtener columnas
+        with engine.connect() as conn:
+            from sqlalchemy import text
+            columns_info = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'planila_notas'")).fetchall()
+            columnas = [row[0] for row in columns_info]
+
+        # 2. Configurar el Prompt
+        prompt = f"""
+        Eres un Analista de Datos experto. Tabla: 'planila_notas'. Columnas: {', '.join(columnas)}.
+        Pregunta: "{user_question}"
+        Genera SOLO la consulta SQL (sin ```sql). Usa 'apellidos_y_nombres' y 'promedio' si es necesario.
+        """
+
+        # 3. Llamada al modelo con la ruta corregida
+        model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
         sql_response = model.generate_content(prompt).text.strip()
-        
-        # Limpiar la respuesta de Gemini (quitar ```sql si aparece)
         sql_query = sql_response.replace('```sql', '').replace('```', '').strip()
 
-        # 3. Ejecutar la consulta en PostgreSQL
+        # 4. Ejecutar y Responder
         with engine.connect() as conn:
             result = conn.execute(text(sql_query))
             data_result = result.fetchall()
 
-        # 4. Pedirle a Gemini que interprete el resultado para el usuario
-        interpretation_prompt = f"El usuario preguntó: '{user_question}'. El resultado de la base de datos fue: {data_result}. Responde de forma natural y profesional."
+        interpretation_prompt = f"Pregunta: '{user_question}'. Datos: {data_result}. Responde breve y profesional."
         final_answer = model.generate_content(interpretation_prompt).text
 
         return jsonify({"reply": final_answer})
 
     except Exception as e:
-        return jsonify({"reply": f"Lo siento, tuve un problema analizando los datos: {str(e)}"})
+        return jsonify({"reply": f"Error de análisis: {str(e)}"})
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
     app.run(host='0.0.0.0', port=port)
