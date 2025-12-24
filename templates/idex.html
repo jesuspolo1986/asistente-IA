@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Pro Analyst - Inteligencia de Negocios</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1e3a8a;
+            --secondary-color: #10b981;
+            --bg-color: #f8fafc;
+            --text-color: #1e293b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            background: var(--primary-color);
+            color: white;
+            padding: 1rem 0;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            margin: 20px auto;
+        }
+
+        .upload-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s ease;
+        }
+
+        .upload-card:hover {
+            border-color: var(--secondary-color);
+        }
+
+        .upload-form {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        input[type="file"] {
+            padding: 8px;
+            background: #f1f5f9;
+            border-radius: 6px;
+            flex-grow: 1;
+        }
+
+        .btn-upload {
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 500px;
+        }
+
+        .analysis-output {
+            flex-grow: 1;
+            padding: 25px;
+            overflow-y: auto;
+            border-bottom: 1px solid #e2e8f0;
+            background-image: linear-gradient(to bottom, #ffffff, #f9fafb);
+        }
+
+        .input-area {
+            padding: 20px;
+            background: #f1f5f9;
+            display: flex;
+            gap: 10px;
+        }
+
+        textarea {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            resize: none;
+            font-size: 16px;
+        }
+
+        .btn-analyze {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+
+        .btn-analyze:disabled {
+            opacity: 0.5;
+        }
+
+        /* Estilos para tablas generadas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 0.9em;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        table thead tr {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            text-align: left;
+        }
+
+        table th, table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #dddddd;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #64748b;
+        }
+
+        .ai-response {
+            line-height: 1.6;
+            color: #334155;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1><i class="fas fa-chart-line"></i> AI Pro Analyst</h1>
+        <p>Tu consultor estratégico automatizado</p>
+    </header>
+
+    <div class="container">
+        
+        <div class="upload-card">
+            <h3><i class="fas fa-file-excel"></i> Cargar Datos de Ventas</h3>
+            <p style="font-size: 0.85em; color: #64748b;">Sincroniza tus archivos Excel o CSV para que la IA los analice.</p>
+            <form id="upload-form" class="upload-form">
+                <input type="file" name="file" accept=".csv, .xlsx" required>
+                <button type="submit" class="btn-upload">
+                    <i class="fas fa-sync"></i> Sincronizar Datos
+                </button>
+            </form>
+        </div>
+
+        <div class="chat-container">
+            <div id="output" class="analysis-output">
+                <div style="text-align: center; color: #94a3b8; margin-top: 100px;">
+                    <i class="fas fa-robot fa-3x" style="margin-bottom: 15px;"></i>
+                    <p>Esperando tu consulta empresarial...<br>Ejemplo: "¿Cuál es mi producto estrella y cuánto vendió?"</p>
+                </div>
+            </div>
+
+            <div id="loading" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> La IA está consultando la base de datos y preparando tu informe...
+            </div>
+
+            <form id="analysis-form" class="input-area">
+                <textarea id="question" rows="2" placeholder="Haz una pregunta sobre tus datos..." required></textarea>
+                <button type="submit" id="submit-btn" class="btn-analyze">
+                    Ejecutar Análisis <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('analysis-form');
+        const output = document.getElementById('output');
+        const loading = document.getElementById('loading');
+        const submitBtn = document.getElementById('submit-btn');
+        const uploadForm = document.getElementById('upload-form');
+
+        // Lógica de Chat
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const questionValue = document.getElementById('question').value;
+
+            loading.style.display = 'block';
+            submitBtn.disabled = true;
+            output.innerHTML = '';
+
+            try {
+                // Sincronizado con app.py: ruta '/chat' y clave 'message'
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: questionValue })
+                });
+                
+                const data = await response.json();
+                output.innerHTML = `<div class="ai-response">${data.reply}</div>`;
+            } catch (error) {
+                output.innerHTML = `<p style="color:red">Error: No se pudo conectar con el servidor de Koyeb.</p>`;
+            } finally {
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        };
+
+        // Lógica de Carga (Esqueleto para mañana)
+        uploadForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(uploadForm);
+            alert("Sincronizando archivo... Mañana habilitaremos la carga real a PostgreSQL.");
+            
+            try {
+                const res = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await res.json();
+                console.log(result.message);
+            } catch (err) {
+                console.error("Error en carga:", err);
+            }
+        };
+    </script>
+</body>
+</html>

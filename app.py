@@ -3,8 +3,8 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import google.generativeai as genai
 from db_manager import create_tables
-
-app = Flask(__name__)
+template_dir = os.path.abspath('templates')
+app = Flask(__name__, template_folder=template_dir)
 CORS(app)
 
 # Configuración de Gemini
