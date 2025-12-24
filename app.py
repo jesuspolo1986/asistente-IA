@@ -104,7 +104,8 @@ def chat():
         """
 
         # 3. Llamada al modelo 2.0 Flash
-        model = genai.GenerativeModel('models/gemini-2.0-flash')
+        # Cambia a la versión 1.5 que tiene más "espacio" para peticiones gratuitas
+        model = genai.GenerativeModel('models/gemini-1.5-flash')
         response = model.generate_content(prompt)
         sql_query = response.text.strip().replace('```sql', '').replace('```', '').strip()
 
