@@ -35,34 +35,40 @@ def upload():
         return jsonify({"error": "No se seleccionó ningún archivo"}), 400
     
     file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "Nombre de archivo vacío"}), 400
-
     try:
-        # Leer archivo según extensión
+        # 1. Leer el archivo
         if file.filename.endswith('.csv'):
             df = pd.read_csv(file)
         else:
-            # openpyxl es necesario para .xlsx
+            # skiprows: Si tus datos reales empiezan más abajo, podrías probar con skiprows=5
             df = pd.read_excel(BytesIO(file.read()))
 
-        # Normalizar nombres de columnas a minúsculas
+        # 2. Limpieza Crítica: Eliminar columnas "Unnamed"
+        df = df.loc[:, ~df.columns.str.contains('^Unnamed', case=False, na=False)]
+        
+        # 3. Normalizar nombres
         df.columns = [c.lower().strip() for c in df.columns]
 
-        # Conexión y carga a PostgreSQL
-        db_url = os.environ.get("DATABASE_URL")
-        if not db_url:
-            return jsonify({"error": "DATABASE_URL no configurada"}), 500
-            
-        engine = create_engine(db_url)
-        # Cargamos los datos en la tabla 'ventas'
-        df.to_sql('ventas', engine, if_exists='append', index=False)
+        # 4. Filtrar solo las columnas que existen en tu tabla de PostgreSQL
+        # Esto evita el error de "UndefinedColumn"
+        columnas_validas = ['producto', 'cantidad', 'precio']
+        columnas_a_insertar = [c for c in df.columns if c in columnas_validas]
+        
+        if not columnas_a_insertar:
+            return jsonify({"error": "El archivo no tiene las columnas requeridas (producto, cantidad, precio)"}), 400
 
-        return jsonify({"reply": f"✅ ¡Éxito! Se cargaron {len(df)} filas desde '{file.filename}' a la base de datos."})
+        df_final = df[columnas_a_insertar]
+
+        # 5. Carga a la DB
+        db_url = os.environ.get("DATABASE_URL")
+        engine = create_engine(db_url)
+        df_final.to_sql('ventas', engine, if_exists='append', index=False)
+
+        return jsonify({"reply": f"✅ ¡Éxito! Se sincronizaron {len(df_final)} registros. Se ignoraron columnas no compatibles."})
     
     except Exception as e:
-        return jsonify({"error": f"Error al procesar el archivo: {str(e)}"}), 500
-
+        print(f"Error detalle: {str(e)}") # Esto saldrá en tus logs de Koyeb
+        return jsonify({"error": f"Error al procesar: Verifica que el Excel tenga los títulos 'producto', 'cantidad' y 'precio'"}), 500
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
