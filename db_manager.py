@@ -55,3 +55,28 @@ def cargar_excel_a_bd(file_path: str):
         return True, "Datos cargados exitosamente en la tabla ventas."
     except Exception as e:
         return False, f"Error al cargar Excel: {str(e)}"
+from sqlalchemy import create_engine, text
+import os
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL)
+
+def preparar_base_de_datos():
+    with engine.connect() as conn:
+        # Borramos la tabla vieja si existe para empezar de cero con Ventas
+        conn.execute(text("DROP TABLE IF EXISTS planilla_notas CASCADE;"))
+        
+        # Creamos la nueva tabla de Ventas
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS ventas (
+                id SERIAL PRIMARY KEY,
+                fecha DATE,
+                vendedor VARCHAR(100),
+                producto VARCHAR(100),
+                cantidad INT,
+                precio_unitario FLOAT,
+                total FLOAT
+            );
+        """))
+        conn.commit()
+    print("Base de datos lista para recibir ventas.")

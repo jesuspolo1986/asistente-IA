@@ -29,53 +29,20 @@ except Exception as e:
 def index():
     return render_template('index.html')
 
+import pandas as pd
+
 @app.route('/upload', methods=['POST'])
-def upload():
-    if 'file' not in request.files:
-        return jsonify({"error": "No hay archivo"}), 400
-    
+def upload_file():
     file = request.files['file']
-    try:
-        # 1. Cargamos el Excel sin saltar filas inicialmente para analizarlo
-        data = file.read()
-        df_raw = pd.read_excel(BytesIO(data))
-
-        # 2. BUSCADOR AUTOMÁTICO: Encontramos la fila donde están los nombres
-        # Buscamos en todas las celdas la palabra "APELLIDOS"
-        row_idx = None
-        for i, row in df_raw.iterrows():
-            if row.astype(str).str.contains('APELLIDOS', case=False, na=False).any():
-                row_idx = i
-                break
+    if file and file.filename.endswith('.csv'):
+        # Leemos el CSV
+        df = pd.DataFrame(pd.read_csv(file))
         
-        if row_idx is not None:
-            # Re-leer el archivo saltando exactamente hasta esa fila
-            df = pd.read_excel(BytesIO(data), skiprows=row_idx + 1)
-        else:
-            # Si no lo encuentra, usamos un salto estándar de seguridad
-            df = pd.read_excel(BytesIO(data), skiprows=10)
-
-        # 3. Limpiar columnas vacías (Unnamed)
-        df = df.loc[:, ~df.columns.str.contains('^Unnamed', case=False, na=False)]
+        # Lo subimos a la base de datos de Koyeb
+        df.to_sql('ventas', con=engine, if_exists='append', index=False)
         
-        # 4. Limpiar nombres de columnas
-        df.columns = [str(c).strip().replace('\n', ' ').lower() for c in df.columns]
-
-        # 5. Filtrar filas: Solo nos interesan las que tienen un nombre de alumno
-        # Usamos la primera columna (que debería ser nombres) para limpiar
-        df = df.dropna(subset=[df.columns[0]])
-
-        # 6. Carga a la base de datos
-        db_url = os.environ.get("DATABASE_URL")
-        engine = create_engine(db_url)
-        df.to_sql('planila_notas', engine, if_exists='replace', index=False)
-
-        return jsonify({
-            "reply": f"✅ ¡Sincronización Lograda! Columnas: {', '.join(df.columns[:3])}... Se cargaron {len(df)} registros."
-        })
-    
-    except Exception as e:
-        return jsonify({"error": f"Error detectado: {str(e)}"}), 500
+        return {"status": "success", "message": f"Se cargaron {len(df)} registros de ventas."}
+    return {"status": "error", "message": "Formato no compatible."}
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
