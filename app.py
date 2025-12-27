@@ -49,7 +49,7 @@ def obtener_contexto_analitico():
         )
         return contexto
     except Exception as e:
-        return f"Error: {e}"
+        return f"Error al procesar contexto: {e}"
 
 @app.route('/')
 def index():
@@ -60,8 +60,12 @@ def upload():
     file = request.files.get('file')
     if not file: return jsonify({"error": "No file"}), 400
     try:
-        # Leer archivo
-        df = pd.read_csv(file, sep=None, engine='python') if file.filename.endswith('.csv') else pd.read_excel(file)
+        # Leer archivo (CSV o Excel)
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(file, sep=None, engine='python')
+        else:
+            df = pd.read_excel(file)
+            
         df.columns = [c.strip() for c in df.columns]
         
         # Guardar en SQLite
@@ -78,7 +82,7 @@ def upload():
         
         return jsonify({
             "reply": "🚀 Base de datos actualizada. Análisis y visualización listos.",
-            "chart_data": chart_data  # Esto activa la gráfica en el frontend
+            "chart_data": chart_data
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -90,36 +94,40 @@ def chat():
     contexto = obtener_contexto_analitico()
     
     try:
-        # Lógica para extraer datos dinámicos según la pregunta
         conn = sqlite3.connect(DATABASE)
         df = pd.read_sql_query("SELECT * FROM ventas", conn)
         conn.close()
 
         extra_data = None
-        # Si el usuario pregunta por vendedores, preparamos esos datos
+        # Gráficos dinámicos basados en la pregunta
         if "vendedor" in pregunta or "vendedores" in pregunta:
             v_data = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
             extra_data = {"labels": v_data.index.tolist(), "values": v_data.values.tolist(), "title": "Ventas por Vendedor"}
         
-        # Si pregunta por productos o ranking
-        elif "producto" in pregunta or "ranking" in pregunta:
+        elif "producto" in pregunta or "ranking" in pregunta or "pareto" in pregunta:
             p_data = df.groupby('Producto')['Total'].sum().sort_values(ascending=False).head(5)
             extra_data = {"labels": p_data.index.tolist(), "values": p_data.values.tolist(), "title": "Top 5 Productos"}
 
+        # LLAMADA A MISTRAL (Corregida)
         chat_response = client.chat.complete(
             model=model,
             messages=[
                 {"role": "system", "content": f"Eres AI Pro Analyst. Usa tablas y negritas. Datos: {contexto}"},
                 {"role": "user", "content": pregunta}
-            ]
+            ],
+            max_tokens=800,
+            temperature=0.1
         )
         
         return jsonify({
             "reply": chat_response.choices[0].message.content,
-            "new_chart_data": extra_data # Enviamos los nuevos datos del gráfico
+            "new_chart_data": extra_data
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error en chat: {e}") # Log para Koyeb
+        return jsonify({"error": "Error procesando la consulta de IA"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    # Usar el puerto de la variable de entorno para despliegue
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host='0.0.0.0', port=port)
