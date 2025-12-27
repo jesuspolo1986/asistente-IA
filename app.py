@@ -36,7 +36,8 @@ def upload_file():
     file = request.files['file']
     if file and file.filename.endswith('.csv'):
         # Leemos el CSV
-        df = pd.DataFrame(pd.read_csv(file))
+       # El parámetro sep=None con engine='python' detecta automáticamente si es coma o punto y coma
+        df = pd.read_csv(file, sep=None, engine='python')
         
         # Lo subimos a la base de datos de Koyeb
         df.to_sql('ventas', con=engine, if_exists='append', index=False)
