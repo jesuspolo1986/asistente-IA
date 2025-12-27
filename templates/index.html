@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Pro Analyst - Inteligencia de Negocios</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root { --primary-color: #1e3a8a; --secondary-color: #10b981; --bg-color: #f8fafc; --text-color: #1e293b; }
         body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; display: flex; flex-direction: column; align-items: center; }
@@ -20,13 +21,17 @@
         textarea { flex-grow: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; resize: none; font-size: 16px; }
         .btn-analyze { background: var(--primary-color); color: white; border: none; padding: 0 25px; border-radius: 8px; cursor: pointer; font-weight: bold; }
         .loading { display: none; text-align: center; padding: 15px; color: #64748b; font-style: italic; }
-        .ai-response { line-height: 1.6; color: #334155; padding: 10px; border-left: 4px solid var(--primary-color); background: #f8fafc; }
+        /* Estilos para las tablas y el texto de la IA */
+        .ai-response { line-height: 1.6; color: #334155; padding: 15px; border-left: 4px solid var(--primary-color); background: #f8fafc; margin-bottom: 15px; }
+        .ai-response table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        .ai-response th, .ai-response td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+        .ai-response th { background: #f1f5f9; }
     </style>
 </head>
 <body>
     <header>
         <h1><i class="fas fa-chart-line"></i> AI Pro Analyst</h1>
-        <p>Tu consultor estratégico automatizado</p>
+        <p>Tu consultor estratégico con Mistral AI</p>
     </header>
 
     <div class="container">
@@ -34,24 +39,17 @@
             <h3><i class="fas fa-file-excel"></i> Cargar Datos de Negocio</h3>
             <form id="upload-form" class="upload-form">
                 <input type="file" name="file" accept=".csv, .xlsx" required>
-                <button type="submit" class="btn-upload" id="upload-btn">
-                    <i class="fas fa-sync"></i> Sincronizar Datos
-                </button>
+                <button type="submit" class="btn-upload" id="upload-btn">Sincronizar Datos</button>
             </form>
         </div>
 
         <div class="chat-container">
             <div id="output" class="analysis-output">
-                <div style="text-align: center; color: #94a3b8; margin-top: 100px;">
-                    <i class="fas fa-robot fa-3x" style="margin-bottom: 15px;"></i>
-                    <p>Sincroniza un archivo y hazme una pregunta sobre tus datos.</p>
-                </div>
+                <p style="text-align: center; color: #94a3b8;">Sincroniza un archivo para empezar.</p>
             </div>
-            <div id="loading" class="loading">
-                <i class="fas fa-spinner fa-spin"></i> Procesando información...
-            </div>
+            <div id="loading" class="loading">Procesando...</div>
             <form id="analysis-form" class="input-area">
-                <textarea id="question" rows="2" placeholder="Ej: ¿Cuál es el promedio de ventas?" required></textarea>
+                <textarea id="question" rows="2" placeholder="Haz una pregunta sobre tus ventas..." required></textarea>
                 <button type="submit" id="submit-btn" class="btn-analyze">Analizar</button>
             </form>
         </div>
@@ -61,34 +59,26 @@
         const output = document.getElementById('output');
         const loading = document.getElementById('loading');
 
-        // Lógica para Carga de Archivos
         document.getElementById('upload-form').onsubmit = async (e) => {
             e.preventDefault();
             const btn = document.getElementById('upload-btn');
             const formData = new FormData(e.target);
-            
             btn.disabled = true;
-            output.innerHTML = "<i>Subiendo y procesando archivo...</i>";
+            output.innerHTML = "<i>Procesando archivo...</i>";
 
             try {
                 const res = await fetch('/upload', { method: 'POST', body: formData });
                 const data = await res.json();
-                const mensajeFinal = data.reply || data.response || "Sin respuesta del servidor";
-                output.innerHTML += `<div class="ai-response"><b>AI:</b> ${mensajeFinal}</div>`;
-                output.scrollTop = output.scrollHeight; // Desplazar hacia abajo automáticamente
+                output.innerHTML = `<div class="ai-response">${data.reply || data.error}</div>`;
             } catch (err) {
-                output.innerHTML = `<p style="color:red">Error de conexión al subir.</p>`;
-            } finally {
-                btn.disabled = false;
-            }
+                output.innerHTML = `<p style="color:red">Error al subir.</p>`;
+            } finally { btn.disabled = false; }
         };
 
-        // Lógica para Chat
         document.getElementById('analysis-form').onsubmit = async (e) => {
             e.preventDefault();
-            const question = document.getElementById('question').value;
+            const question = document.getElementById('question');
             const btn = document.getElementById('submit-btn');
-
             loading.style.display = 'block';
             btn.disabled = true;
 
@@ -96,12 +86,15 @@
                 const res = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: question })
+                    body: JSON.stringify({ message: question.value })
                 });
                 const data = await res.json();
-                output.innerHTML = `<div class="ai-response">${data.reply}</div>`;
+                // Renderizar con marked.parse para ver tablas y negritas
+                output.innerHTML += `<div class="ai-response"><b>Pregunta:</b> ${question.value}<hr>${marked.parse(data.reply)}</div>`;
+                question.value = "";
+                output.scrollTop = output.scrollHeight;
             } catch (err) {
-                output.innerHTML = `<p style="color:red">Error en la consulta.</p>`;
+                output.innerHTML += `<p style="color:red">Error en consulta.</p>`;
             } finally {
                 loading.style.display = 'none';
                 btn.disabled = false;

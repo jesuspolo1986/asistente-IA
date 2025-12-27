@@ -1,68 +1,96 @@
 import os
 import sqlite3
+import pandas as pd
 from flask import Flask, request, jsonify, render_template
 from mistralai import Mistral
 
 app = Flask(__name__)
 
-# Configuración de Mistral - Asegúrate de poner MISTRAL_API_KEY en Koyeb
+# Configuración de Mistral
 api_key = os.environ.get("MISTRAL_API_KEY")
 model = "mistral-large-latest"
 client = Mistral(api_key=api_key)
 
-# Inicializar Base de Datos (Mantiene tu tabla 'ventas')
+DATABASE = 'database.db'
+
 def init_db():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ventas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             producto TEXT,
             monto REAL,
-            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            fecha TEXT
         )
     ''')
     conn.commit()
     conn.close()
-    print("Base de datos lista: Tabla 'ventas' creada.")
+    print("Base de datos lista.")
 
 init_db()
 
+def obtener_contexto_db():
+    try:
+        conn = sqlite3.connect(DATABASE)
+        # Obtener nombres de columnas
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(ventas)")
+        columnas = [info[1] for info in cursor.fetchall()]
+        
+        # Obtener una muestra de los datos
+        df = pd.read_sql_query("SELECT * FROM ventas LIMIT 5", conn)
+        conn.close()
+        
+        if df.empty:
+            return "La tabla está actualmente vacía. Esperando que el usuario suba datos."
+        return f"Estructura de la tabla 'ventas': {columnas}. Ejemplo de datos: {df.to_dict(orient='records')}"
+    except Exception as e:
+        return f"Error leyendo base de datos: {e}"
+
 @app.route('/')
 def index():
-    return render_template('index.html') # O el nombre de tu archivo HTML
+    return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    # Aquí va tu lógica de subida de archivos/datos
-    return jsonify({"reply": "success", "message": "Datos recibidos"})
+    if 'file' not in request.files:
+        return jsonify({"error": "No hay archivo"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No seleccionado"}), 400
+
+    try:
+        # Cargar datos con Pandas y guardar en SQLite
+        df = pd.read_csv(file) if file.filename.endswith('.csv') else pd.read_excel(file)
+        conn = sqlite3.connect(DATABASE)
+        df.to_sql('ventas', conn, if_exists='replace', index=False)
+        conn.close()
+        return jsonify({"reply": "✅ ¡Datos sincronizados! Ya puedes hacerme preguntas sobre este archivo."})
+    except Exception as e:
+        return jsonify({"error": f"Error al procesar: {str(e)}"}), 500
 
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
     user_message = data.get("message")
-
-    if not user_message:
-        return jsonify({"error": "No message provided"}), 400
+    contexto = obtener_contexto_db()
 
     try:
-        # Llamada a la API de Mistral
         chat_response = client.chat.complete(
             model=model,
             messages=[
+                {
+                    "role": "system", 
+                    "content": f"Eres AI Pro Analyst. USA ESTOS DATOS REALES: {contexto}. Responde de forma profesional usando tablas si es necesario."
+                },
                 {"role": "user", "content": user_message}
             ]
         )
-        
-        respuesta_texto = chat_response.choices[0].message.content
-        return jsonify({"reply": respuesta_texto})
-
+        return jsonify({"reply": chat_response.choices[0].message.content})
     except Exception as e:
-        print(f"Error con Mistral: {e}")
-        return jsonify({"error": "Error al procesar la solicitud"}), 500
-@app.route('/favicon.ico')
-def favicon():
-    return '', 204
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
