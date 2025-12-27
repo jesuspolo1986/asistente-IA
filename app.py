@@ -19,12 +19,8 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ventas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            Fecha TEXT,
-            Vendedor TEXT,
-            Producto TEXT,
-            Cantidad INTEGER,
-            Precio_Unitario REAL,
-            Total REAL
+            Fecha TEXT, Vendedor TEXT, Producto TEXT, 
+            Cantidad INTEGER, Precio_Unitario REAL, Total REAL
         )
     ''')
     conn.commit()
@@ -39,34 +35,24 @@ def obtener_contexto_analitico():
         conn.close()
         
         if df.empty:
-            return "La base de datos está vacía actualmente."
+            return "Sin datos."
 
-        # INTELIGENCIA DE DATOS: Pre-procesamos los totales para la IA
-        resumen_productos = df.groupby('Producto').agg({
-            'Cantidad': 'sum',
-            'Total': 'sum',
-            'Precio_Unitario': 'first'
-        }).sort_values(by='Total', ascending=False).to_dict(orient='index')
-
-        resumen_vendedores = df.groupby('Vendedor').agg({
-            'Total': 'sum',
-            'Cantidad': 'sum'
-        }).to_dict(orient='index')
-
-        total_general = df['Total'].sum()
-        conteo_ventas = len(df)
-
-        # Construimos un contexto potente para Mistral
+        # ANALÍTICA DE PRECISIÓN
+        total_gral = df['Total'].sum()
+        # Resumen de productos ordenado
+        prod_stats = df.groupby('Producto').agg({'Total': 'sum', 'Cantidad': 'sum'}).sort_values(by='Total', ascending=False).to_dict(orient='index')
+        # MATRIZ EXACTA: Quién vendió qué
+        matriz_exacta = df.groupby(['Vendedor', 'Producto'])['Total'].sum().unstack(fill_value=0).to_dict(orient='index')
+        
         contexto = (
-            f"DATOS CONSOLIDADOS DEL NEGOCIO:\n"
-            f"- Total de ventas generales: ${total_general:,.2f}\n"
-            f"- Cantidad de transacciones: {conteo_ventas}\n"
-            f"- Resumen por Producto (Ventas totales y cantidades): {resumen_productos}\n"
-            f"- Resumen por Vendedor (Ingresos generados): {resumen_vendedores}\n"
+            f"SISTEMA DE INTELIGENCIA DE NEGOCIOS\n"
+            f"TOTAL FACTURADO: ${total_gral:,.2f}\n"
+            f"PERFORMANCE POR PRODUCTO: {prod_stats}\n"
+            f"MATRIZ DE VENTAS POR VENDEDOR: {matriz_exacta}\n"
         )
         return contexto
     except Exception as e:
-        return f"Error analizando datos: {e}"
+        return f"Error: {e}"
 
 @app.route('/')
 def index():
@@ -74,54 +60,33 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file"}), 400
-    
-    file = request.files['file']
+    file = request.files.get('file')
+    if not file: return jsonify({"error": "No file"}), 400
     try:
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(file, sep=None, engine='python')
-        else:
-            df = pd.read_excel(file)
-
-        # Normalizar nombres de columnas
+        df = pd.read_csv(file, sep=None, engine='python') if file.filename.endswith('.csv') else pd.read_excel(file)
         df.columns = [c.strip() for c in df.columns]
-
         conn = sqlite3.connect(DATABASE)
         df.to_sql('ventas', conn, if_exists='replace', index=False)
         conn.close()
-        
-        return jsonify({"reply": f"✅ ¡Análisis completado! He procesado {len(df)} registros. Ya puedes consultar métricas avanzadas."})
+        return jsonify({"reply": "🚀 Base de datos actualizada. Análisis cruzado listo."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
-    user_message = data.get("message")
-    
-    # Obtenemos el resumen inteligente
-    contexto_pro = obtener_contexto_analitico()
-
+    contexto = obtener_contexto_analitico()
     try:
         chat_response = client.chat.complete(
             model=model,
             messages=[
-                {
-                    "role": "system", 
-                    "content": (
-                        "Eres AI Pro Analyst, un experto consultor de negocios. "
-                        "Tienes acceso a estos datos consolidados que ya han sido calculados: \n"
-                        f"{contexto_pro}\n"
-                        "Usa estos datos para responder de forma estratégica, profesional y con tablas Markdown."
-                    )
-                },
-                {"role": "user", "content": user_message}
+                {"role": "system", "content": f"Eres AI Pro Analyst. Responde con datos EXACTOS basados en: {contexto}. Usa tablas y negritas."},
+                {"role": "user", "content": data.get("message")}
             ]
         )
         return jsonify({"reply": chat_response.choices[0].message.content})
     except Exception as e:
-        return jsonify({"error": "Error en la consulta"}), 500
+        return jsonify({"error": "Error de conexión"}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
