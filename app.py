@@ -48,7 +48,7 @@ def upload_file():
 def chat():
     data = request.json
     user_question = data.get("message", "")
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.0-flash')
 
     try:
         with engine.connect() as conn:
