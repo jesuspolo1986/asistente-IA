@@ -8,73 +8,71 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --primary: #0f172a; --accent: #3b82f6; --success: #10b981; --bg: #f1f5f9; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); margin: 0; color: #1e293b; overflow: hidden; }
+        :root { --primary: #0f172a; --accent: #3b82f6; --success: #10b981; --bg: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); margin: 0; color: #1e293b; overflow: hidden; }
         
-        header { background: var(--primary); color: white; padding: 0.8rem 2rem; display: flex; justify-content: space-between; align-items: center; height: 50px; }
+        header { background: var(--primary); color: white; padding: 0 2rem; display: flex; align-items: center; height: 50px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         
-        .main-grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; padding: 20px; max-width: 1600px; margin: 0 auto; height: calc(100vh - 90px); }
+        .main-grid { display: grid; grid-template-columns: 280px 1fr; gap: 15px; padding: 15px; max-width: 1600px; margin: 0 auto; height: calc(100vh - 50px); box-sizing: border-box; }
         
-        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        .card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         
-        /* ÁREA DE CONTENIDO REORGANIZADA */
-        .content-area { display: flex; flex-direction: column; gap: 20px; height: 100%; overflow: hidden; }
+        .content-area { display: flex; flex-direction: column; gap: 15px; height: 100%; overflow: hidden; }
         
-        /* Panel de Gráfico (ARRIBA) */
-        #chart-card { height: 260px; flex-shrink: 0; display: none; /* Se activa al cargar datos */ }
+        /* GRÁFICA OPTIMIZADA (Pequeña y Compacta) */
+        #chart-card { height: 160px; flex-shrink: 0; display: none; border-bottom: 2px solid #f1f5f9; }
         
-        /* Panel de Chat (ABAJO - Toma el resto del espacio) */
+        /* CHAT EXPANDIDO (Área Principal de Lectura) */
         .chat-card { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
         
-        #output { flex-grow: 1; overflow-y: auto; padding: 10px; scroll-behavior: smooth; border-bottom: 1px solid #f1f5f9; }
+        #output { flex-grow: 1; overflow-y: auto; padding: 15px; scroll-behavior: smooth; font-size: 0.95rem; }
         
-        .message { margin-bottom: 20px; padding: 15px; border-radius: 8px; line-height: 1.6; animation: fadeIn 0.3s ease; }
-        .ai-msg { background: white; border-left: 5px solid var(--accent); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .user-msg { background: #e2e8f0; margin-left: auto; max-width: 80%; font-weight: 500; }
+        .message { margin-bottom: 15px; padding: 12px 18px; border-radius: 12px; line-height: 1.5; animation: fadeIn 0.3s ease; }
+        .ai-msg { background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid var(--accent); }
+        .user-msg { background: #eff6ff; color: #1e40af; align-self: flex-end; width: fit-content; max-width: 80%; }
 
-        /* Input fijo abajo */
-        .input-group { display: flex; gap: 10px; background: #f8fafc; padding: 15px; border-radius: 0 0 12px 12px; }
-        textarea { flex-grow: 1; border: 1px solid #e2e8f0; border-radius: 8px; outline: none; resize: none; font-size: 1rem; padding: 10px; font-family: inherit; }
+        /* Input fijo y elegante */
+        .input-group { display: flex; gap: 10px; background: #fff; padding: 12px; border-top: 1px solid #e2e8f0; }
+        textarea { flex-grow: 1; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; resize: none; font-size: 0.95rem; padding: 8px 12px; height: 40px; }
         
         button { cursor: pointer; transition: 0.2s; border: none; border-radius: 8px; font-weight: 600; }
         
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* Tablas compactas para leer mejor */
+        table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 0.85rem; }
+        th, td { border: 1px solid #e2e8f0; padding: 6px 10px; text-align: left; }
+        th { background: #f8fafc; color: #64748b; }
 
-        /* Estilos de Tabla para la IA */
-        table { border-collapse: collapse; width: 100%; margin: 10px 0; border-radius: 8px; overflow: hidden; }
-        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
-        th { background: #f1f5f9; font-weight: 600; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
 <header>
-    <h1><i class="fas fa-chart-pie"></i> AI Pro Analyst <span style="font-weight: 300; font-size: 0.8rem; opacity: 0.7;">BI Dashboard</span></h1>
-    <div id="status"><i class="fas fa-circle" style="color: var(--success); font-size: 0.7rem;"></i> Motor Activo</div>
+    <h3><i class="fas fa-chart-line"></i> AI Pro Analyst <span style="font-weight: 300; font-size: 0.7rem; color: #94a3b8;">v2.0 Performance</span></h3>
 </header>
 
 <div class="main-grid">
     <div class="card">
-        <h3><i class="fas fa-folder-open"></i> Datos</h3>
+        <h4 style="margin: 0 0 10px 0;"><i class="fas fa-database"></i> Datos</h4>
         <form id="upload-form">
-            <input type="file" name="file" id="file-input" style="width: 100%; margin: 15px 0;" required>
-            <button type="submit" id="upload-btn" style="width: 100%; background: var(--primary); color: white; padding: 12px;">
-                <i class="fas fa-sync"></i> Procesar Archivo
+            <input type="file" name="file" id="file-input" style="font-size: 0.8rem; width: 100%; margin-bottom: 10px;" required>
+            <button type="submit" id="upload-btn" style="width: 100%; background: var(--primary); color: white; padding: 10px; font-size: 0.85rem;">
+                <i class="fas fa-cloud-upload-alt"></i> Procesar
             </button>
         </form>
-        <div style="margin-top: 20px; font-size: 0.8rem; color: #64748b;">
-            <p><i class="fas fa-info-circle"></i> Sube el Excel para activar el análisis predictivo y visual.</p>
+        <div id="file-status" style="margin-top: 15px; font-size: 0.75rem; color: #64748b;">
+            <i class="fas fa-info-circle"></i> Sube un archivo para habilitar el gráfico superior.
         </div>
     </div>
 
     <div class="content-area">
         
-        <div id="chart-card" class="card chart-container">
-            <h4 style="margin: 0 0 10px 0; display: flex; justify-content: space-between;">
-                <span><i class="fas fa-chart-bar"></i> Visualización de Datos</span>
-                <small id="chart-title" style="color: var(--accent); font-weight: 400;"></small>
-            </h4>
-            <div style="flex-grow: 1; position: relative;">
+        <div id="chart-card" class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <span style="font-size: 0.85rem; font-weight: 600; color: #64748b;"><i class="fas fa-chart-bar"></i> INDICADORES</span>
+                <span id="chart-title" style="font-size: 0.85rem; color: var(--accent); font-weight: 700;"></span>
+            </div>
+            <div style="flex-grow: 1; height: 110px;">
                 <canvas id="salesChart"></canvas>
             </div>
         </div>
@@ -82,13 +80,13 @@
         <div class="card chat-card">
             <div id="output">
                 <div class="message ai-msg">
-                    👋 <strong>¡Sistema Iniciado!</strong> Por favor, carga tu archivo de ventas para comenzar el análisis estratégico. Los gráficos aparecerán en el panel superior automáticamente.
+                    👋 <strong>¡Bienvenido!</strong> Al cargar tus datos, verás aquí el análisis detallado. El gráfico superior se mantendrá pequeño para que puedas leer sin interrupciones.
                 </div>
             </div>
             
             <form id="chat-form" class="input-group">
-                <textarea id="question" rows="1" placeholder="Ej: ¿Qué vendedor es más eficiente?" required></textarea>
-                <button type="submit" style="background: var(--accent); color: white; width: 60px;">
+                <textarea id="question" rows="1" placeholder="Ej: ¿Cuál es el producto más rentable?" required></textarea>
+                <button type="submit" style="background: var(--accent); color: white; width: 50px;">
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </form>
@@ -100,7 +98,6 @@
     let myChart = null;
     const output = document.getElementById('output');
 
-    // Función para renderizar gráfico
     function renderChart(chartData) {
         const ctx = document.getElementById('salesChart').getContext('2d');
         if (myChart) myChart.destroy();
@@ -110,10 +107,10 @@
             data: {
                 labels: chartData.labels,
                 datasets: [{
-                    label: 'Ingresos ($)',
                     data: chartData.values,
-                    backgroundColor: 'rgba(59, 130, 246, 0.8)',
-                    borderRadius: 5
+                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                    borderRadius: 4,
+                    barThickness: 15
                 }]
             },
             options: {
@@ -122,41 +119,32 @@
                 responsive: true,
                 plugins: { legend: { display: false } },
                 scales: {
-                    x: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-                    y: { grid: { display: false } }
+                    x: { beginAtZero: true, ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' } },
+                    y: { ticks: { font: { size: 10 } }, grid: { display: false } }
                 }
             }
         });
     }
 
-    // Carga de archivos
     document.getElementById('upload-form').onsubmit = async (e) => {
         e.preventDefault();
         const btn = document.getElementById('upload-btn');
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analizando...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
         try {
             const res = await fetch('/upload', { method: 'POST', body: new FormData(e.target) });
             const data = await res.json();
-            
             output.innerHTML += `<div class="message ai-msg" style="border-left-color: var(--success)">${data.reply}</div>`;
-            
             if(data.chart_data) {
                 document.getElementById('chart-card').style.display = 'flex';
-                document.getElementById('chart-title').innerText = 'Top 5 Productos';
+                document.getElementById('chart-title').innerText = 'TOP 5 PRODUCTOS';
                 renderChart(data.chart_data);
             }
-        } catch (err) {
-            alert("Error en el servidor.");
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-sync"></i> Procesar Archivo';
-            output.scrollTop = output.scrollHeight;
-        }
+        } catch (err) { alert("Error."); }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Procesar'; output.scrollTop = output.scrollHeight; }
     };
 
-    // Chat interactivo
     document.getElementById('chat-form').onsubmit = async (e) => {
         e.preventDefault();
         const qField = document.getElementById('question');
@@ -173,19 +161,14 @@
                 body: JSON.stringify({ message: question })
             });
             const data = await res.json();
-            
             output.innerHTML += `<div class="message ai-msg">${marked.parse(data.reply)}</div>`;
-            
             if(data.new_chart_data) {
                 document.getElementById('chart-card').style.display = 'flex';
-                document.getElementById('chart-title').innerText = data.new_chart_data.title;
+                document.getElementById('chart-title').innerText = data.new_chart_data.title.toUpperCase();
                 renderChart(data.new_chart_data);
             }
-        } catch (err) {
-            output.innerHTML += `<div class="message ai-msg" style="color:red">Error en la IA.</div>`;
-        } finally {
-            output.scrollTop = output.scrollHeight;
-        }
+        } catch (err) { output.innerHTML += `<div class="message ai-msg" style="color:red">Error.</div>`; }
+        finally { output.scrollTop = output.scrollHeight; }
     };
 </script>
 </body>
