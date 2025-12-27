@@ -10,8 +10,7 @@ pandas==2.2.3
 openpyxl==3.1.2
 reportlab
 matplotlib
-google-genai==0.1.0
-google-generativeai
+mistralai
 Flask==3.0.3
 gunicorn==22.0.0
 psycopg2-binary==2.9.9

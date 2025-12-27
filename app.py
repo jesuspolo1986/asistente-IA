@@ -1,80 +1,68 @@
 import os
+import sqlite3
 from flask import Flask, request, jsonify, render_template
-from flask_cors import CORS
-import google.generativeai as genai
-from sqlalchemy import text
-# Importamos las funciones exactas de db_manager
-from db_manager import engine, create_tables, cargar_archivo_a_bd
+from mistralai import Mistral
 
 app = Flask(__name__)
-CORS(app)
 
-# Configuración de Gemini
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+# Configuración de Mistral - Asegúrate de poner MISTRAL_API_KEY en Koyeb
+api_key = os.environ.get("MISTRAL_API_KEY")
+model = "mistral-large-latest"
+client = Mistral(api_key=api_key)
 
-# Inicializar DB al arrancar (Aquí es donde se llamaba mal la función antes)
-try:
-    create_tables()
-except Exception as e:
-    print(f"Error inicializando tablas: {e}")
+# Inicializar Base de Datos (Mantiene tu tabla 'ventas')
+def init_db():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ventas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            producto TEXT,
+            monto REAL,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+    print("Base de datos lista: Tabla 'ventas' creada.")
+
+init_db()
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html') # O el nombre de tu archivo HTML
 
 @app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"status": "error", "message": "No hay archivo"})
-    
-    file = request.files['file']
-    if file and (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
-        # Guardar temporalmente en la carpeta /tmp de Koyeb
-        temp_path = os.path.join("/tmp", file.filename)
-        file.save(temp_path)
-        
-        success, message = cargar_archivo_a_bd(temp_path)
-        
-        if success:
-            return jsonify({"status": "success", "message": message})
-        else:
-            return jsonify({"status": "error", "message": message})
-    
-    return jsonify({"status": "error", "message": "Formato no válido (use CSV o Excel)"})
+def upload():
+    # Aquí va tu lógica de subida de archivos/datos
+    return jsonify({"status": "success", "message": "Datos recibidos"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
-    user_question = data.get("message", "")
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    user_message = data.get("message")
+
+    if not user_message:
+        return jsonify({"error": "No message provided"}), 400
 
     try:
-        with engine.connect() as conn:
-            # Obtener columnas de la tabla 'ventas'
-            columns_info = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'ventas'")).fetchall()
-            columnas = [row[0] for row in columns_info]
-
-            # Prompt para generar SQL
-            prompt = f"Eres un Analista SQL experto. Tabla: 'ventas'. Columnas: {', '.join(columnas)}. Pregunta: '{user_question}'. Responde SOLO con el código SQL."
-            
-            response = model.generate_content(prompt)
-            sql_query = response.text.strip().replace('```sql', '').replace('```', '').strip()
-
-            # Ejecutar query
-            result = conn.execute(text(sql_query))
-            data_result = result.fetchall()
-
-            # Respuesta humana
-            interpretation_prompt = f"El usuario preguntó: '{user_question}'. Datos: {data_result}. Responde de forma breve y profesional."
-            final_answer = model.generate_content(interpretation_prompt).text
-
-            return jsonify({"reply": final_answer})
+        # Llamada a la API de Mistral
+        chat_response = client.chat.complete(
+            model=model,
+            messages=[
+                {"role": "user", "content": user_message}
+            ]
+        )
+        
+        respuesta_texto = chat_response.choices[0].message.content
+        return jsonify({"response": respuesta_texto})
 
     except Exception as e:
-        return jsonify({"reply": f"Error en consulta: {str(e)}"})
+        print(f"Error con Mistral: {e}")
+        return jsonify({"error": "Error al procesar la solicitud"}), 500
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 8000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=8000)
