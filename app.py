@@ -86,18 +86,40 @@ def upload():
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
+    pregunta = data.get("message").lower()
     contexto = obtener_contexto_analitico()
+    
     try:
+        # Lógica para extraer datos dinámicos según la pregunta
+        conn = sqlite3.connect(DATABASE)
+        df = pd.read_sql_query("SELECT * FROM ventas", conn)
+        conn.close()
+
+        extra_data = None
+        # Si el usuario pregunta por vendedores, preparamos esos datos
+        if "vendedor" in pregunta or "vendedores" in pregunta:
+            v_data = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
+            extra_data = {"labels": v_data.index.tolist(), "values": v_data.values.tolist(), "title": "Ventas por Vendedor"}
+        
+        # Si pregunta por productos o ranking
+        elif "producto" in pregunta or "ranking" in pregunta:
+            p_data = df.groupby('Producto')['Total'].sum().sort_values(ascending=False).head(5)
+            extra_data = {"labels": p_data.index.tolist(), "values": p_data.values.tolist(), "title": "Top 5 Productos"}
+
         chat_response = client.chat.complete(
             model=model,
             messages=[
-                {"role": "system", "content": f"Eres AI Pro Analyst. Responde con datos EXACTOS basados en: {contexto}. Usa tablas y negritas."},
-                {"role": "user", "content": data.get("message")}
+                {"role": "system", "content": f"Eres AI Pro Analyst. Usa tablas y negritas. Datos: {contexto}"},
+                {"role": "user", "content": pregunta}
             ]
         )
-        return jsonify({"reply": chat_response.choices[0].message.content})
+        
+        return jsonify({
+            "reply": chat_response.choices[0].message.content,
+            "new_chart_data": extra_data # Enviamos los nuevos datos del gráfico
+        })
     except Exception as e:
-        return jsonify({"error": "Error de conexión"}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)

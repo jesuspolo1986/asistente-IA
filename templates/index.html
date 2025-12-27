@@ -11,16 +11,16 @@
         :root { --primary: #0f172a; --accent: #3b82f6; --success: #10b981; --bg: #f1f5f9; }
         body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); margin: 0; color: #1e293b; overflow: hidden; }
         
-        header { background: var(--primary); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; height: 60px; }
+        header { background: var(--primary); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; height: 60px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         
         .main-grid { display: grid; grid-template-columns: 350px 1fr; gap: 20px; padding: 20px; max-width: 1600px; margin: 0 auto; height: calc(100vh - 100px); }
         
         .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         
         /* Contenedor de Chat y Gráfico */
-        .content-area { display: grid; grid-template-rows: 1fr 300px; gap: 20px; height: 100%; overflow: hidden; }
+        .content-area { display: grid; grid-template-rows: 1fr 320px; gap: 20px; height: 100%; overflow: hidden; }
         
-        #output { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        #output { flex-grow: 1; overflow-y: auto; padding: 10px; scroll-behavior: smooth; }
         .message { margin-bottom: 20px; padding: 15px; border-radius: 8px; line-height: 1.6; animation: fadeIn 0.3s ease; }
         .ai-msg { background: white; border-left: 5px solid var(--accent); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .user-msg { background: #e2e8f0; margin-left: auto; max-width: 80%; font-weight: 500; }
@@ -28,76 +28,99 @@
         .chart-container { background: white; border-radius: 12px; padding: 15px; position: relative; display: none; }
         
         .input-group { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; margin-top: 10px; border: 1px solid #e2e8f0; }
-        textarea { flex-grow: 1; border: none; outline: none; resize: none; font-size: 1rem; }
+        textarea { flex-grow: 1; border: none; outline: none; resize: none; font-size: 1rem; padding: 5px; }
         
+        button { cursor: pointer; transition: 0.2s; border: none; border-radius: 8px; font-weight: 600; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Estilos para Tablas generadas por la IA */
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 0.9rem; }
+        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+        th { background: #f8fafc; }
     </style>
 </head>
 <body>
 
 <header>
-    <h1><i class="fas fa-chart-pie"></i> AI Pro Analyst <span style="font-weight: 300; font-size: 0.8rem; opacity: 0.7;">Intelligence Dashboard</span></h1>
-    <div id="status"><i class="fas fa-circle" style="color: var(--success); font-size: 0.7rem;"></i> Motor listo</div>
+    <h1><i class="fas fa-chart-line"></i> AI Pro Analyst <span style="font-weight: 300; font-size: 0.8rem; opacity: 0.7;">Business Intelligence</span></h1>
+    <div id="status"><i class="fas fa-circle" style="color: var(--success); font-size: 0.7rem;"></i> Sistema Conectado</div>
 </header>
 
 <div class="main-grid">
     <div class="card">
-        <h3><i class="fas fa-database"></i> Datos</h3>
+        <h3><i class="fas fa-database"></i> Gestión de Datos</h3>
+        <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 20px;">Sube un archivo CSV o Excel para alimentar el motor de análisis.</p>
+        
         <form id="upload-form">
-            <input type="file" name="file" id="file-input" style="width: 100%; margin: 15px 0;" required>
-            <button type="submit" id="upload-btn" style="width: 100%; background: var(--primary); color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer;">
+            <input type="file" name="file" id="file-input" style="width: 100%; margin-bottom: 15px;" required>
+            <button type="submit" id="upload-btn" style="width: 100%; background: var(--primary); color: white; padding: 12px;">
                 <i class="fas fa-upload"></i> Cargar y Analizar
             </button>
         </form>
-        <div id="file-info" style="margin-top: 20px; font-size: 0.85rem; color: #64748b;"></div>
+
+        <hr style="margin: 25px 0; border: 0; border-top: 1px solid #e2e8f0;">
+        
+        <div style="font-size: 0.8rem; color: #94a3b8;">
+            <strong>Modo Actual:</strong><br>
+            <i class="fas fa-check-circle" style="color: var(--success);"></i> Gráficos Dinámicos Habilitados<br>
+            <i class="fas fa-check-circle" style="color: var(--success);"></i> Matriz Cruzada de Ventas
+        </div>
     </div>
 
     <div class="content-area">
         <div class="card" style="overflow: hidden;">
             <div id="output">
-                <div class="message ai-msg">🚀 Sistema listo. Sube un archivo para activar las gráficas y el análisis de IA.</div>
+                <div class="message ai-msg">
+                    👋 <strong>¡Hola! Soy tu asistente de inteligencia de negocios.</strong><br>
+                    Carga tus datos a la izquierda. Una vez listos, podré mostrarte tendencias, rankings y gráficos automáticos.
+                </div>
             </div>
+            
             <form id="chat-form" class="input-group">
-                <textarea id="question" rows="1" placeholder="Haz una pregunta estratégica..."></textarea>
-                <button type="submit" id="send-btn" style="background: var(--accent); color: white; border: none; border-radius: 8px; padding: 0 20px;"><i class="fas fa-paper-plane"></i></button>
+                <textarea id="question" rows="1" placeholder="Ej: ¿Qué productos venden más mis vendedores?" required></textarea>
+                <button type="submit" id="send-btn" style="background: var(--accent); color: white; padding: 0 20px;">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
             </form>
         </div>
 
         <div id="chart-card" class="card chart-container">
-            <h4 style="margin: 0 0 10px 0;"><i class="fas fa-chart-bar"></i> Top 5 Productos por Ingresos</h4>
-            <canvas id="salesChart"></canvas>
+            <h4 style="margin: 0 0 10px 0;"><i class="fas fa-chart-bar"></i> Visualización de Datos</h4>
+            <div style="flex-grow: 1; position: relative;">
+                <canvas id="salesChart"></canvas>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    let myChart = null; // Variable global para controlar el gráfico
+    let myChart = null;
+    const output = document.getElementById('output');
 
-    // 1. MANEJO DE CARGA DE ARCHIVOS (Aquí es donde se activan los gráficos)
+    // 1. MANEJO DE SUBIDA DE ARCHIVOS
     document.getElementById('upload-form').onsubmit = async (e) => {
         e.preventDefault();
         const btn = document.getElementById('upload-btn');
-        const output = document.getElementById('output');
-        
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
 
         try {
-            const res = await fetch('/upload', { method: 'POST', body: new FormData(e.target) });
+            const formData = new FormData(e.target);
+            const res = await fetch('/upload', { method: 'POST', body: formData });
             const data = await res.json();
             
-            // Mostrar respuesta en el chat
-            output.innerHTML += `<div class="message ai-msg" style="border-left-color: var(--success)">${data.reply}</div>`;
+            output.innerHTML += `<div class="message ai-msg" style="border-left: 5px solid var(--success)">${data.reply}</div>`;
             
-            // MAGIA VISUAL: Si el servidor envió chart_data, dibujamos
+            // Si el servidor envía datos iniciales de gráfico (Top 5 Productos)
             if(data.chart_data) {
-                console.log("Datos recibidos para el gráfico:", data.chart_data);
                 renderChart(data.chart_data);
-                document.getElementById('chart-card').style.display = 'block'; // Mostrar el contenedor
+                document.getElementById('chart-card').style.display = 'block';
+                document.querySelector('#chart-card h4').innerHTML = `<i class="fas fa-chart-bar"></i> Top 5 Productos por Ingreso`;
             }
         } catch (err) {
-            console.error(err);
-            alert("Error al cargar el archivo.");
+            alert("Error al procesar el archivo. Revisa el formato.");
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-upload"></i> Cargar y Analizar';
@@ -105,49 +128,40 @@
         }
     };
 
-    // 2. FUNCIÓN PARA RENDERIZAR EL GRÁFICO (Chart.js)
+    // 2. FUNCIÓN PARA DIBUJAR EL GRÁFICO (CHART.JS)
     function renderChart(chartData) {
         const ctx = document.getElementById('salesChart').getContext('2d');
-        
-        // Si ya existía un gráfico, lo destruimos para crear uno nuevo
-        if (myChart) {
-            myChart.destroy();
-        }
+        if (myChart) { myChart.destroy(); }
         
         myChart = new Chart(ctx, {
-            type: 'bar', // Tipo de gráfico: barras
+            type: 'bar',
             data: {
                 labels: chartData.labels,
                 datasets: [{
-                    label: 'Ingresos Totales ($)',
+                    label: 'Total ($)',
                     data: chartData.values,
-                    backgroundColor: 'rgba(59, 130, 246, 0.8)', // Azul corporativo
-                    borderColor: '#3b82f6',
-                    borderWidth: 1,
-                    borderRadius: 5
+                    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                    borderRadius: 6
                 }]
             },
             options: {
-                indexAxis: 'y', // Barras horizontales (más profesional)
+                indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
+                plugins: { legend: { display: false } },
                 scales: {
-                    x: { beginAtZero: true, grid: { display: false } },
+                    x: { beginAtZero: true, grid: { color: '#f1f5f9' } },
                     y: { grid: { display: false } }
                 }
             }
         });
     }
 
-    // 3. MANEJO DEL CHAT (Tu código original)
+    // 3. MANEJO DEL CHAT DINÁMICO
     document.getElementById('chat-form').onsubmit = async (e) => {
         e.preventDefault();
         const qField = document.getElementById('question');
         const question = qField.value;
-        const output = document.getElementById('output');
 
         if(!question.trim()) return;
 
@@ -161,9 +175,18 @@
                 body: JSON.stringify({ message: question })
             });
             const data = await res.json();
+            
+            // Insertar respuesta de la IA (Markdown a HTML)
             output.innerHTML += `<div class="message ai-msg">${marked.parse(data.reply)}</div>`;
+            
+            // ACTUALIZACIÓN DE GRÁFICO SI LA IA ENVÍA NUEVOS DATOS (Vendedores, etc.)
+            if(data.new_chart_data) {
+                renderChart(data.new_chart_data);
+                document.getElementById('chart-card').style.display = 'block';
+                document.querySelector('#chart-card h4').innerHTML = `<i class="fas fa-chart-bar"></i> ${data.new_chart_data.title}`;
+            }
         } catch (err) {
-            output.innerHTML += `<div class="message ai-msg" style="color:red">Error en la consulta.</div>`;
+            output.innerHTML += `<div class="message ai-msg" style="color:red">Error de conexión con el motor de IA.</div>`;
         } finally {
             output.scrollTop = output.scrollHeight;
         }
