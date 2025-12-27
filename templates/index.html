@@ -6,123 +6,153 @@
     <title>AI Pro Analyst | Business Intelligence</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #0f172a; --accent: #3b82f6; --success: #10b981; --bg: #f1f5f9; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); margin: 0; color: #1e293b; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); margin: 0; color: #1e293b; overflow: hidden; }
         
-        /* Sidebar/Header Layout */
-        header { background: var(--primary); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        header h1 { font-size: 1.25rem; margin: 0; display: flex; align-items: center; gap: 10px; }
+        header { background: var(--primary); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; height: 60px; }
         
-        .main-grid { display: grid; grid-template-columns: 350px 1fr; gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; height: calc(100vh - 100px); }
+        .main-grid { display: grid; grid-template-columns: 350px 1fr; gap: 20px; padding: 20px; max-width: 1600px; margin: 0 auto; height: calc(100vh - 100px); }
         
-        /* Cards */
-        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
-        .upload-section { border: 2px dashed #cbd5e1; transition: 0.3s; }
-        .upload-section:hover { border-color: var(--accent); }
+        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         
-        /* Chat Area */
-        .chat-area { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-        #output { flex-grow: 1; overflow-y: auto; padding: 10px; scroll-behavior: smooth; }
+        /* Contenedor de Chat y Gráfico */
+        .content-area { display: grid; grid-template-rows: 1fr 300px; gap: 20px; height: 100%; overflow: hidden; }
         
-        .message { margin-bottom: 20px; padding: 15px; border-radius: 8px; line-height: 1.6; }
-        .ai-msg { background: #ffffff; border-left: 5px solid var(--accent); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .user-msg { background: #e2e8f0; align-self: flex-end; max-width: 80%; margin-left: auto; font-weight: 500; }
-        
-        /* Forms */
-        .input-group { display: flex; gap: 10px; margin-top: 15px; background: white; padding: 10px; border-radius: 12px; border: 1px solid #e2e8f0; }
-        textarea { flex-grow: 1; border: none; outline: none; resize: none; font-size: 1rem; padding: 10px; }
-        button { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; }
-        button:hover { opacity: 0.9; transform: translateY(-1px); }
-        button:disabled { background: #94a3b8; }
+        #output { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        .message { margin-bottom: 20px; padding: 15px; border-radius: 8px; line-height: 1.6; animation: fadeIn 0.3s ease; }
+        .ai-msg { background: white; border-left: 5px solid var(--accent); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .user-msg { background: #e2e8f0; margin-left: auto; max-width: 80%; font-weight: 500; }
 
-        /* Tables and Markdown styling */
-        table { border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 0.9rem; }
-        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
-        th { background: #f8fafc; color: var(--primary); }
+        .chart-container { background: white; border-radius: 12px; padding: 15px; position: relative; display: none; }
         
-        .loader { display: none; text-align: center; color: var(--accent); font-weight: bold; margin: 10px 0; }
+        .input-group { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; margin-top: 10px; border: 1px solid #e2e8f0; }
+        textarea { flex-grow: 1; border: none; outline: none; resize: none; font-size: 1rem; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
 <header>
-    <h1><i class="fas fa-brain"></i> AI Pro Analyst <span style="font-weight: 300; font-size: 0.8rem; opacity: 0.8;">v2.0 Precision</span></h1>
-    <div id="status" style="font-size: 0.85rem;"><i class="fas fa-circle" style="color: var(--success);"></i> Sistema Activo</div>
+    <h1><i class="fas fa-chart-pie"></i> AI Pro Analyst <span style="font-weight: 300; font-size: 0.8rem; opacity: 0.7;">Intelligence Dashboard</span></h1>
+    <div id="status"><i class="fas fa-circle" style="color: var(--success); font-size: 0.7rem;"></i> Motor listo</div>
 </header>
 
 <div class="main-grid">
     <div class="card">
-        <h3><i class="fas fa-cloud-upload-alt"></i> Fuente de Datos</h3>
-        <p style="font-size: 0.85rem; color: #64748b;">Sube tu CSV o Excel para sincronizar el motor analítico.</p>
+        <h3><i class="fas fa-database"></i> Datos</h3>
         <form id="upload-form">
-            <input type="file" name="file" id="file-input" style="width: 100%; margin-bottom: 15px;" required>
-            <button type="submit" id="upload-btn" style="width: 100%;">
-                <i class="fas fa-sync"></i> Sincronizar Ahora
+            <input type="file" name="file" id="file-input" style="width: 100%; margin: 15px 0;" required>
+            <button type="submit" id="upload-btn" style="width: 100%; background: var(--primary); color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer;">
+                <i class="fas fa-upload"></i> Cargar y Analizar
             </button>
         </form>
-        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-        <div style="font-size: 0.8rem; color: #94a3b8;">
-            <strong>Soporta:</strong> .csv, .xlsx<br>
-            <strong>Procesamiento:</strong> En tiempo real
-        </div>
+        <div id="file-info" style="margin-top: 20px; font-size: 0.85rem; color: #64748b;"></div>
     </div>
 
-    <div class="card chat-area">
-        <div id="output">
-            <div class="message ai-msg">
-                👋 <strong>¡Bienvenido a AI Pro Analyst!</strong><br>
-                Sincroniza tus datos a la izquierda para comenzar un análisis estratégico. Puedo ayudarte con rankings, proyecciones y detección de anomalías.
+    <div class="content-area">
+        <div class="card" style="overflow: hidden;">
+            <div id="output">
+                <div class="message ai-msg">🚀 Sistema listo. Sube un archivo para activar las gráficas y el análisis de IA.</div>
             </div>
+            <form id="chat-form" class="input-group">
+                <textarea id="question" rows="1" placeholder="Haz una pregunta estratégica..."></textarea>
+                <button type="submit" id="send-btn" style="background: var(--accent); color: white; border: none; border-radius: 8px; padding: 0 20px;"><i class="fas fa-paper-plane"></i></button>
+            </form>
         </div>
-        
-        <div id="loader" class="loader"><i class="fas fa-spinner fa-spin"></i> Consultando a la IA...</div>
 
-        <form id="chat-form" class="input-group">
-            <textarea id="question" rows="1" placeholder="Ej: ¿Quién vendió más laptops en total?" required></textarea>
-            <button type="submit" id="send-btn"><i class="fas fa-paper-plane"></i></button>
-        </form>
+        <div id="chart-card" class="card chart-container">
+            <h4 style="margin: 0 0 10px 0;"><i class="fas fa-chart-bar"></i> Top 5 Productos por Ingresos</h4>
+            <canvas id="salesChart"></canvas>
+        </div>
     </div>
 </div>
 
 <script>
-    const output = document.getElementById('output');
-    const loader = document.getElementById('loader');
+    let myChart = null; // Variable global para controlar el gráfico
 
-    // Manejo de Carga
+    // 1. MANEJO DE CARGA DE ARCHIVOS (Aquí es donde se activan los gráficos)
     document.getElementById('upload-form').onsubmit = async (e) => {
         e.preventDefault();
         const btn = document.getElementById('upload-btn');
+        const output = document.getElementById('output');
+        
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
 
         try {
             const res = await fetch('/upload', { method: 'POST', body: new FormData(e.target) });
             const data = await res.json();
-            output.innerHTML += `<div class="message ai-msg" style="border-left-color: var(--success)">${data.reply || data.error}</div>`;
+            
+            // Mostrar respuesta en el chat
+            output.innerHTML += `<div class="message ai-msg" style="border-left-color: var(--success)">${data.reply}</div>`;
+            
+            // MAGIA VISUAL: Si el servidor envió chart_data, dibujamos
+            if(data.chart_data) {
+                console.log("Datos recibidos para el gráfico:", data.chart_data);
+                renderChart(data.chart_data);
+                document.getElementById('chart-card').style.display = 'block'; // Mostrar el contenedor
+            }
         } catch (err) {
-            alert("Error al conectar con el servidor.");
+            console.error(err);
+            alert("Error al cargar el archivo.");
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-sync"></i> Sincronizar Ahora';
+            btn.innerHTML = '<i class="fas fa-upload"></i> Cargar y Analizar';
             output.scrollTop = output.scrollHeight;
         }
     };
 
-    // Manejo de Chat
+    // 2. FUNCIÓN PARA RENDERIZAR EL GRÁFICO (Chart.js)
+    function renderChart(chartData) {
+        const ctx = document.getElementById('salesChart').getContext('2d');
+        
+        // Si ya existía un gráfico, lo destruimos para crear uno nuevo
+        if (myChart) {
+            myChart.destroy();
+        }
+        
+        myChart = new Chart(ctx, {
+            type: 'bar', // Tipo de gráfico: barras
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    label: 'Ingresos Totales ($)',
+                    data: chartData.values,
+                    backgroundColor: 'rgba(59, 130, 246, 0.8)', // Azul corporativo
+                    borderColor: '#3b82f6',
+                    borderWidth: 1,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                indexAxis: 'y', // Barras horizontales (más profesional)
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { beginAtZero: true, grid: { display: false } },
+                    y: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // 3. MANEJO DEL CHAT (Tu código original)
     document.getElementById('chat-form').onsubmit = async (e) => {
         e.preventDefault();
-        const questionField = document.getElementById('question');
-        const question = questionField.value;
-        const btn = document.getElementById('send-btn');
+        const qField = document.getElementById('question');
+        const question = qField.value;
+        const output = document.getElementById('output');
 
         if(!question.trim()) return;
 
-        // Mostrar pregunta del usuario
         output.innerHTML += `<div class="message user-msg">${question}</div>`;
-        loader.style.display = 'block';
-        btn.disabled = true;
-        questionField.value = "";
+        qField.value = "";
 
         try {
             const res = await fetch('/chat', {
@@ -133,10 +163,8 @@
             const data = await res.json();
             output.innerHTML += `<div class="message ai-msg">${marked.parse(data.reply)}</div>`;
         } catch (err) {
-            output.innerHTML += `<div class="message ai-msg" style="color:red">Error en la consulta. Intente de nuevo.</div>`;
+            output.innerHTML += `<div class="message ai-msg" style="color:red">Error en la consulta.</div>`;
         } finally {
-            loader.style.display = 'none';
-            btn.disabled = false;
             output.scrollTop = output.scrollHeight;
         }
     };

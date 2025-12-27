@@ -34,14 +34,11 @@ def obtener_contexto_analitico():
         df = pd.read_sql_query("SELECT * FROM ventas", conn)
         conn.close()
         
-        if df.empty:
-            return "Sin datos."
+        if df.empty: return "Sin datos."
 
-        # ANALÍTICA DE PRECISIÓN
+        # Analítica de precisión para la IA
         total_gral = df['Total'].sum()
-        # Resumen de productos ordenado
         prod_stats = df.groupby('Producto').agg({'Total': 'sum', 'Cantidad': 'sum'}).sort_values(by='Total', ascending=False).to_dict(orient='index')
-        # MATRIZ EXACTA: Quién vendió qué
         matriz_exacta = df.groupby(['Vendedor', 'Producto'])['Total'].sum().unstack(fill_value=0).to_dict(orient='index')
         
         contexto = (
@@ -63,12 +60,26 @@ def upload():
     file = request.files.get('file')
     if not file: return jsonify({"error": "No file"}), 400
     try:
+        # Leer archivo
         df = pd.read_csv(file, sep=None, engine='python') if file.filename.endswith('.csv') else pd.read_excel(file)
         df.columns = [c.strip() for c in df.columns]
+        
+        # Guardar en SQLite
         conn = sqlite3.connect(DATABASE)
         df.to_sql('ventas', conn, if_exists='replace', index=False)
         conn.close()
-        return jsonify({"reply": "🚀 Base de datos actualizada. Análisis cruzado listo."})
+
+        # PREPARAR DATOS PARA EL GRÁFICO (Top 5 productos)
+        top_productos = df.groupby('Producto')['Total'].sum().sort_values(ascending=False).head(5)
+        chart_data = {
+            "labels": top_productos.index.tolist(),
+            "values": top_productos.values.tolist()
+        }
+        
+        return jsonify({
+            "reply": "🚀 Base de datos actualizada. Análisis y visualización listos.",
+            "chart_data": chart_data  # Esto activa la gráfica en el frontend
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
