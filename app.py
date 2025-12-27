@@ -35,7 +35,7 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload():
     # Aquí va tu lógica de subida de archivos/datos
-    return jsonify({"status": "success", "message": "Datos recibidos"})
+    return jsonify({"reply": "success", "message": "Datos recibidos"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -55,7 +55,7 @@ def chat():
         )
         
         respuesta_texto = chat_response.choices[0].message.content
-        return jsonify({"response": respuesta_texto})
+        return jsonify({"reply": respuesta_texto})
 
     except Exception as e:
         print(f"Error con Mistral: {e}")
