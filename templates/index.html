@@ -3,188 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Pro Analyst | Business Intelligence</title>
+    <title>AI Pro Analyst - Business Intelligence</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #0f172a; --accent: #3b82f6; --danger: #ef4444; --bg: #f8fafc; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); margin: 0; color: #1e293b; }
+        :root { --accent: #3b82f6; --bg: #f8fafc; --dark: #0f172a; }
+        body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--dark); }
+        .main-container { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
         
-        header { background: var(--primary); color: white; padding: 0 2rem; display: flex; align-items: center; height: 50px; position: sticky; top: 0; z-index: 100; }
+        /* Sidebar */
+        .sidebar { background: white; border-right: 1px solid #e2e8f0; padding: 20px; display: flex; flex-direction: column; }
+        .status-card { background: #f1f5f9; padding: 15px; border-radius: 12px; margin-top: auto; margin-bottom: 20px; font-size: 0.85rem; }
+        .progress-bar { background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { background: var(--accent); height: 100%; transition: width 0.5s; }
         
-        /* DISEÑO DE GRILLA (PC) */
-        .main-grid { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 50px); }
-        
-        .sidebar { background: white; border-right: 1px solid #e2e8f0; padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
-        
-        #chart-container-sidebar { margin-top: 15px; padding-top: 15px; border-top: 1px solid #f1f5f9; display: none; flex-direction: column; gap: 10px; }
-        
-        .chat-area { display: flex; flex-direction: column; background: var(--bg); overflow: hidden; height: 100%; }
-        
-        #output { flex-grow: 1; overflow-y: auto; padding: 25px 8%; scroll-behavior: smooth; }
-        
-        .message { margin-bottom: 25px; line-height: 1.6; animation: fadeIn 0.3s ease; }
-        .ai-msg { color: #334155; font-size: 1rem; }
-        .user-msg { background: #3b82f6; color: white; padding: 12px 20px; border-radius: 15px 15px 0 15px; width: fit-content; max-width: 85%; margin-left: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        /* Chat Area */
+        .chat-area { display: flex; flex-direction: column; padding: 20px; overflow-hidden; }
+        #chat-window { flex: 1; overflow-y: auto; background: white; border-radius: 15px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 20px; }
+        .input-group { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        input[type="text"] { flex: 1; border: none; outline: none; font-size: 1rem; }
+        button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 600; }
+        .btn-primary { background: var(--dark); color: white; }
 
-        .input-wrapper { background: white; padding: 15px 8%; border-top: 1px solid #e2e8f0; }
-        .input-group { display: flex; gap: 10px; align-items: center; background: #f1f5f9; padding: 8px 15px; border-radius: 25px; }
-        textarea { flex-grow: 1; border: none; background: transparent; outline: none; resize: none; font-size: 1rem; padding: 8px; font-family: inherit; max-height: 150px; }
-        
-        button { cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; }
-        .btn-primary { background: var(--primary); color: white; padding: 12px; width: 100%; font-weight: 600; }
-        .btn-send { background: var(--accent); color: white; width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
-
-        /* SECCIÓN DE FIRMA PROFESIONAL */
-        .sidebar-footer {
-            margin-top: auto;
-            padding-top: 20px;
-            border-top: 1px solid #f1f5f9;
-            font-size: 0.75rem;
-            color: #64748b;
-        }
-        .dev-name { color: var(--primary); font-weight: 700; display: block; margin-top: 2px; }
-        .powered-by { font-style: italic; display: flex; align-items: center; gap: 4px; margin-top: 4px; }
-        .location { margin-top: 6px; display: flex; align-items: center; gap: 5px; opacity: 0.8; }
-
-        /* TABLAS RESPONSIVE */
-        .table-container { width: 100%; overflow-x: auto; margin: 20px 0; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        table { border-collapse: collapse; width: 100%; background: white; min-width: 500px; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #f1f5f9; }
-        th { background: #f8fafc; font-weight: 700; color: #475569; }
-
-        /* --- MEDIA QUERY PARA MÓVILES --- */
-        @media (max-width: 850px) {
-            .main-grid { grid-template-columns: 1fr; height: auto; display: block; }
-            .sidebar { border-right: none; border-bottom: 1px solid #e2e8f0; width: 100%; box-sizing: border-box; min-height: auto; }
-            .sidebar-footer { margin-top: 20px; padding-bottom: 10px; }
-            .chat-area { height: 70vh; }
-            #output { padding: 20px 5%; }
-            .input-wrapper { padding: 10px 5%; }
-        }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Overlay de Login */
+        #auth-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .auth-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; }
+        .auth-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-<header>
-    <h3><i class="fas fa-brain"></i> AI Pro Analyst</h3>
-</header>
+<div id="auth-overlay">
+    <div class="auth-box">
+        <i class="fas fa-brain" style="font-size: 3rem; color: var(--accent);"></i>
+        <h2>AI Pro Analyst</h2>
+        <p style="color: #64748b;">Prueba Gratuita de 7 Días</p>
+        <form id="auth-form">
+            <input type="email" id="auth-email" class="auth-input" placeholder="Correo Corporativo" required>
+            <input type="password" id="auth-password" class="auth-input" placeholder="Contraseña" required>
+            <button type="submit" id="btn-auth" class="btn-primary" style="width: 100%; margin-top: 10px;">Comenzar Ahora</button>
+            <p id="auth-switch" style="font-size: 0.8rem; color: var(--accent); cursor: pointer; margin-top: 15px;">¿Ya tienes cuenta? Inicia Sesión</p>
+        </form>
+    </div>
+</div>
 
-<div class="main-grid">
+<div class="main-container">
     <div class="sidebar">
-        <div>
-            <h4 style="margin: 0 0 15px 0;">Panel de Control</h4>
-            <form id="upload-form">
-                <input type="file" name="file" id="file-input" style="font-size: 0.8rem; width: 100%; margin-bottom: 12px;" required>
-                <button type="submit" id="upload-btn" class="btn-primary">Procesar Datos</button>
-            </form>
-            <button onclick="newSession()" style="background:none; border: 1px solid #cbd5e1; color:#64748b; width:100%; padding:8px; margin-top:10px; border-radius:8px; font-size:0.8rem;">
-                <i class="fas fa-redo"></i> Nueva Sesión
-            </button>
-        </div>
-
-        <div id="chart-container-sidebar">
-            <span style="font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Gráfico de Apoyo</span>
-            <div style="height: 180px;"><canvas id="salesChart"></canvas></div>
-        </div>
-
-        <div class="sidebar-footer">
-            <span>Desarrollado por:</span>
-            <span class="dev-name">Jesus M Polo</span>
-            <span class="powered-by">Powered by <i class="fas fa-bolt" style="color: #fbbf24;"></i> <strong>MISTRAL</strong></span>
-            <div class="location">
-                <i class="fas fa-location-dot"></i> Guanare - Venezuela
+        <h2 style="font-size: 1.2rem;"><i class="fas fa-chart-pie"></i> Panel de Control</h2>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        
+        <div id="status-card" class="status-card">
+            <div style="display:flex; justify-content: space-between;">
+                <span>Días de prueba:</span>
+                <strong id="dias-restantes">7 / 7</strong>
             </div>
+            <div class="progress-bar"><div id="barra-dias" class="progress-fill"></div></div>
+            <p id="info-consultas" style="margin: 0; color: #64748b;">Consultas hoy: 0 / 10</p>
+        </div>
+
+        <div style="font-size: 0.75rem; color: #94a3b8; text-align: center;">
+            Desarrollado por: <strong>Jesus M Polo</strong>
         </div>
     </div>
 
     <div class="chat-area">
-        <div id="output">
-            <div class="message ai-msg">
-                <h2>Centro de Análisis Listo</h2>
-                <p>Las tablas y reportes se optimizarán automáticamente para su pantalla.</p>
+        <div id="chat-window">
+            <div style="color: #64748b; text-align: center; margin-top: 100px;">
+                <i class="fas fa-file-upload" style="font-size: 2rem; display: block; margin-bottom: 10px;"></i>
+                Sube un archivo Excel o CSV para comenzar el análisis estratégico.
             </div>
         </div>
-        
-        <div class="input-wrapper">
-            <form id="chat-form" class="input-group">
-                <textarea id="question" rows="1" placeholder="Escriba su consulta..." required></textarea>
-                <button type="submit" class="btn-send"><i class="fas fa-paper-plane"></i></button>
-            </form>
-        </div>
+
+        <form id="chat-form" class="input-group">
+            <input type="text" id="user-input" placeholder="Pregunta sobre tus datos (ej. ¿Quién vendió más?)...">
+            <button type="submit" class="btn-primary">Analizar <i class="fas fa-paper-plane"></i></button>
+        </form>
     </div>
 </div>
 
+
+
 <script>
-    let myChart = null;
-    const output = document.getElementById('output');
-    const chartSidebar = document.getElementById('chart-container-sidebar');
+    // === 1. CONFIGURACIÓN (REEMPLAZA ESTO) ===
+    const supabaseUrl = 'TU_PROJECT_URL_AQUÍ';
+    const supabaseKey = 'TU_PUBLISHABLE_KEY_AQUÍ';
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-    function renderChart(chartData) {
-        const ctx = document.getElementById('salesChart').getContext('2d');
-        if (myChart) myChart.destroy();
-        myChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: chartData.labels,
-                datasets: [{ data: chartData.values, backgroundColor: '#3b82f6', borderRadius: 4 }]
-            },
-            options: {
-                indexAxis: 'y',
-                maintainAspectRatio: false,
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { x: { display: false }, y: { ticks: { font: { size: 10 } } } }
-            }
-        });
-    }
+    let isSignUp = true;
+    let currentUser = null;
 
-    function newSession() {
-        location.reload();
-    }
+    // === 2. GESTIÓN DE AUTENTICACIÓN ===
+    const authForm = document.getElementById('auth-form');
+    const authOverlay = document.getElementById('auth-overlay');
+    const authSwitch = document.getElementById('auth-switch');
+    const btnAuth = document.getElementById('btn-auth');
 
-    document.getElementById('upload-form').onsubmit = async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('upload-btn');
-        btn.innerHTML = 'Procesando...';
-        const res = await fetch('/upload', { method: 'POST', body: new FormData(e.target) });
-        const data = await res.json();
-        output.innerHTML += `<div class="message ai-msg"><strong>Sistema:</strong> ${data.reply}</div>`;
-        if(data.chart_data) {
-            chartSidebar.style.display = 'flex';
-            renderChart(data.chart_data);
-        }
-        btn.innerHTML = 'Procesar Datos';
-        output.scrollTop = output.scrollHeight;
+    authSwitch.onclick = () => {
+        isSignUp = !isSignUp;
+        btnAuth.innerText = isSignUp ? "Comenzar Ahora" : "Entrar al Panel";
+        authSwitch.innerText = isSignUp ? "¿Ya tienes cuenta? Inicia Sesión" : "¿No tienes cuenta? Regístrate";
     };
 
+    authForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('auth-email').value;
+        const password = document.getElementById('auth-password').value;
+        
+        btnAuth.disabled = true;
+        btnAuth.innerText = "Procesando...";
+
+        try {
+            if (isSignUp) {
+                const { error } = await supabase.auth.signUp({ email, password });
+                if (error) throw error;
+                alert("¡Registro exitoso! Revisa tu email para confirmar.");
+            } else {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                currentUser = data.user;
+                authOverlay.style.display = 'none';
+                actualizarDashboard();
+            }
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            btnAuth.disabled = false;
+            btnAuth.innerText = isSignUp ? "Comenzar Ahora" : "Entrar al Panel";
+        }
+    };
+
+    // === 3. CONTROL DE LÍMITES Y ACCESO ===
+    async function verificarAcceso() {
+        const { data: perfil } = await supabase.from('perfiles_empresa').select('*').eq('id', currentUser.id).single();
+        
+        // Validar 7 días
+        const diasUsados = Math.floor((new Date() - new Date(perfil.fecha_registro)) / (1000 * 60 * 60 * 24));
+        if (diasUsados > 7) {
+            alert("Periodo de prueba terminado.");
+            return false;
+        }
+
+        // Validar consultas diarias
+        if (perfil.consultas_realizadas_hoy >= perfil.consultas_diarias_limite) {
+            alert("Límite diario alcanzado (10/10).");
+            return false;
+        }
+        return true;
+    }
+
+    async function actualizarDashboard() {
+        const { data: perfil } = await supabase.from('perfiles_empresa').select('*').eq('id', currentUser.id).single();
+        if (perfil) {
+            const diasUsados = Math.floor((new Date() - new Date(perfil.fecha_registro)) / (1000 * 60 * 60 * 24));
+            const restantes = Math.max(0, 7 - diasUsados);
+            document.getElementById('dias-restantes').innerText = `${restantes} / 7`;
+            document.getElementById('barra-dias').style.width = `${(restantes / 7) * 100}%`;
+            document.getElementById('info-consultas').innerText = `Consultas hoy: ${perfil.consultas_realizadas_hoy} / 10`;
+        }
+    }
+
+    // === 4. CHAT E INTEGRACIÓN CON IA ===
     document.getElementById('chat-form').onsubmit = async (e) => {
         e.preventDefault();
-        const qField = document.getElementById('question');
-        const question = qField.value;
-        output.innerHTML += `<div class="message user-msg">${question}</div>`;
-        qField.value = "";
+        if (!await verificarAcceso()) return;
 
-        const res = await fetch('/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: question })
-        });
-        const data = await res.json();
+        const input = document.getElementById('user-input');
+        const text = input.value;
+        if (!text) return;
+
+        // Aquí simulas el envío a Mistral
+        console.log("Enviando a IA:", text);
         
-        let htmlResponse = marked.parse(data.reply);
-        htmlResponse = htmlResponse.replace(/<table>/g, '<div class="table-container"><table>').replace(/<\/table>/g, '</table></div>');
-        
-        output.innerHTML += `<div class="message ai-msg">${htmlResponse}</div>`;
-        if(data.new_chart_data) {
-            chartSidebar.style.display = 'flex';
-            renderChart(data.new_chart_data);
-        }
-        output.scrollTop = output.scrollHeight;
+        // Al recibir respuesta exitosa:
+        await supabase.rpc('incrementar_consulta', { usuario_id: currentUser.id });
+        actualizarDashboard();
+        input.value = "";
     };
+
+    // Auto-login si ya hay sesión
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+            currentUser = session.user;
+            authOverlay.style.display = 'none';
+            actualizarDashboard();
+        }
+    });
+
 </script>
 </body>
 </html>
