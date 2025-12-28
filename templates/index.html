@@ -2,170 +2,89 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Pro Analyst - Inteligencia Real</title>
-    
+    <title>AI Pro Analyst - Business Intelligence</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
     <style>
-        :root { --accent: #3b82f6; --success: #10b981; --bg: #f8fafc; --dark: #0f172a; }
-        body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--dark); overflow: hidden; }
-        .main-container { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
-        .sidebar { background: white; border-right: 1px solid #e2e8f0; padding: 20px; display: flex; flex-direction: column; }
-        .status-card { background: #f1f5f9; padding: 15px; border-radius: 12px; margin-top: auto; margin-bottom: 20px; font-size: 0.85rem; }
-        .progress-bar { background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0; }
-        .progress-fill { background: var(--accent); height: 100%; transition: width 0.5s; }
-        .chat-area { display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
-        #chat-window { flex: 1; overflow-y: auto; background: white; border-radius: 15px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .msg { padding: 12px; border-radius: 10px; max-width: 85%; }
-        .msg-user { align-self: flex-end; background: var(--dark); color: white; }
+        :root { --accent: #3b82f6; --dark: #0f172a; --bg: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); display: flex; height: 100vh; }
+        .sidebar { width: 280px; background: white; border-right: 1px solid #e2e8f0; padding: 20px; display: flex; flex-direction: column; }
+        .main { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
+        #chat-window { flex: 1; background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; overflow-y: auto; margin-bottom: 20px; }
+        .msg { margin-bottom: 15px; padding: 12px; border-radius: 8px; max-width: 80%; }
+        .msg-user { align-self: flex-end; background: var(--dark); color: white; margin-left: auto; }
         .msg-ai { align-self: flex-start; background: #f1f5f9; border: 1px solid #e2e8f0; }
-        #chart-box { width: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; display: none; }
-        .input-group { display: flex; gap: 10px; background: white; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; }
-        input[type="text"] { flex: 1; border: none; outline: none; font-size: 1rem; }
-        button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 600; }
-        .btn-primary { background: var(--dark); color: white; }
-        #auth-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .auth-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; }
+        .input-area { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        input { flex: 1; border: none; outline: none; font-size: 1rem; }
+        #chart-box { height: 250px; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
-
-<div id="auth-overlay">
-    <div class="auth-box">
-        <i class="fas fa-brain" style="font-size: 3rem; color: var(--accent);"></i>
-        <h2>AI Pro Analyst</h2>
-        <form id="auth-form">
-            <input type="email" id="auth-email" style="width:100%; padding:10px; margin:10px 0;" placeholder="Correo" required>
-            <input type="password" id="auth-password" style="width:100%; padding:10px; margin:10px 0;" placeholder="Contraseña" required>
-            <button type="submit" class="btn-primary" style="width: 100%;">Entrar</button>
-        </form>
-    </div>
-</div>
-
-<div class="main-container">
     <div class="sidebar">
-        <h2>Dashboard</h2>
-        <div class="status-card">
-            <span>Prueba: <strong id="dias-restantes">7/7</strong></span>
-            <div class="progress-bar"><div id="barra-dias" class="progress-fill"></div></div>
-            <p id="info-consultas">Consultas: 0 / 10</p>
-        </div>
-        <div style="font-size: 0.7rem; text-align: center;">By Jesus M Polo</div>
+        <h2>AI Pro Analyst</h2>
+        <div style="margin-top: auto; font-size: 0.8rem; color: #64748b;">Analista: <strong>Jesus M Polo</strong></div>
     </div>
-
-    <div class="chat-area">
+    <div class="main">
         <div id="chat-window">
-            <div id="drop-zone" style="text-align: center; padding: 30px; border: 2px dashed #ccc; cursor: pointer;" onclick="document.getElementById('file-upload').click()">
-                <i class="fas fa-file-csv" style="font-size: 2rem;"></i>
-                <p>Sube tu archivo para un análisis real</p>
+            <div id="upload-zone" style="text-align: center; border: 2px dashed #cbd5e1; padding: 30px; border-radius: 12px; cursor: pointer;" onclick="document.getElementById('file-input').click()">
+                <i class="fas fa-upload" style="font-size: 2rem; color: var(--accent);"></i>
+                <p>Sube tu archivo para iniciar el análisis con Mistral AI</p>
             </div>
-            <input type="file" id="file-upload" style="display: none;" accept=".csv" onchange="handleFileSelect(this)">
+            <input type="file" id="file-input" style="display:none" onchange="uploadFile(this)">
             <div id="chart-box"><canvas id="canvasIA"></canvas></div>
         </div>
-        <form id="chat-form" class="input-group">
-            <input type="text" id="user-input" placeholder="Pregunta: ¿Quién es el mejor vendedor?">
-            <button type="submit" class="btn-primary"><i class="fas fa-paper-plane"></i></button>
+        <form id="chat-form" class="input-area">
+            <input type="text" id="user-input" placeholder="Pregunta sobre tus ventas...">
+            <button type="submit" style="background:var(--dark); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;"><i class="fas fa-paper-plane"></i></button>
         </form>
     </div>
-</div>
 
-<script>
-    const supabaseUrl = 'https://kebpamfydhnxeaeegulx.supabase.co';
-    const supabaseKey = 'sb_publishable_4MfYQjPVzSmLoEqp4XiVOQ_qjkjEpKi';
-    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+    <script>
+        let chartInstance = null;
 
-    let currentUser = null;
-    let datosArchivo = [];
-    let chartInstance = null;
-
-    function handleFileSelect(input) {
-        Papa.parse(input.files[0], {
-            header: true,
-            dynamicTyping: true,
-            complete: function(results) {
-                datosArchivo = results.data.filter(r => Object.values(r)[0] !== null);
-                document.getElementById('drop-zone').innerHTML = `<i class="fas fa-check" style="color:green"></i> Archivo cargado (${datosArchivo.length} filas)`;
-            }
-        });
-    }
-
-    document.getElementById('chat-form').onsubmit = async (e) => {
-        e.preventDefault();
-        const input = document.getElementById('user-input');
-        const query = input.value.toLowerCase();
-        if (!query || !datosArchivo.length) return;
-
-        const chatWin = document.getElementById('chat-window');
-        chatWin.innerHTML += `<div class="msg msg-user">${query}</div>`;
-        
-        // --- MOTOR DE LÓGICA DE ANÁLISIS ---
-        let respuesta = "";
-        
-        if (query.includes("vendedor") || query.includes("vendido")) {
-            // Buscamos las columnas (Nombre en la 0, Monto en la 1 o similar)
-            const keys = Object.keys(datosArchivo[0]);
-            const colNombre = keys[0];
-            const colValor = keys.find(k => k.toLowerCase().includes('venta') || k.toLowerCase().includes('monto') || typeof datosArchivo[0][k] === 'number');
-
-            // Ordenar para encontrar el mejor
-            const ranking = [...datosArchivo].sort((a, b) => (b[colValor] || 0) - (a[colValor] || 0));
-            const mejor = ranking[0];
-
-            respuesta = `Analizando los datos... El <strong>${colNombre}</strong> con mayor desempeño es <strong>${mejor[colNombre]}</strong> con un total de <strong>${mejor[colValor]}</strong>.`;
-            
-            renderizarGraficoReal(ranking.slice(0, 5), colNombre, colValor);
-        } else {
-            respuesta = "He revisado las filas y los datos están listos. Prueba preguntando por el 'mejor vendedor' o 'ventas totales'.";
+        async function uploadFile(input) {
+            const formData = new FormData();
+            formData.append('file', input.files[0]);
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            document.getElementById('upload-zone').innerHTML = `<i class="fas fa-check-circle" style="color:#10b981"></i> ${data.reply}`;
+            if(data.chart_data) renderChart(data.chart_data);
         }
 
-        chatWin.innerHTML += `<div class="msg msg-ai"><strong>AI Analyst:</strong> ${respuesta}</div>`;
-        input.value = "";
-        chatWin.scrollTop = chatWin.scrollHeight;
+        document.getElementById('chat-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('user-input');
+            const msg = input.value;
+            if(!msg) return;
 
-        await supabaseClient.rpc('incrementar_consulta', { usuario_id: currentUser.id });
-        actualizarDashboard();
-    };
+            const chatWin = document.getElementById('chat-window');
+            chatWin.innerHTML += `<div class="msg msg-user">${msg}</div>`;
+            input.value = "";
 
-    function renderizarGraficoReal(top5, colNombre, colValor) {
-        const ctx = document.getElementById('canvasIA').getContext('2d');
-        document.getElementById('chart-box').style.display = 'block';
-        if (chartInstance) chartInstance.destroy();
+            const res = await fetch('/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: msg})
+            });
+            const data = await res.json();
+            chatWin.innerHTML += `<div class="msg msg-ai"><strong>AI:</strong> ${data.reply}</div>`;
+            if(data.new_chart_data) renderChart(data.new_chart_data);
+            chatWin.scrollTop = chatWin.scrollHeight;
+        };
 
-        chartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: top5.map(d => d[colNombre]),
-                datasets: [{
-                    label: 'Ventas Reales',
-                    data: top5.map(d => d[colValor]),
-                    backgroundColor: '#3b82f6'
-                }]
-            }
-        });
-    }
-
-    // Auth simple
-    document.getElementById('auth-form').onsubmit = async (e) => {
-        e.preventDefault();
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email: document.getElementById('auth-email').value,
-            password: document.getElementById('auth-password').value
-        });
-        if (error) alert(error.message);
-        else { currentUser = data.user; document.getElementById('auth-overlay').style.display='none'; actualizarDashboard(); }
-    };
-
-    async function actualizarDashboard() {
-        const { data: perfil } = await supabaseClient.from('perfiles_empresa').select('*').eq('id', currentUser.id).single();
-        if (perfil) {
-            document.getElementById('info-consultas').innerText = `Consultas: ${perfil.consultas_realizadas_hoy} / 10`;
+        function renderChart(cData) {
+            const ctx = document.getElementById('canvasIA').getContext('2d');
+            document.getElementById('chart-box').style.display = 'block';
+            if(chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: cData.labels,
+                    datasets: [{ label: cData.title, data: cData.values, backgroundColor: '#3b82f6' }]
+                },
+                options: { maintainAspectRatio: false }
+            });
         }
-    }
-</script>
+    </script>
 </body>
 </html>

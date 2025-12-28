@@ -36,20 +36,20 @@ def obtener_contexto_analitico():
         
         if df.empty: return "Sin datos."
 
-        # Analítica de precisión para la IA
         total_gral = df['Total'].sum()
-        prod_stats = df.groupby('Producto').agg({'Total': 'sum', 'Cantidad': 'sum'}).sort_values(by='Total', ascending=False).to_dict(orient='index')
-        matriz_exacta = df.groupby(['Vendedor', 'Producto'])['Total'].sum().unstack(fill_value=0).to_dict(orient='index')
+        # Resumen para que la IA no se pierda en 100 filas
+        prod_stats = df.groupby('Producto')['Total'].sum().sort_values(ascending=False).head(5).to_dict()
+        vend_stats = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False).head(5).to_dict()
         
         contexto = (
-            f"SISTEMA DE INTELIGENCIA DE NEGOCIOS\n"
-            f"TOTAL FACTURADO: ${total_gral:,.2f}\n"
-            f"PERFORMANCE POR PRODUCTO: {prod_stats}\n"
-            f"MATRIZ DE VENTAS POR VENDEDOR: {matriz_exacta}\n"
+            f"DATOS DE NEGOCIO:\n"
+            f"- Total Ventas: ${total_gral:,.2f}\n"
+            f"- Top Productos: {prod_stats}\n"
+            f"- Top Vendedores: {vend_stats}\n"
         )
         return contexto
     except Exception as e:
-        return f"Error al procesar contexto: {e}"
+        return f"Error de contexto: {e}"
 
 @app.route('/')
 def index():
@@ -60,7 +60,6 @@ def upload():
     file = request.files.get('file')
     if not file: return jsonify({"error": "No file"}), 400
     try:
-        # Leer archivo (CSV o Excel)
         if file.filename.endswith('.csv'):
             df = pd.read_csv(file, sep=None, engine='python')
         else:
@@ -68,21 +67,15 @@ def upload():
             
         df.columns = [c.strip() for c in df.columns]
         
-        # Guardar en SQLite
         conn = sqlite3.connect(DATABASE)
         df.to_sql('ventas', conn, if_exists='replace', index=False)
         conn.close()
 
-        # PREPARAR DATOS PARA EL GRÁFICO (Top 5 productos)
-        top_productos = df.groupby('Producto')['Total'].sum().sort_values(ascending=False).head(5)
-        chart_data = {
-            "labels": top_productos.index.tolist(),
-            "values": top_productos.values.tolist()
-        }
-        
+        # Gráfico inicial
+        top_p = df.groupby('Producto')['Total'].sum().sort_values(ascending=False).head(5)
         return jsonify({
-            "reply": "🚀 Base de datos actualizada. Análisis y visualización listos.",
-            "chart_data": chart_data
+            "reply": "✅ Datos cargados. IA lista para analizar.",
+            "chart_data": {"labels": top_p.index.tolist(), "values": top_p.values.tolist(), "title": "Top 5 Productos"}
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -90,7 +83,7 @@ def upload():
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
-    pregunta = data.get("message").lower()
+    pregunta = data.get("message")
     contexto = obtener_contexto_analitico()
     
     try:
@@ -99,24 +92,22 @@ def chat():
         conn.close()
 
         extra_data = None
-        # Gráficos dinámicos basados en la pregunta
-        if "vendedor" in pregunta or "vendedores" in pregunta:
-            v_data = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
-            extra_data = {"labels": v_data.index.tolist(), "values": v_data.values.tolist(), "title": "Ventas por Vendedor"}
+        p_lower = pregunta.lower()
         
-        elif "producto" in pregunta or "ranking" in pregunta or "pareto" in pregunta:
+        if "vendedor" in p_lower:
+            v_data = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False).head(5)
+            extra_data = {"labels": v_data.index.tolist(), "values": v_data.values.tolist(), "title": "Ranking de Vendedores"}
+        
+        elif "producto" in p_lower or "ventas" in p_lower:
             p_data = df.groupby('Producto')['Total'].sum().sort_values(ascending=False).head(5)
-            extra_data = {"labels": p_data.index.tolist(), "values": p_data.values.tolist(), "title": "Top 5 Productos"}
+            extra_data = {"labels": p_data.index.tolist(), "values": p_data.values.tolist(), "title": "Ventas por Producto"}
 
-        # LLAMADA A MISTRAL (Corregida)
         chat_response = client.chat.complete(
             model=model,
             messages=[
-                {"role": "system", "content": f"Eres AI Pro Analyst. Usa tablas y negritas. Datos: {contexto}"},
+                {"role": "system", "content": f"Eres AI Pro Analyst. Responde con negritas y brevedad. Contexto: {contexto}"},
                 {"role": "user", "content": pregunta}
-            ],
-            max_tokens=800,
-            temperature=0.1
+            ]
         )
         
         return jsonify({
@@ -124,10 +115,8 @@ def chat():
             "new_chart_data": extra_data
         })
     except Exception as e:
-        print(f"Error en chat: {e}") # Log para Koyeb
-        return jsonify({"error": "Error procesando la consulta de IA"}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    # Usar el puerto de la variable de entorno para despliegue
     port = int(os.environ.get("PORT", 8000))
     app.run(host='0.0.0.0', port=port)
