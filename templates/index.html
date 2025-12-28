@@ -18,7 +18,7 @@
         .progress-fill { background: var(--accent); height: 100%; transition: width 0.5s; }
         
         /* Chat Area */
-        .chat-area { display: flex; flex-direction: column; padding: 20px; overflow-hidden; }
+        .chat-area { display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
         #chat-window { flex: 1; overflow-y: auto; background: white; border-radius: 15px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 20px; }
         .input-group { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; }
         input[type="text"] { flex: 1; border: none; outline: none; font-size: 1rem; }
@@ -68,7 +68,7 @@
 
     <div class="chat-area">
         <div id="chat-window">
-            <div style="color: #64748b; text-align: center; margin-top: 100px;">
+            <div id="welcome-msg" style="color: #64748b; text-align: center; margin-top: 100px;">
                 <i class="fas fa-file-upload" style="font-size: 2rem; display: block; margin-bottom: 10px;"></i>
                 Sube un archivo Excel o CSV para comenzar el análisis estratégico.
             </div>
@@ -81,23 +81,24 @@
     </div>
 </div>
 
-
-
 <script>
     // === 1. CONFIGURACIÓN (REEMPLAZA ESTO) ===
-    const supabaseUrl = 'TU_PROJECT_URL_AQUÍ';
-    const supabaseKey = 'TU_PUBLISHABLE_KEY_AQUÍ';
-    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+    const supabaseUrl = 'https://kebpamfydhnxeaeegulx.supabase.co';
+    const supabaseKey = 'sb_publishable_4MfYQjPVzSmLoEqp4XiVOQ_qjkjEpKi';
+    
+    // CORRECCIÓN: Usamos el objeto global 'supabase' de la librería para crear el cliente
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     let isSignUp = true;
     let currentUser = null;
 
-    // === 2. GESTIÓN DE AUTENTICACIÓN ===
+    // Elementos del DOM
     const authForm = document.getElementById('auth-form');
     const authOverlay = document.getElementById('auth-overlay');
     const authSwitch = document.getElementById('auth-switch');
     const btnAuth = document.getElementById('btn-auth');
 
+    // === 2. GESTIÓN DE AUTENTICACIÓN ===
     authSwitch.onclick = () => {
         isSignUp = !isSignUp;
         btnAuth.innerText = isSignUp ? "Comenzar Ahora" : "Entrar al Panel";
@@ -114,18 +115,18 @@
 
         try {
             if (isSignUp) {
-                const { error } = await supabase.auth.signUp({ email, password });
+                const { error } = await supabaseClient.auth.signUp({ email, password });
                 if (error) throw error;
                 alert("¡Registro exitoso! Revisa tu email para confirmar.");
             } else {
-                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
                 if (error) throw error;
                 currentUser = data.user;
                 authOverlay.style.display = 'none';
                 actualizarDashboard();
             }
         } catch (err) {
-            alert(err.message);
+            alert("Error: " + err.message);
         } finally {
             btnAuth.disabled = false;
             btnAuth.innerText = isSignUp ? "Comenzar Ahora" : "Entrar al Panel";
@@ -134,8 +135,16 @@
 
     // === 3. CONTROL DE LÍMITES Y ACCESO ===
     async function verificarAcceso() {
-        const { data: perfil } = await supabase.from('perfiles_empresa').select('*').eq('id', currentUser.id).single();
+        if (!currentUser) return false;
         
+        const { data: perfil, error } = await supabaseClient
+            .from('perfiles_empresa')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+        
+        if (error || !perfil) return false;
+
         // Validar 7 días
         const diasUsados = Math.floor((new Date() - new Date(perfil.fecha_registro)) / (1000 * 60 * 60 * 24));
         if (diasUsados > 7) {
@@ -152,7 +161,14 @@
     }
 
     async function actualizarDashboard() {
-        const { data: perfil } = await supabase.from('perfiles_empresa').select('*').eq('id', currentUser.id).single();
+        if (!currentUser) return;
+        
+        const { data: perfil } = await supabaseClient
+            .from('perfiles_empresa')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+
         if (perfil) {
             const diasUsados = Math.floor((new Date() - new Date(perfil.fecha_registro)) / (1000 * 60 * 60 * 24));
             const restantes = Math.max(0, 7 - diasUsados);
@@ -165,30 +181,40 @@
     // === 4. CHAT E INTEGRACIÓN CON IA ===
     document.getElementById('chat-form').onsubmit = async (e) => {
         e.preventDefault();
-        if (!await verificarAcceso()) return;
+        
+        const access = await verificarAcceso();
+        if (!access) return;
 
         const input = document.getElementById('user-input');
         const text = input.value;
         if (!text) return;
 
-        // Aquí simulas el envío a Mistral
-        console.log("Enviando a IA:", text);
+        // Simulación envío a IA
+        const chatWin = document.getElementById('chat-window');
+        chatWin.innerHTML += `<p><strong>Tú:</strong> ${text}</p>`;
         
-        // Al recibir respuesta exitosa:
-        await supabase.rpc('incrementar_consulta', { usuario_id: currentUser.id });
-        actualizarDashboard();
-        input.value = "";
+        try {
+            // Acción en Supabase
+            await supabaseClient.rpc('incrementar_consulta', { usuario_id: currentUser.id });
+            await actualizarDashboard();
+            input.value = "";
+            chatWin.innerHTML += `<p style="color:var(--accent)"><strong>AI:</strong> Analizando tus datos...</p>`;
+            chatWin.scrollTop = chatWin.scrollHeight;
+        } catch (err) {
+            console.error(err);
+        }
     };
 
-    // Auto-login si ya hay sesión
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-            currentUser = session.user;
-            authOverlay.style.display = 'none';
-            actualizarDashboard();
-        }
-    });
-
+    // Auto-login al cargar
+    window.onload = () => {
+        supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                currentUser = session.user;
+                authOverlay.style.display = 'none';
+                actualizarDashboard();
+            }
+        });
+    };
 </script>
 </body>
 </html>
