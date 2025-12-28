@@ -35,7 +35,8 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload():
     file = request.files.get('file')
-    if not file: return jsonify({"error": "No hay archivo"}), 400
+    if not file: 
+        return jsonify({"error": "No hay archivo"}), 400
     try:
         df = pd.read_csv(file) if file.filename.endswith('.csv') else pd.read_excel(file)
         df.columns = [c.strip() for c in df.columns]
@@ -48,7 +49,11 @@ def upload():
         top_v = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False).head(5)
         return jsonify({
             "reply": "✅ Datos cargados. IA lista para analizar.",
-            "chart_data": {"labels": top_v.index.tolist(), "values": top_v.values.tolist(), "title": "Ventas Totales por Vendedor"}
+            "chart_data": {
+                "labels": top_v.index.tolist(), 
+                "values": top_v.values.tolist(), 
+                "title": "Ventas Totales por Vendedor"
+            }
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -66,20 +71,37 @@ def chat():
         # ANALÍTICA PROFUNDA: Agrupamos por Vendedor y Producto
         detalle_vendedores = df.groupby(['Vendedor', 'Producto']).agg({
             'Total': 'sum',
-            'Precio_Unitario': 'mean' # Sacamos el precio promedio por producto
+            'Precio_Unitario': 'mean'
         }).reset_index().to_dict(orient='records')
         
-        # Lógica de Gráficos (se mantiene)
+        # Lógica de Gráficos
         extra_chart = None
         if "vendedor" in pregunta.lower():
             v_data = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False).head(5)
-            extra_chart = {"labels": v_data.index.tolist(), "values": v_data.values.tolist(), "title": "Ranking de Vendedores"}
+            extra_chart = {
+                "labels": v_data.index.tolist(), 
+                "values": v_data.values.tolist(), 
+                "title": "Ranking de Vendedores"
+            }
 
-        # Consulta a Mistral con el DETALLE COMPLETO
+        # Consulta a Mistral con instrucciones de estilo recuperadas
         response = client.chat.complete(
             model=model,
             messages=[
-                {"role": "system", "content": f"Eres un analista experto. Datos detallados: {detalle_vendedores}. Responde directo, usa tablas si hay varios productos y negritas."},
+                {
+                    "role": "system", 
+                    "content": (
+                        "Eres AI Pro Analyst, un consultor senior de negocios. "
+                        f"Datos actuales: {detalle_vendedores}. "
+                        "INSTRUCCIONES DE ESTILO: "
+                        "1. Usa emojis para resaltar logros (ej. ⭐ para el mejor vendedor, 🚀 para crecimiento). "
+                        "2. Si detectas un líder claro, nómbralo con honores. "
+                        "3. Al final de cada respuesta, añade siempre una sección de 'RECOMENDACIÓN ESTRATÉGICA' "
+                        "basada en los números analizados. "
+                        "4. Usa tablas Markdown para comparar datos si es necesario. "
+                        "5. Sé proactivo: si ves que algo va mal o muy bien, menciónalo."
+                    )
+                },
                 {"role": "user", "content": pregunta}
             ]
         )
@@ -89,7 +111,9 @@ def chat():
             "new_chart_data": extra_chart
         })
     except Exception as e:
+        print(f"Error: {e}") # Para debug en consola
         return jsonify({"error": "Error procesando consulta"}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
     app.run(host='0.0.0.0', port=port)
