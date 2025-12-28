@@ -2,89 +2,156 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>AI Pro Analyst - Business Intelligence</title>
+    <title>AI Pro Analyst - Dashboard Seguro</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
         :root { --accent: #3b82f6; --dark: #0f172a; --bg: #f8fafc; }
-        body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); display: flex; height: 100vh; }
+        body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); height: 100vh; display: flex; }
+        
+        /* Estilos del Login */
+        #auth-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .auth-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .auth-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
+        
+        /* Interfaz Principal (Oculta hasta el login) */
         .sidebar { width: 280px; background: white; border-right: 1px solid #e2e8f0; padding: 20px; display: flex; flex-direction: column; }
         .main { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
-        #chat-window { flex: 1; background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; overflow-y: auto; margin-bottom: 20px; }
-        .msg { margin-bottom: 15px; padding: 12px; border-radius: 8px; max-width: 80%; }
-        .msg-user { align-self: flex-end; background: var(--dark); color: white; margin-left: auto; }
+        
+        #chat-window { flex: 1; background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .msg { padding: 12px; border-radius: 10px; max-width: 80%; font-size: 0.95rem; }
+        .msg-user { align-self: flex-end; background: var(--dark); color: white; }
         .msg-ai { align-self: flex-start; background: #f1f5f9; border: 1px solid #e2e8f0; }
-        .input-area { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; }
-        input { flex: 1; border: none; outline: none; font-size: 1rem; }
-        #chart-box { height: 250px; margin-top: 10px; display: none; }
+        
+        .input-area { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px; }
+        input[type="text"] { flex: 1; border: none; outline: none; }
+        
+        #canvas-wrapper { width: 100%; max-height: 300px; display: none; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <h2>AI Pro Analyst</h2>
-        <div style="margin-top: auto; font-size: 0.8rem; color: #64748b;">Analista: <strong>Jesus M Polo</strong></div>
-    </div>
-    <div class="main">
-        <div id="chat-window">
-            <div id="upload-zone" style="text-align: center; border: 2px dashed #cbd5e1; padding: 30px; border-radius: 12px; cursor: pointer;" onclick="document.getElementById('file-input').click()">
-                <i class="fas fa-upload" style="font-size: 2rem; color: var(--accent);"></i>
-                <p>Sube tu archivo para iniciar el análisis con Mistral AI</p>
-            </div>
-            <input type="file" id="file-input" style="display:none" onchange="uploadFile(this)">
-            <div id="chart-box"><canvas id="canvasIA"></canvas></div>
-        </div>
-        <form id="chat-form" class="input-area">
-            <input type="text" id="user-input" placeholder="Pregunta sobre tus ventas...">
-            <button type="submit" style="background:var(--dark); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;"><i class="fas fa-paper-plane"></i></button>
+
+<div id="auth-overlay">
+    <div class="auth-box">
+        <i class="fas fa-brain" style="font-size: 3rem; color: var(--accent); margin-bottom: 15px;"></i>
+        <h2 style="margin:0">AI Pro Analyst</h2>
+        <p style="color: #64748b; font-size: 0.9rem;">Accede a tu panel de analítica</p>
+        <form id="auth-form">
+            <input type="email" id="auth-email" class="auth-input" placeholder="Correo corporativo" required>
+            <input type="password" id="auth-password" class="auth-input" placeholder="Contraseña" required>
+            <button type="submit" style="width:100%; background:var(--dark); color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-weight:600; margin-top:10px;">Entrar al Sistema</button>
         </form>
     </div>
+</div>
 
-    <script>
-        let chartInstance = null;
+<div class="sidebar">
+    <h2 style="font-size: 1.2rem;"><i class="fas fa-chart-pie"></i> Pro Analyst</h2>
+    <div id="user-info" style="margin-top: 20px; font-size: 0.85rem; color: #64748b;"></div>
+    <div style="margin-top: auto; font-size: 0.75rem; color: #94a3b8;">Analista Senior: <br><strong>Jesus M Polo</strong></div>
+</div>
 
-        async function uploadFile(input) {
-            const formData = new FormData();
-            formData.append('file', input.files[0]);
-            const res = await fetch('/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-            document.getElementById('upload-zone').innerHTML = `<i class="fas fa-check-circle" style="color:#10b981"></i> ${data.reply}`;
-            if(data.chart_data) renderChart(data.chart_data);
+<div class="main">
+    <div id="chat-window">
+        <div id="upload-zone" style="text-align: center; border: 2px dashed #cbd5e1; padding: 40px; border-radius: 15px; cursor: pointer;" onclick="document.getElementById('file-in').click()">
+            <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; color: var(--accent);"></i>
+            <p><strong>Sube tu archivo CSV o Excel</strong> para que la IA lo analice</p>
+        </div>
+        <input type="file" id="file-in" style="display:none" onchange="subirArchivo(this)">
+        <div id="canvas-wrapper"><canvas id="graficoIA"></canvas></div>
+    </div>
+
+    <form id="chat-form" class="input-area">
+        <input type="text" id="user-input" placeholder="Haz una pregunta sobre tus datos..." autocomplete="off">
+        <button type="submit" style="background:var(--dark); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;"><i class="fas fa-paper-plane"></i></button>
+    </form>
+</div>
+
+<script>
+    // 1. CONFIGURACIÓN SUPABASE (Seguridad)
+    const supabaseUrl = 'https://kebpamfydhnxeaeegulx.supabase.co';
+    const supabaseKey = 'sb_publishable_4MfYQjPVzSmLoEqp4XiVOQ_qjkjEpKi';
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+    let chartInstance = null;
+
+    // Lógica de Login
+    document.getElementById('auth-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('auth-email').value;
+        const password = document.getElementById('auth-password').value;
+        
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        
+        if (error) {
+            alert("Error: " + error.message);
+        } else {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('user-info').innerHTML = `<i class="fas fa-user"></i> ${data.user.email}`;
         }
+    };
 
-        document.getElementById('chat-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const input = document.getElementById('user-input');
-            const msg = input.value;
-            if(!msg) return;
+    // 2. LÓGICA DE CARGA (Hacia Python)
+    async function subirArchivo(input) {
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        
+        const res = await fetch('/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        
+        document.getElementById('upload-zone').innerHTML = `
+            <i class="fas fa-check-circle" style="color:#10b981; font-size: 2rem;"></i>
+            <p><strong>${data.reply}</strong></p>
+        `;
+        if(data.chart_data) renderChart(data.chart_data);
+    }
 
-            const chatWin = document.getElementById('chat-window');
-            chatWin.innerHTML += `<div class="msg msg-user">${msg}</div>`;
-            input.value = "";
+    // 3. CHAT CON MISTRAL AI (Hacia Python)
+    document.getElementById('chat-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('user-input');
+        const query = input.value;
+        if(!query) return;
 
-            const res = await fetch('/chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({message: msg})
-            });
-            const data = await res.json();
-            chatWin.innerHTML += `<div class="msg msg-ai"><strong>AI:</strong> ${data.reply}</div>`;
-            if(data.new_chart_data) renderChart(data.new_chart_data);
-            chatWin.scrollTop = chatWin.scrollHeight;
-        };
+        const chatWin = document.getElementById('chat-window');
+        chatWin.innerHTML += `<div class="msg msg-user">${query}</div>`;
+        input.value = "";
 
-        function renderChart(cData) {
-            const ctx = document.getElementById('canvasIA').getContext('2d');
-            document.getElementById('chart-box').style.display = 'block';
-            if(chartInstance) chartInstance.destroy();
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: cData.labels,
-                    datasets: [{ label: cData.title, data: cData.values, backgroundColor: '#3b82f6' }]
-                },
-                options: { maintainAspectRatio: false }
-            });
+        const res = await fetch('/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message: query })
+        });
+        const data = await res.json();
+        
+        chatWin.innerHTML += `<div class="msg msg-ai"><strong>AI:</strong> ${data.reply}</div>`;
+        if(data.new_chart_data) renderChart(data.new_chart_data);
+        chatWin.scrollTop = chatWin.scrollHeight;
+    };
+
+    function renderChart(cData) {
+        const ctx = document.getElementById('graficoIA').getContext('2d');
+        document.getElementById('canvas-wrapper').style.display = 'block';
+        if(chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: cData.labels,
+                datasets: [{ label: cData.title, data: cData.values, backgroundColor: '#3b82f6' }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    // Persistencia de sesión
+    window.onload = async () => {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('user-info').innerHTML = `<i class="fas fa-user"></i> ${session.user.email}`;
         }
-    </script>
+    };
+</script>
 </body>
 </html>
