@@ -63,20 +63,23 @@ def chat():
         df = pd.read_sql_query("SELECT * FROM ventas", conn)
         conn.close()
 
-        # Contexto reducido para ahorrar tokens
-        resumen = df.groupby('Vendedor')['Total'].sum().to_dict()
+        # ANALÍTICA PROFUNDA: Agrupamos por Vendedor y Producto
+        detalle_vendedores = df.groupby(['Vendedor', 'Producto']).agg({
+            'Total': 'sum',
+            'Precio_Unitario': 'mean' # Sacamos el precio promedio por producto
+        }).reset_index().to_dict(orient='records')
         
-        # Lógica de Gráficos
+        # Lógica de Gráficos (se mantiene)
         extra_chart = None
         if "vendedor" in pregunta.lower():
             v_data = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False).head(5)
             extra_chart = {"labels": v_data.index.tolist(), "values": v_data.values.tolist(), "title": "Ranking de Vendedores"}
 
-        # Consulta a Mistral
+        # Consulta a Mistral con el DETALLE COMPLETO
         response = client.chat.complete(
             model=model,
             messages=[
-                {"role": "system", "content": f"Eres un analista experto. Usa los datos: {resumen}. Responde directo y usa negritas."},
+                {"role": "system", "content": f"Eres un analista experto. Datos detallados: {detalle_vendedores}. Responde directo, usa tablas si hay varios productos y negritas."},
                 {"role": "user", "content": pregunta}
             ]
         )
@@ -87,7 +90,6 @@ def chat():
         })
     except Exception as e:
         return jsonify({"error": "Error procesando consulta"}), 500
-
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
     app.run(host='0.0.0.0', port=port)
