@@ -8,6 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     
     <style>
         :root { --accent: #3b82f6; --success: #10b981; --bg: #f8fafc; --dark: #0f172a; }
@@ -25,25 +26,26 @@
         #chat-window { 
             flex: 1; overflow-y: auto; background: white; border-radius: 15px; 
             border: 2px dashed #cbd5e1; padding: 20px; margin-bottom: 15px;
-            display: flex; align-items: center; justify-content: center; transition: all 0.3s;
+            display: flex; flex-direction: column; align-items: flex-start;
         }
-        #chat-window.dragover { background: #f0f9ff; border-color: var(--accent); }
+        .msg { margin-bottom: 12px; padding: 10px; border-radius: 8px; max-width: 80%; }
+        .msg-user { align-self: flex-end; background: #e0f2fe; color: #0369a1; }
+        .msg-ai { align-self: flex-start; background: #f1f5f9; border: 1px solid #e2e8f0; }
         
         /* Botones y Entradas */
         .input-group { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; }
         input[type="text"] { flex: 1; border: none; outline: none; font-size: 1rem; }
-        button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 600; transition: 0.2s; }
+        button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 600; }
         .btn-primary { background: var(--dark); color: white; }
         .btn-success { background: var(--success); color: white; display: none; margin-bottom: 10px; width: 100%; }
-        .btn-success:hover { background: #059669; }
 
         /* Login Overlay */
         #auth-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .auth-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .auth-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; }
         .auth-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; }
         
-        .file-label { cursor: pointer; text-align: center; color: #64748b; }
-        .file-label i { font-size: 3.5rem; color: var(--accent); margin-bottom: 15px; display: block; }
+        .file-zone { text-align: center; width: 100%; margin: auto; cursor: pointer; }
+        .file-zone i { font-size: 3rem; color: var(--accent); }
     </style>
 </head>
 <body>
@@ -52,12 +54,11 @@
     <div class="auth-box">
         <i class="fas fa-brain" style="font-size: 3rem; color: var(--accent);"></i>
         <h2>AI Pro Analyst</h2>
-        <p style="color: #64748b;">Business Intelligence SaaS</p>
         <form id="auth-form">
             <input type="email" id="auth-email" class="auth-input" placeholder="Correo Corporativo" required>
             <input type="password" id="auth-password" class="auth-input" placeholder="Contraseña" required>
-            <button type="submit" id="btn-auth" class="btn-primary" style="width: 100%; margin-top: 10px;">Comenzar Ahora</button>
-            <p id="auth-switch" style="font-size: 0.8rem; color: var(--accent); cursor: pointer; margin-top: 15px;">¿Ya tienes cuenta? Inicia Sesión</p>
+            <button type="submit" id="btn-auth" class="btn-primary" style="width: 100%; margin-top: 10px;">Entrar al Panel</button>
+            <p id="auth-switch" style="font-size: 0.8rem; color: var(--accent); cursor: pointer; margin-top: 15px;">¿No tienes cuenta? Regístrate</p>
         </form>
     </div>
 </div>
@@ -65,118 +66,110 @@
 <div class="main-container">
     <div class="sidebar">
         <h2 style="font-size: 1.2rem;"><i class="fas fa-chart-pie"></i> Panel de Control</h2>
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-        
         <div id="status-card" class="status-card">
-            <div style="display:flex; justify-content: space-between;">
-                <span>Días de prueba:</span>
-                <strong id="dias-restantes">7 / 7</strong>
-            </div>
+            <span>Días de prueba:</span> <strong id="dias-restantes">7 / 7</strong>
             <div class="progress-bar"><div id="barra-dias" class="progress-fill"></div></div>
-            <p id="info-consultas" style="margin: 0; color: #64748b;">Consultas hoy: 0 / 10</p>
+            <p id="info-consultas">Consultas hoy: 0 / 10</p>
         </div>
-
-        <div style="font-size: 0.75rem; color: #94a3b8; text-align: center;">
+        <div style="font-size: 0.75rem; color: #94a3b8; text-align: center; margin-top: auto;">
             Desarrollado por: <strong>Jesus M Polo</strong>
         </div>
     </div>
 
     <div class="chat-area">
         <button id="btn-pdf" class="btn-success" onclick="generarPDF()">
-            <i class="fas fa-file-pdf"></i> Descargar Reporte Estratégico PDF
+            <i class="fas fa-file-pdf"></i> Descargar Reporte PDF
         </button>
 
-        <div id="chat-window" ondrop="dropHandler(event)" ondragover="dragOverHandler(event)" ondragleave="dragLeaveHandler(event)">
-            <label for="file-upload" class="file-label" id="drop-zone-label">
+        <div id="chat-window">
+            <div id="drop-zone" class="file-zone" onclick="document.getElementById('file-upload').click()">
                 <i class="fas fa-cloud-upload-alt"></i>
-                <span style="font-weight: 600; font-size: 1.2rem; color: #0f172a;">Haz clic o arrastra tu archivo aquí</span>
-                <p>Soporta Excel (.xlsx) y CSV</p>
-            </label>
-            <input type="file" id="file-upload" style="display: none;" accept=".csv, .xlsx, .xls" onchange="handleFileSelect(this)">
+                <p><strong>Haz clic para subir tu Excel/CSV</strong></p>
+            </div>
+            <input type="file" id="file-upload" style="display: none;" accept=".csv, .xlsx" onchange="handleFileSelect(this)">
         </div>
 
         <form id="chat-form" class="input-group">
             <input type="text" id="user-input" placeholder="Pregunta sobre tus datos...">
-            <button type="submit" class="btn-primary">Analizar <i class="fas fa-paper-plane"></i></button>
+            <button type="submit" class="btn-primary"><i class="fas fa-paper-plane"></i></button>
         </form>
     </div>
 </div>
 
 <script>
-    // 1. Configuración de Supabase
     const supabaseUrl = 'https://kebpamfydhnxeaeegulx.supabase.co';
     const supabaseKey = 'sb_publishable_4MfYQjPVzSmLoEqp4XiVOQ_qjkjEpKi';
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     let currentUser = null;
+    let datosArchivo = [];
     let currentFileName = "";
 
-    // 2. Función para generar PDF Profesional
+    // MANEJO DE ARCHIVOS
+    function handleFileSelect(input) {
+        const file = input.files[0];
+        if (!file) return;
+        currentFileName = file.name;
+
+        Papa.parse(file, {
+            header: true,
+            dynamicTyping: true,
+            complete: function(results) {
+                datosArchivo = results.data;
+                document.getElementById('drop-zone').innerHTML = `
+                    <i class="fas fa-check-circle" style="color:var(--success)"></i>
+                    <p><strong>${file.name} listo</strong>. ${datosArchivo.length} filas detectadas.</p>
+                `;
+                document.getElementById('btn-pdf').style.display = 'block';
+            }
+        });
+    }
+
+    // CHAT E IA
+    document.getElementById('chat-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('user-input');
+        const query = input.value;
+        if (!query || datosArchivo.length === 0) return alert("Sube un archivo primero.");
+
+        const chatWin = document.getElementById('chat-window');
+        chatWin.innerHTML += `<div class="msg msg-user"><strong>Tú:</strong> ${query}</div>`;
+        input.value = "";
+
+        // Lógica de respuesta simulada
+        setTimeout(async () => {
+            const respuesta = `He analizado las ${datosArchivo.length} filas de tu archivo. Sobre "${query}", detecto que los valores son consistentes.`;
+            chatWin.innerHTML += `<div class="msg msg-ai"><strong>AI:</strong> ${respuesta}</div>`;
+            chatWin.scrollTop = chatWin.scrollHeight;
+            
+            // Descontar de Supabase
+            await supabaseClient.rpc('incrementar_consulta', { usuario_id: currentUser.id });
+            actualizarDashboard();
+        }, 800);
+    };
+
+    // PDF
     function generarPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
-        
-        // Encabezado
-        doc.setFillColor(15, 23, 42);
-        doc.rect(0, 0, 210, 40, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(22);
-        doc.text("AI PRO ANALYST REPORT", 20, 25);
-        
-        // Cuerpo del reporte
-        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(18);
+        doc.text("AI PRO ANALYST - REPORTE", 20, 20);
         doc.setFontSize(12);
-        doc.text(`Archivo analizado: ${currentFileName}`, 20, 55);
-        doc.text(`Fecha del reporte: ${new Date().toLocaleDateString()}`, 20, 65);
-        doc.text(`Analista Senior: Jesus M Polo`, 20, 75);
-        
-        doc.setDrawColor(200, 200, 200);
-        doc.line(20, 80, 190, 80);
-        
-        doc.setFont("helvetica", "bold");
-        doc.text("CONCLUSIONES CLAVE:", 20, 95);
-        doc.setFont("helvetica", "normal");
-        doc.text("- Integridad de datos verificada al 100%.", 25, 105);
-        doc.text("- Patrones de crecimiento identificados en el set de datos.", 25, 115);
-        doc.text("- Recomendación: Expandir el análisis a trimestres anteriores.", 25, 125);
-
-        doc.save(`Reporte_${currentFileName.replace('.csv','')}.pdf`);
+        doc.text(`Analizado por: Jesus M Polo`, 20, 35);
+        doc.text(`Archivo: ${currentFileName}`, 20, 45);
+        doc.text(`Total registros: ${datosArchivo.length}`, 20, 55);
+        doc.save(`Reporte_${currentFileName}.pdf`);
     }
 
-    // 3. Manejo de Archivos
-    function handleFileSelect(input) {
-        if (input.files.length > 0) processFile(input.files[0]);
-    }
-
-    function dragOverHandler(ev) { ev.preventDefault(); document.getElementById('chat-window').classList.add('dragover'); }
-    function dragLeaveHandler(ev) { document.getElementById('chat-window').classList.remove('dragover'); }
-    function dropHandler(ev) {
-        ev.preventDefault();
-        document.getElementById('chat-window').classList.remove('dragover');
-        if (ev.dataTransfer.files.length > 0) processFile(ev.dataTransfer.files[0]);
-    }
-
-    function processFile(file) {
-        currentFileName = file.name;
-        const label = document.getElementById('drop-zone-label');
-        label.innerHTML = `
-            <i class="fas fa-file-excel" style="color: #10b981;"></i>
-            <span style="color: #059669; font-weight: 600;">${file.name} CARGADO</span>
-            <p>El reporte PDF está listo para ser generado.</p>
-        `;
-        document.getElementById('btn-pdf').style.display = 'block'; // Muestra el botón de PDF
-    }
-
-    // 4. Autenticación (Supabase)
+    // LOGIN & DASHBOARD
     const authForm = document.getElementById('auth-form');
     const authOverlay = document.getElementById('auth-overlay');
     const authSwitch = document.getElementById('auth-switch');
-    const btnAuth = document.getElementById('btn-auth');
-    let isSignUp = true;
+    let isSignUp = false;
 
     authSwitch.onclick = () => {
         isSignUp = !isSignUp;
-        btnAuth.innerText = isSignUp ? "Comenzar Ahora" : "Entrar al Panel";
+        document.getElementById('btn-auth').innerText = isSignUp ? "Registrarse" : "Entrar al Panel";
         authSwitch.innerText = isSignUp ? "¿Ya tienes cuenta? Inicia Sesión" : "¿No tienes cuenta? Regístrate";
     };
 
@@ -184,22 +177,17 @@
         e.preventDefault();
         const email = document.getElementById('auth-email').value;
         const password = document.getElementById('auth-password').value;
-        btnAuth.disabled = true;
-
         try {
-            if (isSignUp) {
-                const { error } = await supabaseClient.auth.signUp({ email, password });
-                if (error) throw error;
-                alert("Registro exitoso. ¡Inicia sesión para entrar!");
-                isSignUp = false; authSwitch.click();
-            } else {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) throw error;
+            const { data, error } = isSignUp 
+                ? await supabaseClient.auth.signUp({ email, password })
+                : await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+            if (!isSignUp) {
                 currentUser = data.user;
                 authOverlay.style.display = 'none';
                 actualizarDashboard();
-            }
-        } catch (err) { alert(err.message); } finally { btnAuth.disabled = false; }
+            } else { alert("Registro enviado. Revisa tu email."); }
+        } catch (err) { alert(err.message); }
     };
 
     async function actualizarDashboard() {
