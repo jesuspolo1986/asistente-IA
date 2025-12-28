@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Pro Analyst - Business Intelligence</title>
+    <title>AI Pro Analyst - Inteligencia Real</title>
     
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -15,38 +15,22 @@
         :root { --accent: #3b82f6; --success: #10b981; --bg: #f8fafc; --dark: #0f172a; }
         body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--dark); overflow: hidden; }
         .main-container { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
-        
-        /* Sidebar */
         .sidebar { background: white; border-right: 1px solid #e2e8f0; padding: 20px; display: flex; flex-direction: column; }
         .status-card { background: #f1f5f9; padding: 15px; border-radius: 12px; margin-top: auto; margin-bottom: 20px; font-size: 0.85rem; }
         .progress-bar { background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0; }
         .progress-fill { background: var(--accent); height: 100%; transition: width 0.5s; }
-        
-        /* Chat Area */
         .chat-area { display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
-        #chat-window { 
-            flex: 1; overflow-y: auto; background: white; border-radius: 15px; 
-            border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 15px;
-            display: flex; flex-direction: column; gap: 15px;
-        }
-        .msg { padding: 12px 16px; border-radius: 12px; max-width: 85%; line-height: 1.5; }
+        #chat-window { flex: 1; overflow-y: auto; background: white; border-radius: 15px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 12px; border-radius: 10px; max-width: 85%; }
         .msg-user { align-self: flex-end; background: var(--dark); color: white; }
         .msg-ai { align-self: flex-start; background: #f1f5f9; border: 1px solid #e2e8f0; }
-
-        /* Contenedor de Gráficos */
-        #chart-box { width: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; display: none; margin-top: 10px; }
-        
-        /* Inputs y Botones */
+        #chart-box { width: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; display: none; }
         .input-group { display: flex; gap: 10px; background: white; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; }
         input[type="text"] { flex: 1; border: none; outline: none; font-size: 1rem; }
-        button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 600; transition: 0.3s; }
+        button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 600; }
         .btn-primary { background: var(--dark); color: white; }
-        .btn-success { background: var(--success); color: white; display: none; margin-bottom: 10px; width: 100%; }
-
-        /* Auth Overlay */
         #auth-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); z-index: 9999; display: flex; align-items: center; justify-content: center; }
         .auth-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; }
-        .auth-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -55,199 +39,133 @@
     <div class="auth-box">
         <i class="fas fa-brain" style="font-size: 3rem; color: var(--accent);"></i>
         <h2>AI Pro Analyst</h2>
-        <p>Inicia sesión para analizar tus datos</p>
         <form id="auth-form">
-            <input type="email" id="auth-email" class="auth-input" placeholder="Correo" required>
-            <input type="password" id="auth-password" class="auth-input" placeholder="Contraseña" required>
-            <button type="submit" id="btn-auth" class="btn-primary" style="width: 100%;">Entrar al Panel</button>
-            <p id="auth-switch" style="font-size: 0.8rem; color: var(--accent); cursor: pointer; margin-top: 15px;">¿No tienes cuenta? Regístrate</p>
+            <input type="email" id="auth-email" style="width:100%; padding:10px; margin:10px 0;" placeholder="Correo" required>
+            <input type="password" id="auth-password" style="width:100%; padding:10px; margin:10px 0;" placeholder="Contraseña" required>
+            <button type="submit" class="btn-primary" style="width: 100%;">Entrar</button>
         </form>
     </div>
 </div>
 
 <div class="main-container">
     <div class="sidebar">
-        <h2 style="font-size: 1.1rem;"><i class="fas fa-chart-line"></i> Dashboard</h2>
+        <h2>Dashboard</h2>
         <div class="status-card">
-            <div style="display:flex; justify-content: space-between;">
-                <span>Prueba:</span> <strong id="dias-restantes">7 / 7</strong>
-            </div>
+            <span>Prueba: <strong id="dias-restantes">7/7</strong></span>
             <div class="progress-bar"><div id="barra-dias" class="progress-fill"></div></div>
-            <p id="info-consultas" style="margin:0">Consultas: 0 / 10</p>
+            <p id="info-consultas">Consultas: 0 / 10</p>
         </div>
-        <div style="font-size: 0.7rem; color: #94a3b8; text-align: center;">Desarrollado por: Jesus M Polo</div>
+        <div style="font-size: 0.7rem; text-align: center;">By Jesus M Polo</div>
     </div>
 
     <div class="chat-area">
-        <button id="btn-pdf" class="btn-success" onclick="generarPDF()">
-            <i class="fas fa-file-pdf"></i> Exportar Reporte con Gráficas
-        </button>
-
         <div id="chat-window">
-            <div id="drop-zone" style="text-align: center; padding: 40px; cursor: pointer; border: 2px dashed #cbd5e1; border-radius: 12px;" onclick="document.getElementById('file-upload').click()">
-                <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; color: var(--accent);"></i>
-                <p>Haz clic para subir <strong>Excel o CSV</strong></p>
+            <div id="drop-zone" style="text-align: center; padding: 30px; border: 2px dashed #ccc; cursor: pointer;" onclick="document.getElementById('file-upload').click()">
+                <i class="fas fa-file-csv" style="font-size: 2rem;"></i>
+                <p>Sube tu archivo para un análisis real</p>
             </div>
-            <input type="file" id="file-upload" style="display: none;" accept=".csv, .xlsx" onchange="handleFileSelect(this)">
-            
-            <div id="chart-box">
-                <canvas id="canvasIA"></canvas>
-            </div>
+            <input type="file" id="file-upload" style="display: none;" accept=".csv" onchange="handleFileSelect(this)">
+            <div id="chart-box"><canvas id="canvasIA"></canvas></div>
         </div>
-
         <form id="chat-form" class="input-group">
-            <input type="text" id="user-input" placeholder="Ej: ¿Cuál es el producto más vendido?">
+            <input type="text" id="user-input" placeholder="Pregunta: ¿Quién es el mejor vendedor?">
             <button type="submit" class="btn-primary"><i class="fas fa-paper-plane"></i></button>
         </form>
     </div>
 </div>
 
 <script>
-    // Configuración Base
     const supabaseUrl = 'https://kebpamfydhnxeaeegulx.supabase.co';
     const supabaseKey = 'sb_publishable_4MfYQjPVzSmLoEqp4XiVOQ_qjkjEpKi';
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     let currentUser = null;
     let datosArchivo = [];
-    let currentFileName = "";
     let chartInstance = null;
 
-    // 1. Manejo de Archivos y Lectura de Datos
     function handleFileSelect(input) {
-        const file = input.files[0];
-        if (!file) return;
-        currentFileName = file.name;
-
-        Papa.parse(file, {
+        Papa.parse(input.files[0], {
             header: true,
             dynamicTyping: true,
             complete: function(results) {
-                datosArchivo = results.data.filter(row => Object.values(row).some(v => v !== null));
-                document.getElementById('drop-zone').innerHTML = `
-                    <i class="fas fa-check-circle" style="color:var(--success)"></i>
-                    <p><strong>${file.name}</strong> cargado exitosamente (${datosArchivo.length} filas).</p>
-                `;
-                document.getElementById('btn-pdf').style.display = 'block';
+                datosArchivo = results.data.filter(r => Object.values(r)[0] !== null);
+                document.getElementById('drop-zone').innerHTML = `<i class="fas fa-check" style="color:green"></i> Archivo cargado (${datosArchivo.length} filas)`;
             }
         });
     }
 
-    // 2. Chat Inteligente y Generación de Gráficos
     document.getElementById('chat-form').onsubmit = async (e) => {
         e.preventDefault();
         const input = document.getElementById('user-input');
-        const query = input.value;
-        if (!query || datosArchivo.length === 0) return alert("Sube un archivo primero.");
+        const query = input.value.toLowerCase();
+        if (!query || !datosArchivo.length) return;
 
         const chatWin = document.getElementById('chat-window');
         chatWin.innerHTML += `<div class="msg msg-user">${query}</div>`;
+        
+        // --- MOTOR DE LÓGICA DE ANÁLISIS ---
+        let respuesta = "";
+        
+        if (query.includes("vendedor") || query.includes("vendido")) {
+            // Buscamos las columnas (Nombre en la 0, Monto en la 1 o similar)
+            const keys = Object.keys(datosArchivo[0]);
+            const colNombre = keys[0];
+            const colValor = keys.find(k => k.toLowerCase().includes('venta') || k.toLowerCase().includes('monto') || typeof datosArchivo[0][k] === 'number');
+
+            // Ordenar para encontrar el mejor
+            const ranking = [...datosArchivo].sort((a, b) => (b[colValor] || 0) - (a[colValor] || 0));
+            const mejor = ranking[0];
+
+            respuesta = `Analizando los datos... El <strong>${colNombre}</strong> con mayor desempeño es <strong>${mejor[colNombre]}</strong> con un total de <strong>${mejor[colValor]}</strong>.`;
+            
+            renderizarGraficoReal(ranking.slice(0, 5), colNombre, colValor);
+        } else {
+            respuesta = "He revisado las filas y los datos están listos. Prueba preguntando por el 'mejor vendedor' o 'ventas totales'.";
+        }
+
+        chatWin.innerHTML += `<div class="msg msg-ai"><strong>AI Analyst:</strong> ${respuesta}</div>`;
         input.value = "";
+        chatWin.scrollTop = chatWin.scrollHeight;
 
-        setTimeout(async () => {
-            let respuesta = `Analizando las ${datosArchivo.length} filas... `;
-            
-            // Si la pregunta pide gráficas o ventas
-            if (query.toLowerCase().includes("vendido") || query.toLowerCase().includes("ventas") || query.toLowerCase().includes("gráfico")) {
-                respuesta += "He generado una visualización de las tendencias detectadas.";
-                renderizarGrafico();
-            } else {
-                respuesta += "Los datos muestran una estructura consistente para esta consulta.";
-            }
-
-            chatWin.innerHTML += `<div class="msg msg-ai"><strong>AI Analyst:</strong> ${respuesta}</div>`;
-            chatWin.scrollTop = chatWin.scrollHeight;
-            
-            await supabaseClient.rpc('incrementar_consulta', { usuario_id: currentUser.id });
-            actualizarDashboard();
-        }, 600);
+        await supabaseClient.rpc('incrementar_consulta', { usuario_id: currentUser.id });
+        actualizarDashboard();
     };
 
-    function renderizarGrafico() {
+    function renderizarGraficoReal(top5, colNombre, colValor) {
         const ctx = document.getElementById('canvasIA').getContext('2d');
         document.getElementById('chart-box').style.display = 'block';
-        
         if (chartInstance) chartInstance.destroy();
 
         chartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['Prod A', 'Prod B', 'Prod C', 'Prod D', 'Prod E'], // Dinámico mañana
+                labels: top5.map(d => d[colNombre]),
                 datasets: [{
-                    label: 'Volumen de Ventas',
-                    data: [45, 89, 34, 120, 56],
-                    backgroundColor: '#3b82f6',
-                    borderRadius: 5
+                    label: 'Ventas Reales',
+                    data: top5.map(d => d[colValor]),
+                    backgroundColor: '#3b82f6'
                 }]
-            },
-            options: { responsive: true, plugins: { legend: { display: false } } }
+            }
         });
     }
 
-    // 3. Exportar Reporte PDF Profesional
-    function generarPDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        doc.setFillColor(15, 23, 42);
-        doc.rect(0, 0, 210, 30, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.text("AI PRO ANALYST - REPORT", 20, 20);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Analista: Jesus M Polo`, 20, 45);
-        doc.text(`Archivo: ${currentFileName}`, 20, 55);
-        doc.text(`Registros: ${datosArchivo.length}`, 20, 65);
-        doc.save(`Analisis_${currentFileName}.pdf`);
-    }
-
-    // 4. Autenticación Supabase
-    const authForm = document.getElementById('auth-form');
-    const authOverlay = document.getElementById('auth-overlay');
-    const authSwitch = document.getElementById('auth-switch');
-    let isSignUp = false;
-
-    authSwitch.onclick = () => {
-        isSignUp = !isSignUp;
-        document.getElementById('btn-auth').innerText = isSignUp ? "Crear Cuenta" : "Entrar al Panel";
-        authSwitch.innerText = isSignUp ? "¿Ya tienes cuenta? Inicia Sesión" : "¿No tienes cuenta? Regístrate";
-    };
-
-    authForm.onsubmit = async (e) => {
+    // Auth simple
+    document.getElementById('auth-form').onsubmit = async (e) => {
         e.preventDefault();
-        const email = document.getElementById('auth-email').value;
-        const password = document.getElementById('auth-password').value;
-        try {
-            const { data, error } = isSignUp 
-                ? await supabaseClient.auth.signUp({ email, password })
-                : await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) throw error;
-            if (!isSignUp) {
-                currentUser = data.user;
-                authOverlay.style.display = 'none';
-                actualizarDashboard();
-            } else { alert("Verifica tu correo para activar la cuenta."); }
-        } catch (err) { alert(err.message); }
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: document.getElementById('auth-email').value,
+            password: document.getElementById('auth-password').value
+        });
+        if (error) alert(error.message);
+        else { currentUser = data.user; document.getElementById('auth-overlay').style.display='none'; actualizarDashboard(); }
     };
 
     async function actualizarDashboard() {
-        if (!currentUser) return;
         const { data: perfil } = await supabaseClient.from('perfiles_empresa').select('*').eq('id', currentUser.id).single();
         if (perfil) {
-            const dias = Math.max(0, 7 - Math.floor((new Date() - new Date(perfil.fecha_registro)) / 86400000));
-            document.getElementById('dias-restantes').innerText = `${dias} / 7`;
-            document.getElementById('barra-dias').style.width = `${(dias / 7) * 100}%`;
             document.getElementById('info-consultas').innerText = `Consultas: ${perfil.consultas_realizadas_hoy} / 10`;
         }
     }
-
-    window.onload = () => {
-        supabaseClient.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
-                currentUser = session.user;
-                authOverlay.style.display = 'none';
-                actualizarDashboard();
-            }
-        });
-    };
 </script>
 </body>
 </html>
