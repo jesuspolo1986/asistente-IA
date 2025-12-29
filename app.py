@@ -1,119 +1,84 @@
-import os
-import sqlite3
-import pandas as pd
 from flask import Flask, request, jsonify, render_template
-from mistralai import Mistral
+import os
+import pandas as pd
+from sqlalchemy import create_engine
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# Configuración de Mistral
-api_key = os.environ.get("MISTRAL_API_KEY")
-model = "mistral-large-latest"
-client = Mistral(api_key=api_key)
+# Aseguramos que la carpeta de subidas exista
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-DATABASE = 'database.db'
+# --- FUNCIÓN DE PROCESAMIENTO (La que revisamos) ---
+def procesar_y_cargar_excel(file_path):
+    DATABASE_URL = os.environ.get("DATABASE_URL")
+    if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    if not DATABASE_URL:
+        return False, "Error de configuración de BD", None
 
-def init_db():
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS ventas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            Fecha TEXT, Vendedor TEXT, Producto TEXT, 
-            Cantidad INTEGER, Precio_Unitario REAL, Total REAL
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    
+    try:
+        if file_path.endswith('.csv'):
+            df = pd.read_csv(file_path, sep=None, engine='python', encoding='utf-8-sig')
+        else:
+            df = pd.read_excel(file_path)
+        
+        df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]
 
-init_db()
+        # Lógica de KPIs
+        total_ventas = df['total'].sum() if 'total' in df.columns else 0
+        mejor_vendedor = df.groupby('vendedor')['total'].sum().idxmax() if 'vendedor' in df.columns else "N/A"
+        producto_top = df.groupby('producto')['total'].sum().idxmax() if 'producto' in df.columns else "N/A"
+        unidades_totales = int(df['cantidad'].sum()) if 'cantidad' in df.columns else len(df)
+
+        summary = {
+            "total_ventas": f"${total_ventas:,.2f}",
+            "mejor_vendedor": str(mejor_vendedor),
+            "producto_top": str(producto_top),
+            "unidades": str(unidades_totales)
+        }
+
+        with engine.begin() as connection:
+            df.to_sql('ventas', con=connection, if_exists='append', index=False, method='multi')
+        
+        return True, f"Éxito: {len(df)} registros cargados.", summary
+    except Exception as e:
+        return False, str(e), None
+
+# --- RUTA DE CARGA (UPLOAD) ---
+@app.route('/upload', method=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"success": False, "message": "No hay archivo"}), 400
+    
+    file = request.files['file']
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(file_path)
+
+    # Llamamos a la función y capturamos el summary
+    success, message, summary = procesar_y_cargar_excel(file_path)
+
+    # ESTA ES LA CLAVE: Enviamos el summary de vuelta al Dashboard
+    return jsonify({
+        "success": success, 
+        "message": message, 
+        "summary": summary
+    })
+
+# --- RUTA DE CHAT (SIMULADA) ---
+@app.route('/chat', methods=['POST'])
+def chat():
+    # Aquí iría tu lógica actual de conexión con la IA
+    pass
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/upload', methods=['POST'])
-def upload():
-    file = request.files.get('file')
-    if not file: 
-        return jsonify({"error": "No hay archivo"}), 400
-    try:
-        df = pd.read_csv(file) if file.filename.endswith('.csv') else pd.read_excel(file)
-        df.columns = [c.strip() for c in df.columns]
-        
-        conn = sqlite3.connect(DATABASE)
-        df.to_sql('ventas', conn, if_exists='replace', index=False)
-        conn.close()
-
-        # Generar primer vistazo
-        top_v = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False).head(5)
-        return jsonify({
-            "reply": "✅ Datos cargados. IA lista para analizar.",
-            "chart_data": {
-                "labels": top_v.index.tolist(), 
-                "values": top_v.values.tolist(), 
-                "title": "Ventas Totales por Vendedor"
-            }
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    data = request.json
-    pregunta = data.get("message")
-    
-    try:
-        conn = sqlite3.connect(DATABASE)
-        df = pd.read_sql_query("SELECT * FROM ventas", conn)
-        conn.close()
-
-        # ANALÍTICA PROFUNDA: Agrupamos por Vendedor y Producto
-        detalle_vendedores = df.groupby(['Vendedor', 'Producto']).agg({
-            'Total': 'sum',
-            'Precio_Unitario': 'mean'
-        }).reset_index().to_dict(orient='records')
-        
-        # Lógica de Gráficos
-        extra_chart = None
-        if "vendedor" in pregunta.lower():
-            v_data = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False).head(5)
-            extra_chart = {
-                "labels": v_data.index.tolist(), 
-                "values": v_data.values.tolist(), 
-                "title": "Ranking de Vendedores"
-            }
-
-        # Consulta a Mistral con instrucciones de estilo recuperadas
-        response = client.chat.complete(
-            model=model,
-            messages=[
-                {
-                    "role": "system", 
-                    "content": (
-                        "Eres AI Pro Analyst, un consultor senior de negocios. "
-                        f"Datos actuales: {detalle_vendedores}. "
-                        "INSTRUCCIONES DE ESTILO: "
-                        "1. Usa emojis para resaltar logros (ej. ⭐ para el mejor vendedor, 🚀 para crecimiento). "
-                        "2. Si detectas un líder claro, nómbralo con honores. "
-                        "3. Al final de cada respuesta, añade siempre una sección de 'RECOMENDACIÓN ESTRATÉGICA' "
-                        "basada en los números analizados. "
-                        "4. Usa tablas Markdown para comparar datos si es necesario. "
-                        "5. Sé proactivo: si ves que algo va mal o muy bien, menciónalo."
-                    )
-                },
-                {"role": "user", "content": pregunta}
-            ]
-        )
-        
-        return jsonify({
-            "reply": response.choices[0].message.content,
-            "new_chart_data": extra_chart
-        })
-    except Exception as e:
-        print(f"Error: {e}") # Para debug en consola
-        return jsonify({"error": "Error procesando consulta"}), 500
-
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 8000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)

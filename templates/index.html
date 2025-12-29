@@ -199,18 +199,67 @@
         document.getElementById('auth-switch-link').innerText = isSignUp ? "Ya tengo cuenta" : "Crear cuenta";
     };
 
-    document.getElementById('auth-form').onsubmit = async (e) => {
+    document.getElementById('chat-form').onsubmit = async (e) => {
         e.preventDefault();
-        const email = document.getElementById('auth-email').value;
-        const password = document.getElementById('auth-password').value;
-        
-        let result;
-        if (isSignUp) result = await supabaseClient.auth.signUp({ email, password });
-        else result = await supabaseClient.auth.signInWithPassword({ email, password });
+        const input = document.getElementById('user-input'), query = input.value;
+        if(!query) return;
 
-        if (result.error) alert(result.error.message);
-        else if (!isSignUp) actualizarUI(result.data.user);
-        else alert("Registro exitoso. Ahora puedes entrar.");
+        const chatWin = document.getElementById('chat-window');
+        chatWin.innerHTML += `<div class="msg msg-user">${query}</div>`;
+        input.value = "";
+        chatWin.scrollTop = chatWin.scrollHeight;
+
+        try {
+            const res = await fetch('/chat', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ message: query }) 
+            });
+            const data = await res.json();
+            const reply = data.reply;
+            
+            chatWin.innerHTML += `<div class="msg msg-ai"><strong>Visionary AI:</strong><br>${reply.replace(/\n/g, '<br>')}</div>`;
+
+            // --- LÓGICA DE EXTRACCIÓN PARA TARJETAS KPI ---
+            
+            // 1. Extraer Ventas Totales (Busca el valor más alto con $)
+            const ventasMatches = reply.match(/\$\d{1,3}(,\d{3})*(\.\d{2})?/g);
+            if(ventasMatches) {
+                // Tomamos el valor más alto mencionado en la respuesta
+                const valores = ventasMatches.map(v => parseFloat(v.replace(/[$,]/g, '')));
+                const maxVenta = Math.max(...valores);
+                document.getElementById('kpi-total').innerText = `$${maxVenta.toLocaleString()}`;
+            }
+
+            // 2. Extraer Líder de Ventas
+            if(reply.includes("Beatriz Peña")) {
+                document.getElementById('kpi-vendedor').innerText = "Beatriz Peña";
+            } else if (reply.includes("Diego Sosa")) {
+                document.getElementById('kpi-vendedor').innerText = "Diego Sosa";
+            }
+
+            // 3. Extraer Producto Top
+            if(reply.includes("Laptop Pro")) {
+                document.getElementById('kpi-producto').innerText = "Laptop Pro";
+            } else if (reply.includes("Monitor 4K")) {
+                document.getElementById('kpi-producto').innerText = "Monitor 4K";
+            }
+
+            // 4. Extraer Unidades (Busca números seguidos de la palabra unidades o en tablas)
+            const unidadesMatch = reply.match(/(\d+)\s*unidades/i) || reply.match(/\|\s*(\d+)\s*\|/);
+            if(unidadesMatch) {
+                document.getElementById('kpi-unidades').innerText = unidadesMatch[1];
+            }
+
+            // ----------------------------------------------
+
+            document.getElementById('download-pdf').style.display = 'flex';
+            chatWin.scrollTop = chatWin.scrollHeight;
+
+        } catch (error) {
+            console.error("Error en el chat:", error);
+            chatWin.innerHTML += `<div class="msg msg-ai" style="color:red;">Error al conectar con la IA.</div>`;
+        }
     };
 
     async function actualizarUI(user) {

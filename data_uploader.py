@@ -1,48 +1,57 @@
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 import os
 
 def procesar_y_cargar_excel(file_path):
-    # 1. Configuración de la URL (Aseguramos el dialecto postgresql://)
     DATABASE_URL = os.environ.get("DATABASE_URL")
     if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     
     if not DATABASE_URL:
-        return False, "Error: DATABASE_URL no configurada en el servidor."
+        return False, "Error de configuración de BD", None
 
-    # pool_pre_ping es vital para mantener la conexión viva en Koyeb/PostgreSQL
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
     
     try:
-        # 2. Lectura inteligente con detección de separador
+        # 1. Lectura con detección automática
         if file_path.endswith('.csv'):
-            # sep=None y engine='python' detectan automáticamente si es , o ;
-            # encoding='latin1' suele ser más seguro para archivos creados en Excel/Windows
             df = pd.read_csv(file_path, sep=None, engine='python', encoding='utf-8-sig')
         else:
-            # Para archivos .xlsx
             df = pd.read_excel(file_path)
         
-        # 3. Limpieza profunda de nombres de columnas
-        # Quitamos espacios al inicio/final, pasamos a minúsculas y reemplazamos espacios por guiones bajos
+        # 2. Normalización de columnas
         df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]
 
-        # 4. Inserción optimizada en la base de datos
-        with engine.begin() as connection:
-            df.to_sql(
-                'ventas', # Usamos la tabla 'ventas' que ya vimos en tus logs
-                con=connection, 
-                if_exists='append', 
-                index=False,
-                method='multi' # Acelera la carga masiva en la nube
-            )
+        # --- NUEVA LÓGICA: CÁLCULO DE KPIs PARA EL DASHBOARD ---
+        # Buscamos columnas clave (total, vendedor, producto, unidades)
+        # Adaptamos según los nombres que suelen venir en tus archivos
+        total_ventas = df['total'].sum() if 'total' in df.columns else 0
         
-        return True, f"¡Éxito! Se sincronizaron {len(df)} registros correctamente."
+        mejor_vendedor = "N/A"
+        if 'vendedor' in df.columns and 'total' in df.columns:
+            mejor_vendedor = df.groupby('vendedor')['total'].sum().idxmax()
+            
+        producto_top = "N/A"
+        if 'producto' in df.columns and 'total' in df.columns:
+            producto_top = df.groupby('producto')['total'].sum().idxmax()
+            
+        unidades_totales = len(df) # O suma de columna 'cantidad' si existe
+        if 'cantidad' in df.columns:
+            unidades_totales = int(df['cantidad'].sum())
+
+        summary = {
+            "total_ventas": f"${total_ventas:,.2f}",
+            "mejor_vendedor": str(mejor_vendedor),
+            "producto_top": str(producto_top),
+            "unidades": str(unidades_totales)
+        }
+        # ------------------------------------------------------
+
+        # 3. Inserción en DB
+        with engine.begin() as connection:
+            df.to_sql('ventas', con=connection, if_exists='append', index=False, method='multi')
+        
+        return True, f"Se sincronizaron {len(df)} registros.", summary
     
-    except pd.errors.ParserError:
-        return False, "Error de formato: El CSV tiene una estructura irregular. Revisa las comas o puntos y comas."
     except Exception as e:
-        if "openpyxl" in str(e).lower():
-            return False, "Error técnico: Falta la librería 'openpyxl' en el servidor."
-        return False, f"Error crítico: {str(e)}"
+        return False, f"Error: {str(e)}", None
