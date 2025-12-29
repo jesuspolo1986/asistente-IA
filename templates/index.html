@@ -15,40 +15,32 @@
         :root { --accent: #3b82f6; --dark: #0f172a; --bg: #f8fafc; --success: #10b981; --danger: #ef4444; }
         body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); display: flex; height: 100vh; overflow: hidden; }
         
-        /* Sidebar */
         .sidebar { width: 280px; background: white; border-right: 1px solid #e2e8f0; padding: 20px; display: flex; flex-direction: column; z-index: 10; }
         .status-card { background: #f1f5f9; padding: 15px; border-radius: 12px; margin-top: 20px; font-size: 0.85rem; }
         .progress-bar { background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0; }
         .progress-fill { background: var(--accent); height: 100%; transition: width 0.5s; width: 0%; }
         
-        /* Auth Overlay */
         #auth-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); z-index: 9999; display: flex; align-items: center; justify-content: center; }
         .auth-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
         .auth-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
 
-        /* Main Content */
         .main { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; position: relative; }
         #chat-window { flex: 1; background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 25px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
         
-        /* Mensajes */
-        .msg { padding: 14px; border-radius: 12px; max-width: 85%; line-height: 1.5; font-size: 0.95rem; }
+        .msg { padding: 14px; border-radius: 12px; max-width: 85%; line-height: 1.5; font-size: 0.95rem; word-wrap: break-word; }
         .msg-user { align-self: flex-end; background: var(--dark); color: white; margin-left: auto; border-bottom-right-radius: 2px; }
         .msg-ai { align-self: flex-start; background: #f1f5f9; border: 1px solid #e2e8f0; border-bottom-left-radius: 2px; color: #1e293b; }
         
-        /* Area de entrada */
         .input-area { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px; align-items: center; }
         input[type="text"] { flex: 1; border: none; outline: none; font-size: 1rem; }
-        input[type="text"]:disabled { background: #f8fafc; cursor: not-allowed; }
         
-        /* Componentes Visuales */
         #canvas-wrapper { width: 100%; max-height: 300px; display: none; margin: 15px 0; padding: 10px; border: 1px solid #f1f5f9; border-radius: 8px; }
         .btn-action { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
         
         .btn-pdf { background: var(--danger); color: white; padding: 10px 18px; display: none; margin-bottom: 12px; align-self: flex-end; box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2); }
         .btn-pdf:hover { transform: translateY(-1px); background: #dc2626; }
 
-        #upload-zone { text-align: center; border: 2px dashed #cbd5e1; padding: 40px; border-radius: 12px; cursor: pointer; color: #64748b; transition: all 0.2s; }
-        #upload-zone:hover { border-color: var(--accent); background: #eff6ff; color: var(--accent); }
+        #upload-zone { text-align: center; border: 2px dashed #cbd5e1; padding: 40px; border-radius: 12px; cursor: pointer; color: #64748b; }
     </style>
 </head>
 <body>
@@ -56,163 +48,108 @@
 <div id="auth-overlay">
     <div class="auth-box">
         <i class="fas fa-brain" style="font-size: 3rem; color: var(--accent); margin-bottom: 10px;"></i>
-        <h2 style="margin-bottom: 25px;">AI Pro Analyst</h2>
+        <h2>AI Pro Analyst</h2>
         <form id="auth-form">
             <input type="email" id="auth-email" class="auth-input" placeholder="Correo Electrónico" required>
             <input type="password" id="auth-password" class="auth-input" placeholder="Contraseña" required>
-            <button type="submit" class="btn-action" style="width:100%; background:var(--dark); color:white; padding:14px; margin-top: 10px;">
-                Iniciar Sesión <i class="fas fa-sign-in-alt"></i>
-            </button>
+            <button type="submit" class="btn-action" style="width:100%; background:var(--dark); color:white; padding:14px; margin-top: 10px;">Iniciar Sesión</button>
         </form>
     </div>
 </div>
 
 <div class="sidebar">
-    <h2 style="font-size: 1.25rem; color: var(--dark);"><i class="fas fa-chart-line"></i> Dashboard</h2>
-    
+    <h2><i class="fas fa-chart-line"></i> Dashboard</h2>
     <div class="status-card">
         <div style="display:flex; justify-content:space-between; margin-bottom: 5px;">
             <span>Días de prueba:</span> <strong id="dias-val">0/7</strong>
         </div>
         <div class="progress-bar"><div id="barra-dias" class="progress-fill"></div></div>
-        <p id="info-consultas" style="margin:8px 0 0 0; color: #64748b;">Consultas: 0/10</p>
+        <p id="info-consultas">Consultas: 0/10</p>
     </div>
-
     <div style="margin-top:25px; border-top: 1px solid #f1f5f9; padding-top: 20px;">
         <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 15px;">
             <i class="fas fa-user-circle"></i> <span id="user-display">Usuario</span>
         </p>
-        <button onclick="cerrarSesion()" class="btn-action" style="color:var(--danger); background:none; font-size:0.85rem; padding: 0;">
-            <i class="fas fa-power-off"></i> Cerrar Sesión Segura
-        </button>
+        <button onclick="cerrarSesion()" class="btn-action" style="color:var(--danger); background:none; font-size:0.85rem; padding: 0;"><i class="fas fa-power-off"></i> Cerrar Sesión</button>
     </div>
-
-    <div style="margin-top: auto; font-size: 0.75rem; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 15px;">
-        Desarrollado por <strong>Jesus M Polo</strong>
-    </div>
+    <div style="margin-top: auto; font-size: 0.75rem; color: #94a3b8; text-align: center;">Desarrollado por <strong>Jesus M Polo</strong></div>
 </div>
 
 <div class="main">
-    <button id="download-pdf" class="btn-action btn-pdf">
-        <i class="fas fa-file-pdf"></i> Descargar Reporte Ejecutivo
-    </button>
-    
+    <button id="download-pdf" class="btn-action btn-pdf"><i class="fas fa-file-pdf"></i> Descargar Reporte Completo</button>
     <div id="chat-window">
         <div id="upload-zone" onclick="document.getElementById('file-in').click()">
             <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; margin-bottom: 15px;"></i>
-            <p><strong>Haz clic para subir Excel o CSV</strong><br>Análisis inteligente de ventas y productos</p>
+            <p><strong>Haz clic para subir Excel o CSV</strong></p>
         </div>
         <input type="file" id="file-in" style="display:none" onchange="subirArchivo(this)">
         <div id="canvas-wrapper"><canvas id="graficoIA"></canvas></div>
     </div>
-
     <form id="chat-form" class="input-area">
-        <input type="text" id="user-input" placeholder="Pregunta sobre tus datos analizados..." autocomplete="off">
-        <button type="submit" class="btn-action" style="background:var(--dark); color:white; width: 45px; height: 45px; border-radius: 10px;">
-            <i class="fas fa-paper-plane"></i>
-        </button>
+        <input type="text" id="user-input" placeholder="Analiza tus datos aquí..." autocomplete="off">
+        <button type="submit" class="btn-action" style="background:var(--dark); color:white; width: 45px; height: 45px; border-radius: 10px;"><i class="fas fa-paper-plane"></i></button>
     </form>
 </div>
 
 <script>
-    // Configuración Supabase
     const supabaseUrl = 'https://kebpamfydhnxeaeegulx.supabase.co';
     const supabaseKey = 'sb_publishable_4MfYQjPVzSmLoEqp4XiVOQ_qjkjEpKi';
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+    let currentUser = null, chartInstance = null;
 
-    let currentUser = null;
-    let chartInstance = null;
-
-    // --- SEGURIDAD ---
     async function actualizarUI(user) {
-        if (!user) {
-            document.getElementById('auth-overlay').style.display = 'flex';
-            return;
-        }
+        if (!user) { document.getElementById('auth-overlay').style.display = 'flex'; return; }
         currentUser = user;
         document.getElementById('auth-overlay').style.display = 'none';
         document.getElementById('user-display').innerText = user.email;
 
-        // Consultar créditos
-        const { data: perfil, error } = await supabaseClient.from('perfiles_empresa').select('*').eq('id', user.id).single();
-        
+        const { data: perfil } = await supabaseClient.from('perfiles_empresa').select('*').eq('id', user.id).single();
         if (perfil) {
-            const fechaReg = new Date(perfil.fecha_registro);
-            const hoy = new Date();
-            const diasRestantes = Math.max(0, 7 - Math.floor((hoy - fechaReg) / (1000 * 60 * 60 * 24)));
-            
+            if (user.email === "polojesus1986@gmail.com") {
+                document.getElementById('info-consultas').innerText = `Modo: Administrador (Sin límites)`;
+                document.getElementById('dias-val').innerText = "∞";
+                document.getElementById('barra-dias').style.width = `100%`;
+                return;
+            }
+            const hoy = new Date(), fechaReg = new Date(perfil.fecha_registro);
+            const diasRestantes = Math.max(0, 7 - Math.floor((hoy - fechaReg) / 86400000));
             document.getElementById('dias-val').innerText = `${diasRestantes}/7`;
             document.getElementById('barra-dias').style.width = `${(diasRestantes/7)*100}%`;
             document.getElementById('info-consultas').innerText = `Consultas hoy: ${perfil.consultas_realizadas_hoy}/10`;
-
-            // Bloqueo por límite alcanzado
-            if (user.email === "polojesus1986@gmail.com") {
-                document.getElementById('info-consultas').innerText = `Modo: Administrador (Sin límites)`;
-                document.getElementById('user-input').disabled = false;
-                document.getElementById('user-input').placeholder = "Pregunta lo que quieras, Jesus...";
-                return; // Salimos de la función para no aplicar los bloqueos de abajo
-            }
+            if (perfil.consultas_realizadas_hoy >= 10) document.getElementById('user-input').disabled = true;
         }
     }
 
     document.getElementById('auth-form').onsubmit = async (e) => {
         e.preventDefault();
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email: document.getElementById('auth-email').value,
-            password: document.getElementById('auth-password').value
-        });
-        if (error) alert("Error de acceso: " + error.message);
-        else actualizarUI(data.user);
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email: document.getElementById('auth-email').value, password: document.getElementById('auth-password').value });
+        if (error) alert("Error: " + error.message); else actualizarUI(data.user);
     };
 
-    async function cerrarSesion() {
-        await supabaseClient.auth.signOut();
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.reload();
-    }
+    async function cerrarSesion() { await supabaseClient.auth.signOut(); localStorage.clear(); sessionStorage.clear(); window.location.reload(); }
 
-    // --- ANÁLISIS ---
     async function subirArchivo(input) {
         if (!input.files[0]) return;
-        const formData = new FormData();
-        formData.append('file', input.files[0]);
-        
-        document.getElementById('upload-zone').innerHTML = `<i class="fas fa-spinner fa-spin"></i> Procesando archivo...`;
-
+        const formData = new FormData(); formData.append('file', input.files[0]);
+        document.getElementById('upload-zone').innerHTML = `<i class="fas fa-spinner fa-spin"></i> Procesando...`;
         const res = await fetch('/upload', { method: 'POST', body: formData });
         const data = await res.json();
-        
-        document.getElementById('upload-zone').innerHTML = `<i class="fas fa-check-circle" style="color:var(--success)"></i> Archivo Analizado Correctamente`;
+        document.getElementById('upload-zone').innerHTML = `<i class="fas fa-check-circle" style="color:var(--success)"></i> Archivo Analizado`;
         if(data.chart_data) renderChart(data.chart_data);
     }
 
     document.getElementById('chat-form').onsubmit = async (e) => {
         e.preventDefault();
-        const input = document.getElementById('user-input');
-        const query = input.value;
+        const input = document.getElementById('user-input'), query = input.value;
         if(!query || input.disabled) return;
-
         const chatWin = document.getElementById('chat-window');
         chatWin.innerHTML += `<div class="msg msg-user">${query}</div>`;
-        input.value = "";
-        chatWin.scrollTop = chatWin.scrollHeight;
-
-        const res = await fetch('/chat', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ message: query })
-        });
+        input.value = ""; chatWin.scrollTop = chatWin.scrollHeight;
+        const res = await fetch('/chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ message: query }) });
         const data = await res.json();
-        
-        // Renderizado de respuesta de IA con formato
-        const formattedReply = data.reply.replace(/\n/g, '<br>');
-        chatWin.innerHTML += `<div class="msg msg-ai"><strong>AI Pro Analyst:</strong><br>${formattedReply}</div>`;
-        
+        chatWin.innerHTML += `<div class="msg msg-ai"><strong>AI Pro Analyst:</strong><br>${data.reply.replace(/\n/g, '<br>')}</div>`;
         if(data.new_chart_data) renderChart(data.new_chart_data);
-        
         document.getElementById('download-pdf').style.display = 'flex';
-        
         await supabaseClient.rpc('incrementar_consulta', { usuario_id: currentUser.id });
         actualizarUI(currentUser);
         chatWin.scrollTop = chatWin.scrollHeight;
@@ -222,57 +159,28 @@
         const ctx = document.getElementById('graficoIA').getContext('2d');
         document.getElementById('canvas-wrapper').style.display = 'block';
         if(chartInstance) chartInstance.destroy();
-        chartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: cData.labels,
-                datasets: [{ 
-                    label: cData.title, 
-                    data: cData.values, 
-                    backgroundColor: '#3b82f6',
-                    borderRadius: 5
-                }]
-            },
-            options: { 
-                maintainAspectRatio: false,
-                responsive: true
-            }
-        });
+        chartInstance = new Chart(ctx, { type: 'bar', data: { labels: cData.labels, datasets: [{ label: cData.title, data: cData.values, backgroundColor: '#3b82f6', borderRadius: 5 }] }, options: { maintainAspectRatio: false, responsive: true } });
     }
 
-    // --- PDF ---
     document.getElementById('download-pdf').onclick = async () => {
         const { jsPDF } = window.jspdf;
-        const btn = document.getElementById('download-pdf');
+        const btn = document.getElementById('download-pdf'), chatWin = document.getElementById('chat-window');
         btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generando...`;
-        
-        const chatWin = document.getElementById('chat-window');
-        const canvas = await html2canvas(chatWin, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = doc.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-        // Header Profesional
-        doc.setFillColor(15, 23, 42);
-        doc.rect(0, 0, 210, 20, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(14);
-        doc.text("AI PRO ANALYST - REPORTE DE RESULTADOS", 10, 13);
-        doc.setFontSize(9);
-        doc.text(`Generado por: Jesus M Polo | Fecha: ${new Date().toLocaleDateString()}`, 125, 13);
-
-        doc.addImage(imgData, 'PNG', 0, 25, pdfWidth, pdfHeight);
-        doc.save(`Analisis_Negocios_${new Date().getTime()}.pdf`);
-        
-        btn.innerHTML = `<i class="fas fa-file-pdf"></i> Descargar Reporte Ejecutivo`;
+        const oH = chatWin.style.height, oO = chatWin.style.overflow;
+        chatWin.style.height = 'auto'; chatWin.style.overflow = 'visible';
+        try {
+            const canvas = await html2canvas(chatWin, { scale: 2, useCORS: true, windowHeight: chatWin.scrollHeight });
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pdfW = doc.internal.pageSize.getWidth();
+            const pdfH = (canvas.height * pdfW) / canvas.width;
+            doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 25, 'F');
+            doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.text("REPORTE DE ANALÍTICA AVANZADA", 10, 15);
+            doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 30, pdfW, pdfH);
+            doc.save(`Reporte_VENAI_${new Date().getTime()}.pdf`);
+        } finally { chatWin.style.height = oH; chatWin.style.overflow = oO; btn.innerHTML = `<i class="fas fa-file-pdf"></i> Descargar Reporte Completo`; }
     };
 
-    window.onload = async () => {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (session) actualizarUI(session.user);
-    };
+    window.onload = async () => { const { data: { session } } = await supabaseClient.auth.getSession(); if (session) actualizarUI(session.user); };
 </script>
 </body>
 </html>
