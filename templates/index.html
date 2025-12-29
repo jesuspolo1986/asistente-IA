@@ -21,26 +21,19 @@
         .progress-fill { background: var(--accent); height: 100%; transition: width 0.5s; width: 0%; }
         
         #auth-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .auth-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
-        .auth-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
+        .auth-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; }
 
-        .main { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; position: relative; }
-        #chat-window { flex: 1; background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 25px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+        .main { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
+        #chat-window { flex: 1; background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 25px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
         
-        .msg { padding: 14px; border-radius: 12px; max-width: 85%; line-height: 1.5; font-size: 0.95rem; word-wrap: break-word; }
+        .msg { padding: 14px; border-radius: 12px; max-width: 85%; line-height: 1.5; font-size: 0.95rem; }
         .msg-user { align-self: flex-end; background: var(--dark); color: white; margin-left: auto; border-bottom-right-radius: 2px; }
-        .msg-ai { align-self: flex-start; background: #f1f5f9; border: 1px solid #e2e8f0; border-bottom-left-radius: 2px; color: #1e293b; }
+        .msg-ai { align-self: flex-start; background: #f1f5f9; border: 1px solid #e2e8f0; border-bottom-left-radius: 2px; }
         
-        .input-area { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px; align-items: center; }
+        .input-area { display: flex; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px; }
         input[type="text"] { flex: 1; border: none; outline: none; font-size: 1rem; }
         
-        #canvas-wrapper { width: 100%; max-height: 300px; display: none; margin: 15px 0; padding: 10px; border: 1px solid #f1f5f9; border-radius: 8px; }
-        .btn-action { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        
-        .btn-pdf { background: var(--danger); color: white; padding: 10px 18px; display: none; margin-bottom: 12px; align-self: flex-end; box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2); }
-        .btn-pdf:hover { transform: translateY(-1px); background: #dc2626; }
-
-        #upload-zone { text-align: center; border: 2px dashed #cbd5e1; padding: 40px; border-radius: 12px; cursor: pointer; color: #64748b; }
+        .btn-pdf { background: var(--danger); color: white; padding: 10px 18px; display: none; margin-bottom: 12px; align-self: flex-end; cursor: pointer; border: none; border-radius: 8px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -50,9 +43,9 @@
         <i class="fas fa-brain" style="font-size: 3rem; color: var(--accent); margin-bottom: 10px;"></i>
         <h2>AI Pro Analyst</h2>
         <form id="auth-form">
-            <input type="email" id="auth-email" class="auth-input" placeholder="Correo Electrónico" required>
-            <input type="password" id="auth-password" class="auth-input" placeholder="Contraseña" required>
-            <button type="submit" class="btn-action" style="width:100%; background:var(--dark); color:white; padding:14px; margin-top: 10px;">Iniciar Sesión</button>
+            <input type="email" id="auth-email" class="auth-input" style="width:100%; padding:12px; margin:10px 0;" placeholder="Correo" required>
+            <input type="password" id="auth-password" class="auth-input" style="width:100%; padding:12px; margin:10px 0;" placeholder="Contraseña" required>
+            <button type="submit" style="width:100%; background:var(--dark); color:white; padding:14px; cursor:pointer; border:none; border-radius:8px;">Iniciar Sesión</button>
         </form>
     </div>
 </div>
@@ -60,34 +53,27 @@
 <div class="sidebar">
     <h2><i class="fas fa-chart-line"></i> Dashboard</h2>
     <div class="status-card">
-        <div style="display:flex; justify-content:space-between; margin-bottom: 5px;">
-            <span>Días de prueba:</span> <strong id="dias-val">0/7</strong>
-        </div>
+        <div style="display:flex; justify-content:space-between;"><span>Días:</span> <strong id="dias-val">0/7</strong></div>
         <div class="progress-bar"><div id="barra-dias" class="progress-fill"></div></div>
         <p id="info-consultas">Consultas: 0/10</p>
     </div>
-    <div style="margin-top:25px; border-top: 1px solid #f1f5f9; padding-top: 20px;">
-        <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 15px;">
-            <i class="fas fa-user-circle"></i> <span id="user-display">Usuario</span>
-        </p>
-        <button onclick="cerrarSesion()" class="btn-action" style="color:var(--danger); background:none; font-size:0.85rem; padding: 0;"><i class="fas fa-power-off"></i> Cerrar Sesión</button>
+    <div style="margin-top:auto; padding-top:20px; border-top:1px solid #eee;">
+        <span id="user-display" style="font-size:0.8rem;"></span><br>
+        <button onclick="cerrarSesion()" style="color:var(--danger); background:none; border:none; cursor:pointer;">Cerrar Sesión</button>
     </div>
-    <div style="margin-top: auto; font-size: 0.75rem; color: #94a3b8; text-align: center;">Desarrollado por <strong>Jesus M Polo</strong></div>
 </div>
 
 <div class="main">
-    <button id="download-pdf" class="btn-action btn-pdf"><i class="fas fa-file-pdf"></i> Descargar Reporte Completo</button>
+    <button id="download-pdf" class="btn-pdf"><i class="fas fa-file-pdf"></i> Descargar Reporte Completo</button>
     <div id="chat-window">
-        <div id="upload-zone" onclick="document.getElementById('file-in').click()">
-            <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; margin-bottom: 15px;"></i>
-            <p><strong>Haz clic para subir Excel o CSV</strong></p>
+        <div id="upload-zone" style="text-align:center; border:2px dashed #ccc; padding:30px; cursor:pointer;" onclick="document.getElementById('file-in').click()">
+            <i class="fas fa-cloud-upload-alt" style="font-size:2rem;"></i><p>Subir Excel o CSV</p>
         </div>
         <input type="file" id="file-in" style="display:none" onchange="subirArchivo(this)">
-        <div id="canvas-wrapper"><canvas id="graficoIA"></canvas></div>
     </div>
     <form id="chat-form" class="input-area">
-        <input type="text" id="user-input" placeholder="Analiza tus datos aquí..." autocomplete="off">
-        <button type="submit" class="btn-action" style="background:var(--dark); color:white; width: 45px; height: 45px; border-radius: 10px;"><i class="fas fa-paper-plane"></i></button>
+        <input type="text" id="user-input" placeholder="Pregunta algo...">
+        <button type="submit" style="background:var(--dark); color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;"><i class="fas fa-paper-plane"></i></button>
     </form>
 </div>
 
@@ -95,10 +81,10 @@
     const supabaseUrl = 'https://kebpamfydhnxeaeegulx.supabase.co';
     const supabaseKey = 'sb_publishable_4MfYQjPVzSmLoEqp4XiVOQ_qjkjEpKi';
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
-    let currentUser = null, chartInstance = null;
+    let currentUser = null;
 
     async function actualizarUI(user) {
-        if (!user) { document.getElementById('auth-overlay').style.display = 'flex'; return; }
+        if (!user) return;
         currentUser = user;
         document.getElementById('auth-overlay').style.display = 'none';
         document.getElementById('user-display').innerText = user.email;
@@ -106,81 +92,80 @@
         const { data: perfil } = await supabaseClient.from('perfiles_empresa').select('*').eq('id', user.id).single();
         if (perfil) {
             if (user.email === "polojesus1986@gmail.com") {
-                document.getElementById('info-consultas').innerText = `Modo: Administrador (Sin límites)`;
+                document.getElementById('info-consultas').innerText = "Modo: Administrador (Sin límites)";
                 document.getElementById('dias-val').innerText = "∞";
-                document.getElementById('barra-dias').style.width = `100%`;
+                document.getElementById('barra-dias').style.width = "100%";
                 return;
             }
-            const hoy = new Date(), fechaReg = new Date(perfil.fecha_registro);
-            const diasRestantes = Math.max(0, 7 - Math.floor((hoy - fechaReg) / 86400000));
-            document.getElementById('dias-val').innerText = `${diasRestantes}/7`;
-            document.getElementById('barra-dias').style.width = `${(diasRestantes/7)*100}%`;
-            document.getElementById('info-consultas').innerText = `Consultas hoy: ${perfil.consultas_realizadas_hoy}/10`;
-            if (perfil.consultas_realizadas_hoy >= 10) document.getElementById('user-input').disabled = true;
+            const hoy = new Date(), registro = new Date(perfil.fecha_registro);
+            const restantes = Math.max(0, 7 - Math.floor((hoy - registro) / 86400000));
+            document.getElementById('dias-val').innerText = `${restantes}/7`;
+            document.getElementById('barra-dias').style.width = `${(restantes/7)*100}%`;
+            document.getElementById('info-consultas').innerText = `Consultas: ${perfil.consultas_realizadas_hoy}/10`;
         }
     }
 
     document.getElementById('auth-form').onsubmit = async (e) => {
         e.preventDefault();
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email: document.getElementById('auth-email').value, password: document.getElementById('auth-password').value });
-        if (error) alert("Error: " + error.message); else actualizarUI(data.user);
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: document.getElementById('auth-email').value,
+            password: document.getElementById('auth-password').value
+        });
+        if (error) alert(error.message); else actualizarUI(data.user);
     };
 
-    async function cerrarSesion() { await supabaseClient.auth.signOut(); localStorage.clear(); sessionStorage.clear(); window.location.reload(); }
-
     async function subirArchivo(input) {
-        if (!input.files[0]) return;
         const formData = new FormData(); formData.append('file', input.files[0]);
-        document.getElementById('upload-zone').innerHTML = `<i class="fas fa-spinner fa-spin"></i> Procesando...`;
         const res = await fetch('/upload', { method: 'POST', body: formData });
         const data = await res.json();
-        document.getElementById('upload-zone').innerHTML = `<i class="fas fa-check-circle" style="color:var(--success)"></i> Archivo Analizado`;
-        if(data.chart_data) renderChart(data.chart_data);
+        document.getElementById('upload-zone').innerHTML = "✅ Archivo Analizado";
     }
 
     document.getElementById('chat-form').onsubmit = async (e) => {
         e.preventDefault();
         const input = document.getElementById('user-input'), query = input.value;
-        if(!query || input.disabled) return;
         const chatWin = document.getElementById('chat-window');
         chatWin.innerHTML += `<div class="msg msg-user">${query}</div>`;
-        input.value = ""; chatWin.scrollTop = chatWin.scrollHeight;
+        input.value = "";
         const res = await fetch('/chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ message: query }) });
         const data = await res.json();
         chatWin.innerHTML += `<div class="msg msg-ai"><strong>AI Pro Analyst:</strong><br>${data.reply.replace(/\n/g, '<br>')}</div>`;
-        if(data.new_chart_data) renderChart(data.new_chart_data);
-        document.getElementById('download-pdf').style.display = 'flex';
-        await supabaseClient.rpc('incrementar_consulta', { usuario_id: currentUser.id });
-        actualizarUI(currentUser);
+        document.getElementById('download-pdf').style.display = 'block';
         chatWin.scrollTop = chatWin.scrollHeight;
     };
 
-    function renderChart(cData) {
-        const ctx = document.getElementById('graficoIA').getContext('2d');
-        document.getElementById('canvas-wrapper').style.display = 'block';
-        if(chartInstance) chartInstance.destroy();
-        chartInstance = new Chart(ctx, { type: 'bar', data: { labels: cData.labels, datasets: [{ label: cData.title, data: cData.values, backgroundColor: '#3b82f6', borderRadius: 5 }] }, options: { maintainAspectRatio: false, responsive: true } });
-    }
-
+    // FUNCIÓN DE PDF CORREGIDA PARA REPORTE COMPLETO
     document.getElementById('download-pdf').onclick = async () => {
         const { jsPDF } = window.jspdf;
         const btn = document.getElementById('download-pdf'), chatWin = document.getElementById('chat-window');
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generando...`;
-        const oH = chatWin.style.height, oO = chatWin.style.overflow;
-        chatWin.style.height = 'auto'; chatWin.style.overflow = 'visible';
+        btn.innerText = "Generando...";
+
+        // Guardar estado original
+        const originalHeight = chatWin.style.height;
+        const originalOverflow = chatWin.style.overflow;
+
+        // Expandir para captura total
+        chatWin.style.height = 'auto';
+        chatWin.style.overflow = 'visible';
+
         try {
             const canvas = await html2canvas(chatWin, { scale: 2, useCORS: true, windowHeight: chatWin.scrollHeight });
             const doc = new jsPDF('p', 'mm', 'a4');
-            const pdfW = doc.internal.pageSize.getWidth();
-            const pdfH = (canvas.height * pdfW) / canvas.width;
-            doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 25, 'F');
-            doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.text("REPORTE DE ANALÍTICA AVANZADA", 10, 15);
-            doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 30, pdfW, pdfH);
-            doc.save(`Reporte_VENAI_${new Date().getTime()}.pdf`);
-        } finally { chatWin.style.height = oH; chatWin.style.overflow = oO; btn.innerHTML = `<i class="fas fa-file-pdf"></i> Descargar Reporte Completo`; }
-    };
+            const pdfWidth = doc.internal.pageSize.getWidth();
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    window.onload = async () => { const { data: { session } } = await supabaseClient.auth.getSession(); if (session) actualizarUI(session.user); };
+            // Encabezado
+            doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 20, 'F');
+            doc.setTextColor(255, 255, 255); doc.text("AI PRO ANALYST - REPORTE EJECUTIVO", 10, 13);
+
+            doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 25, pdfWidth, pdfHeight);
+            doc.save("Reporte_Completo.pdf");
+        } finally {
+            chatWin.style.height = originalHeight;
+            chatWin.style.overflow = originalOverflow;
+            btn.innerHTML = '<i class="fas fa-file-pdf"></i> Descargar Reporte Completo';
+        }
+    };
 </script>
 </body>
 </html>
