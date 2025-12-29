@@ -146,11 +146,11 @@
             document.getElementById('info-consultas').innerText = `Consultas hoy: ${perfil.consultas_realizadas_hoy}/10`;
 
             // Bloqueo por límite alcanzado
-            if (perfil.consultas_realizadas_hoy >= 10) {
-                const input = document.getElementById('user-input');
-                input.disabled = true;
-                input.placeholder = "Límite de 10 consultas alcanzado por hoy.";
-                alert("Has agotado tus créditos diarios. Vuelve mañana para más análisis.");
+            if (user.email === "polojesus1986@gmail.com") {
+                document.getElementById('info-consultas').innerText = `Modo: Administrador (Sin límites)`;
+                document.getElementById('user-input').disabled = false;
+                document.getElementById('user-input').placeholder = "Pregunta lo que quieras, Jesus...";
+                return; // Salimos de la función para no aplicar los bloqueos de abajo
             }
         }
     }
