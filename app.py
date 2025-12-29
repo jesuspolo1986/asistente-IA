@@ -3,14 +3,20 @@ import os
 import pandas as pd
 from sqlalchemy import create_engine
 from werkzeug.utils import secure_filename
+# IMPORTANTE: Añade estas dos líneas para Mistral
+from mistralai import Mistral 
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# Aseguramos que la carpeta de subidas exista
+# --- CONFIGURACIÓN DE MISTRAL ---
+# Usa una variable de entorno para mayor seguridad en Koyeb
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "TU_API_KEY_AQUI")
+client = Mistral(api_key=MISTRAL_API_KEY)
+model_mistral = "mistral-large-latest" 
+
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# --- FUNCIÓN DE PROCESAMIENTO (La que revisamos) ---
 def procesar_y_cargar_excel(file_path):
     DATABASE_URL = os.environ.get("DATABASE_URL")
     if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
@@ -49,8 +55,6 @@ def procesar_y_cargar_excel(file_path):
     except Exception as e:
         return False, str(e), None
 
-# --- RUTA DE CARGA (UPLOAD) ---
-# CORRECTO
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -61,21 +65,37 @@ def upload_file():
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(file_path)
 
-    # Llamamos a la función y capturamos el summary
     success, message, summary = procesar_y_cargar_excel(file_path)
 
-    # ESTA ES LA CLAVE: Enviamos el summary de vuelta al Dashboard
     return jsonify({
         "success": success, 
         "message": message, 
         "summary": summary
     })
 
-# --- RUTA DE CHAT (SIMULADA) ---
 @app.route('/chat', methods=['POST'])
 def chat():
-    # Aquí iría tu lógica actual de conexión con la IA
-    pass
+    try:
+        data = request.json
+        user_message = data.get("message")
+        
+        if not user_message:
+            return jsonify({"reply": "No se recibió ningún mensaje."}), 400
+
+        # Llamada corregida a Mistral
+        chat_response = client.chat.complete(
+            model=model_mistral,
+            messages=[
+                {"role": "user", "content": user_message},
+            ]
+        )
+        
+        ai_reply = chat_response.choices[0].message.content
+        return jsonify({"reply": ai_reply})
+
+    except Exception as e:
+        print(f"Error en Mistral: {str(e)}")
+        return jsonify({"reply": "Error conectando con Mistral AI."}), 500
 
 @app.route('/')
 def index():
