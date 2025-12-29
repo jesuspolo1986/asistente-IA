@@ -80,23 +80,47 @@ def chat():
         user_message = data.get("message")
         
         if not user_message:
-            return jsonify({"reply": "No se recibió ningún mensaje."}), 400
+            return jsonify({"reply": "No recibí ninguna pregunta."}), 400
 
-        # Llamada corregida a Mistral
+        # 1. Obtener el motor de la base de datos
+        DATABASE_URL = os.environ.get("DATABASE_URL")
+        if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+            DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        
+        engine = create_engine(DATABASE_URL)
+
+        # 2. Consultar los datos actuales para darle contexto a Mistral
+        # Consultamos los 5 productos más vendidos y los 5 menos vendidos
+        with engine.connect() as conn:
+            df_contexto = pd.read_sql("SELECT producto, SUM(total) as ventas_totales FROM ventas GROUP BY producto ORDER BY ventas_totales DESC", conn)
+            
+        resumen_datos = df_contexto.to_string(index=False)
+
+        # 3. Crear el Prompt con contexto real
+        prompt_con_datos = f"""
+        Actúa como un experto Analista de Datos. 
+        Aquí tienes los datos reales de la empresa cargados hoy:
+        {resumen_datos}
+        
+        Pregunta del usuario: {user_message}
+        
+        Instrucciones: Responde de forma breve y profesional basándote ÚNICAMENTE en los datos proporcionados arriba.
+        """
+
+        # 4. Llamada a Mistral
         chat_response = client.chat.complete(
             model=model_mistral,
             messages=[
-                {"role": "user", "content": user_message},
+                {"role": "system", "content": "Eres Visionary AI, integrado en el dashboard de la empresa."},
+                {"role": "user", "content": prompt_con_datos},
             ]
         )
         
-        ai_reply = chat_response.choices[0].message.content
-        return jsonify({"reply": ai_reply})
+        return jsonify({"reply": chat_response.choices[0].message.content})
 
     except Exception as e:
-        print(f"Error en Mistral: {str(e)}")
-        return jsonify({"reply": "Error conectando con Mistral AI."}), 500
-
+        print(f"Error en chat inteligente: {str(e)}")
+        return jsonify({"reply": "Hubo un error al leer la base de datos para responderte."}), 500
 @app.route('/')
 def index():
     return render_template('index.html')
