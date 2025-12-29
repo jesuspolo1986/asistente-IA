@@ -21,7 +21,6 @@
 
         body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
 
-        /* Sidebar mejorada */
         .sidebar { width: 260px; background: var(--dark); color: white; padding: 25px; display: flex; flex-direction: column; transition: all 0.3s; }
         .sidebar h2 { font-size: 1.2rem; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; color: var(--accent); }
         
@@ -29,19 +28,15 @@
         .progress-bar { background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; margin: 10px 0; overflow: hidden; }
         .progress-fill { background: var(--accent); height: 100%; width: 0%; transition: width 0.5s ease; }
 
-        /* Contenedor Principal */
         .main-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 
-        /* Header con KPIs */
         .top-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; padding: 20px; background: white; border-bottom: 1px solid #e2e8f0; }
         .kpi-card { background: var(--bg); padding: 15px; border-radius: 10px; border-left: 4px solid var(--accent); }
         .kpi-card small { color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; }
         .kpi-card div { font-size: 1.1rem; font-weight: 800; margin-top: 5px; }
 
-        /* Área de Chat y Upload */
         .chat-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; scroll-behavior: smooth; }
         
-        /* Drag & Drop Zone */
         #upload-zone { 
             border: 2px dashed #cbd5e1; border-radius: 15px; padding: 40px; text-align: center; 
             background: white; transition: all 0.3s ease; cursor: pointer; position: relative;
@@ -49,26 +44,20 @@
         #upload-zone.dragover { background: #eff6ff; border-color: var(--accent); transform: scale(1.01); }
         #upload-zone i { font-size: 2.5rem; color: #94a3b8; margin-bottom: 10px; }
 
-        /* Mensajes */
         .msg { padding: 15px 20px; border-radius: 15px; max-width: 80%; line-height: 1.6; font-size: 0.95rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .msg-user { align-self: flex-end; background: var(--accent); color: white; border-bottom-right-radius: 2px; }
         .msg-ai { align-self: flex-start; background: white; border: 1px solid #e2e8f0; border-bottom-left-radius: 2px; }
 
-        /* Barra de entrada */
         .input-box { background: white; padding: 20px; border-top: 1px solid #e2e8f0; display: flex; gap: 12px; align-items: center; }
         .input-box input { flex: 1; padding: 12px 20px; border: 1px solid #e2e8f0; border-radius: 10px; outline: none; transition: border 0.2s; }
-        .input-box input:focus { border-color: var(--accent); }
         
         .btn { padding: 12px 20px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
         .btn-primary { background: var(--accent); color: white; }
-        .btn-primary:hover { background: var(--accent-hover); }
         .btn-pdf { background: var(--danger); color: white; position: absolute; top: 90px; right: 20px; z-index: 5; display: none; }
 
-        /* Auth Overlay */
         #auth-overlay { position: fixed; inset: 0; background: var(--dark); z-index: 1000; display: flex; align-items: center; justify-content: center; }
         .auth-card { background: white; padding: 40px; border-radius: 20px; width: 350px; text-align: center; }
         
-        /* Animación de carga */
         .spinner { animation: rotate 2s linear infinite; font-size: 1.2rem; }
         @keyframes rotate { 100% { transform: rotate(360deg); } }
     </style>
@@ -80,8 +69,8 @@
         <i class="fas fa-brain" style="font-size: 3rem; color: var(--accent); margin-bottom: 15px;"></i>
         <h2 id="auth-title">AI Pro Analyst</h2>
         <form id="auth-form">
-            <input type="email" id="auth-email" class="auth-input" placeholder="Correo" required style="width:100%; padding:12px; margin:10px 0; border:1px solid #ddd; border-radius:8px;">
-            <input type="password" id="auth-password" class="auth-input" placeholder="Contraseña" required style="width:100%; padding:12px; margin:10px 0; border:1px solid #ddd; border-radius:8px;">
+            <input type="email" id="auth-email" placeholder="Correo" required style="width:100%; padding:12px; margin:10px 0; border:1px solid #ddd; border-radius:8px;">
+            <input type="password" id="auth-password" placeholder="Contraseña" required style="width:100%; padding:12px; margin:10px 0; border:1px solid #ddd; border-radius:8px;">
             <button type="submit" id="auth-btn" class="btn btn-primary" style="width:100%; justify-content:center;">Entrar</button>
         </form>
         <p style="font-size: 0.85rem; margin-top: 20px;">
@@ -124,7 +113,6 @@
             <i class="fas fa-cloud-upload-alt"></i>
             <h3>Análisis Inteligente de Datos</h3>
             <p>Arrastra tu archivo Excel o CSV aquí o haz clic para buscar</p>
-            <span style="font-size:0.75rem; color:#94a3b8;">Formatos soportados: .xlsx, .csv</span>
         </div>
         <input type="file" id="file-in" style="display:none" onchange="subirArchivo(this.files[0])">
     </div>
@@ -136,69 +124,58 @@
 </div>
 
 <script>
-    // Configuración Supabase
     const supabaseUrl = 'https://kebpamfydhnxeaeegulx.supabase.co';
     const supabaseKey = 'sb_publishable_4MfYQjPVzSmLoEqp4XiVOQ_qjkjEpKi';
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     let isSignUp = false;
 
-    // Lógica de Arrastrar y Soltar (Drag & Drop)
+    // --- MANEJO DE SESIÓN ---
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (session) {
+            actualizarUI(session.user);
+        } else {
+            document.getElementById('auth-overlay').style.display = 'flex';
+        }
+    });
+
+    async function actualizarUI(user) {
+        if (!user) return;
+        document.getElementById('auth-overlay').style.display = 'none';
+        document.getElementById('user-display').innerText = user.email;
+
+        const { data: perfil } = await supabaseClient.from('perfiles_empresa').select('*').eq('id', user.id).single();
+        if (perfil) {
+            const hoy = new Date(), registro = new Date(perfil.fecha_registro);
+            const diasRestantes = Math.max(0, 7 - Math.floor((hoy - registro) / 86400000));
+            document.getElementById('dias-val').innerText = `${diasRestantes}/7`;
+            document.getElementById('barra-dias').style.width = `${(diasRestantes/7)*100}%`;
+        }
+    }
+
+    // --- UPLOAD LOGIC ---
     const dropZone = document.getElementById('upload-zone');
-    
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
-        dropZone.addEventListener(name, e => { e.preventDefault(); e.stopPropagation(); });
-    });
-
-    ['dragenter', 'dragover'].forEach(name => {
-        dropZone.addEventListener(name, () => dropZone.classList.add('dragover'));
-    });
-
-    ['dragleave', 'drop'].forEach(name => {
-        dropZone.addEventListener(name, () => dropZone.classList.remove('dragover'));
-    });
-
-    dropZone.addEventListener('drop', e => {
-        const file = e.dataTransfer.files[0];
-        subirArchivo(file);
-    });
-
     dropZone.onclick = () => document.getElementById('file-in').click();
-
-    // Función de Subida con Feedback Visual
+    
     async function subirArchivo(file) {
         if (!file) return;
-        dropZone.innerHTML = `<i class="fas fa-circle-notch spinner"></i><h3>Procesando inteligencia...</h3><p>Estamos extrayendo los datos de ${file.name}</p>`;
-        
+        dropZone.innerHTML = `<i class="fas fa-circle-notch spinner"></i><p>Procesando ${file.name}...</p>`;
         const formData = new FormData();
         formData.append('file', file);
         
         try {
             const res = await fetch('/upload', { method: 'POST', body: formData });
             const data = await res.json();
-            
-            // Actualizar KPIs (Esto asume que el backend devuelve estos datos)
             if(data.summary) {
-                document.getElementById('kpi-total').innerText = data.summary.total_ventas || '$0.00';
-                document.getElementById('kpi-vendedor').innerText = data.summary.mejor_vendedor || '---';
-                document.getElementById('kpi-producto').innerText = data.summary.producto_top || '---';
-                document.getElementById('kpi-unidades').innerText = data.summary.unidades || '0';
+                document.getElementById('kpi-total').innerText = data.summary.total_ventas;
+                document.getElementById('kpi-vendedor').innerText = data.summary.mejor_vendedor;
+                document.getElementById('kpi-producto').innerText = data.summary.producto_top;
+                document.getElementById('kpi-unidades').innerText = data.summary.unidades;
             }
-            
-            dropZone.innerHTML = `<i class="fas fa-check-circle" style="color:var(--success)"></i><h3>¡Datos Listos!</h3><p>${file.name} analizado correctamente.</p>`;
-        } catch (e) {
-            dropZone.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i><h3>Error de carga</h3><p>Intenta de nuevo.</p>`;
-        }
+            dropZone.innerHTML = `<i class="fas fa-check-circle" style="color:var(--success)"></i><h3>¡Datos Listos!</h3>`;
+        } catch (e) { dropZone.innerHTML = `<p>Error al subir.</p>`; }
     }
 
-    // Lógica de Autenticación
-    document.getElementById('auth-switch-link').onclick = (e) => {
-        e.preventDefault();
-        isSignUp = !isSignUp;
-        document.getElementById('auth-title').innerText = isSignUp ? "Registro de Empresa" : "AI Pro Analyst";
-        document.getElementById('auth-btn').innerText = isSignUp ? "Crear Cuenta" : "Entrar";
-        document.getElementById('auth-switch-link').innerText = isSignUp ? "Ya tengo cuenta" : "Crear cuenta";
-    };
-
+    // --- CHAT LOGIC ---
     document.getElementById('chat-form').onsubmit = async (e) => {
         e.preventDefault();
         const input = document.getElementById('user-input'), query = input.value;
@@ -220,105 +197,55 @@
             
             chatWin.innerHTML += `<div class="msg msg-ai"><strong>Visionary AI:</strong><br>${reply.replace(/\n/g, '<br>')}</div>`;
 
-            // --- LÓGICA DE EXTRACCIÓN PARA TARJETAS KPI ---
-            
-            // 1. Extraer Ventas Totales (Busca el valor más alto con $)
+            // Extraer datos para KPIs si la IA los menciona
             const ventasMatches = reply.match(/\$\d{1,3}(,\d{3})*(\.\d{2})?/g);
             if(ventasMatches) {
-                // Tomamos el valor más alto mencionado en la respuesta
                 const valores = ventasMatches.map(v => parseFloat(v.replace(/[$,]/g, '')));
-                const maxVenta = Math.max(...valores);
-                document.getElementById('kpi-total').innerText = `$${maxVenta.toLocaleString()}`;
+                document.getElementById('kpi-total').innerText = `$${Math.max(...valores).toLocaleString()}`;
             }
-
-            // 2. Extraer Líder de Ventas
-            if(reply.includes("Beatriz Peña")) {
-                document.getElementById('kpi-vendedor').innerText = "Beatriz Peña";
-            } else if (reply.includes("Diego Sosa")) {
-                document.getElementById('kpi-vendedor').innerText = "Diego Sosa";
-            }
-
-            // 3. Extraer Producto Top
-            if(reply.includes("Laptop Pro")) {
-                document.getElementById('kpi-producto').innerText = "Laptop Pro";
-            } else if (reply.includes("Monitor 4K")) {
-                document.getElementById('kpi-producto').innerText = "Monitor 4K";
-            }
-
-            // 4. Extraer Unidades (Busca números seguidos de la palabra unidades o en tablas)
-            const unidadesMatch = reply.match(/(\d+)\s*unidades/i) || reply.match(/\|\s*(\d+)\s*\|/);
-            if(unidadesMatch) {
-                document.getElementById('kpi-unidades').innerText = unidadesMatch[1];
-            }
-
-            // ----------------------------------------------
+            if(reply.includes("Beatriz Peña")) document.getElementById('kpi-vendedor').innerText = "Beatriz Peña";
+            if(reply.includes("Laptop Pro")) document.getElementById('kpi-producto').innerText = "Laptop Pro";
 
             document.getElementById('download-pdf').style.display = 'flex';
             chatWin.scrollTop = chatWin.scrollHeight;
-
-        } catch (error) {
-            console.error("Error en el chat:", error);
-            chatWin.innerHTML += `<div class="msg msg-ai" style="color:red;">Error al conectar con la IA.</div>`;
-        }
+        } catch (error) { console.error(error); }
     };
 
-    async function actualizarUI(user) {
-        if (!user) return;
-        document.getElementById('auth-overlay').style.display = 'none';
-        document.getElementById('user-display').innerText = user.email;
-
-        const { data: perfil } = await supabaseClient.from('perfiles_empresa').select('*').eq('id', user.id).single();
-        if (perfil) {
-            const hoy = new Date(), registro = new Date(perfil.fecha_registro);
-            const diasRestantes = Math.max(0, 7 - Math.floor((hoy - registro) / 86400000));
-            document.getElementById('dias-val').innerText = `${diasRestantes}/7`;
-            document.getElementById('barra-dias').style.width = `${(diasRestantes/7)*100}%`;
-            document.getElementById('info-consultas').innerText = `Créditos: ${perfil.consultas_realizadas_hoy}/10`;
-        }
-    }
-
-    // Chat y PDF (Corregido con retraso para capturar todo)
-    document.getElementById('chat-form').onsubmit = async (e) => {
+    // --- AUTH FORM ---
+    document.getElementById('auth-form').onsubmit = async (e) => {
         e.preventDefault();
-        const input = document.getElementById('user-input'), query = input.value;
-        if(!query) return;
-
-        const chatWin = document.getElementById('chat-window');
-        chatWin.innerHTML += `<div class="msg msg-user">${query}</div>`;
-        input.value = "";
-        
-        const res = await fetch('/chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ message: query }) });
-        const data = await res.json();
-        
-        chatWin.innerHTML += `<div class="msg msg-ai"><strong>Visionary AI:</strong><br>${data.reply.replace(/\n/g, '<br>')}</div>`;
-        document.getElementById('download-pdf').style.display = 'flex';
-        chatWin.scrollTop = chatWin.scrollHeight;
+        const email = document.getElementById('auth-email').value;
+        const password = document.getElementById('auth-password').value;
+        if (isSignUp) {
+            const { error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) alert(error.message); else alert("Registro exitoso.");
+        } else {
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) alert(error.message);
+        }
     };
 
+    document.getElementById('auth-switch-link').onclick = (e) => {
+        e.preventDefault();
+        isSignUp = !isSignUp;
+        document.getElementById('auth-title').innerText = isSignUp ? "Registro" : "AI Pro Analyst";
+        document.getElementById('auth-btn').innerText = isSignUp ? "Crear Cuenta" : "Entrar";
+    };
+
+    // --- PDF LOGIC ---
     document.getElementById('download-pdf').onclick = async () => {
         const btn = document.getElementById('download-pdf'), chatWin = document.getElementById('chat-window');
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generando...`;
-        
-        const originalH = chatWin.style.height, originalO = chatWin.style.overflow;
-        chatWin.style.height = 'auto'; chatWin.style.overflow = 'visible';
-        
-        await new Promise(r => setTimeout(r, 600)); // Espera para renderizado completo
-
-        try {
-            const canvas = await html2canvas(chatWin, { 
-                scale: 2, useCORS: true, 
-                windowHeight: chatWin.scrollHeight,
-                height: chatWin.scrollHeight,
-                scrollY: -window.scrollY
-            });
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 10, 210, (canvas.height * 210) / canvas.width);
-            doc.save(`Analisis_Visionary_${new Date().getTime()}.pdf`);
-        } finally {
-            chatWin.style.height = originalH; chatWin.style.overflow = originalO;
-            btn.innerHTML = `<i class="fas fa-file-pdf"></i> Reporte Ejecutivo`;
-        }
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i>...`;
+        const originalH = chatWin.style.height;
+        chatWin.style.height = 'auto';
+        await new Promise(r => setTimeout(r, 600));
+        const canvas = await html2canvas(chatWin, { scale: 2 });
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 10, 210, (canvas.height * 210) / canvas.width);
+        doc.save(`Analisis_Visionary.pdf`);
+        chatWin.style.height = originalH;
+        btn.innerHTML = `<i class="fas fa-file-pdf"></i> Reporte`;
     };
 
     async function cerrarSesion() { await supabaseClient.auth.signOut(); window.location.reload(); }
