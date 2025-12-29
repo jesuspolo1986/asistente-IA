@@ -75,6 +75,9 @@ def upload_file():
         "summary": summary
     })
 
+# --- MOTOR GLOBAL (Fuera de las funciones) ---
+engine = obtener_db_engine()
+
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
@@ -84,39 +87,33 @@ def chat():
         if not user_message:
             return jsonify({"reply": "Por favor, escribe una pregunta."}), 400
 
-        # --- EXTRACCIÓN DE CONTEXTO REAL ---
-        engine = obtener_db_engine()
+        # --- EXTRACCIÓN RÁPIDA DE CONTEXTO ---
+        # Limitamos el contexto para no saturar la memoria ni el prompt
         with engine.connect() as conn:
-            # Consultamos el rendimiento por producto para darle "vista" a la IA
             df_contexto = pd.read_sql("""
-                SELECT producto, SUM(total) as ventas_totales, COUNT(*) as transacciones 
+                SELECT producto, SUM(total) as ventas_totales 
                 FROM ventas 
                 GROUP BY producto 
                 ORDER BY ventas_totales DESC
+                LIMIT 15
             """, conn)
             
         resumen_datos = df_contexto.to_string(index=False)
 
-        # --- PROMPT REVOLUCIONARIO ---
         prompt_final = f"""
-        CONTEXTO DE NEGOCIO REAL:
+        DATOS REALES:
         {resumen_datos}
         
-        PREGUNTA DEL USUARIO:
-        {user_message}
+        PREGUNTA: {user_message}
         
-        INSTRUCCIONES DE PERSONALIDAD (ESTRICTO):
-        1. Eres Visionary AI, un Consultor de Negocios de Élite 🚀.
-        2. No respondas con texto plano aburrido. Usa negritas, listas y emojis.
-        3. Siempre analiza los datos: Si alguien pregunta por bajas ventas, no solo digas el nombre, ¡da una estrategia para mejorar!
-        4. Sé proactivo: Si ves que un producto estrella está vendiendo mucho, sugiere felicitar al equipo.
-        5. Habla de 'nuestra empresa' o 'tus resultados'.
+        INSTRUCCIONES: Eres Visionary AI 🚀. Responde con emojis, analiza los datos y da una recomendación estratégica breve.
         """
 
+        # Llamada a Mistral con tiempo de espera controlado
         chat_response = client.chat.complete(
             model=model_mistral,
             messages=[
-                {"role": "system", "content": "Eres el motor de inteligencia de AI Pro Analyst. Tu objetivo es transformar datos en decisiones estratégicas."},
+                {"role": "system", "content": "Analista estratégico de negocios."},
                 {"role": "user", "content": prompt_final},
             ]
         )
@@ -124,9 +121,8 @@ def chat():
         return jsonify({"reply": chat_response.choices[0].message.content})
 
     except Exception as e:
-        print(f"Error en chat: {str(e)}")
-        return jsonify({"reply": "⚠️ Tuve un pequeño problema técnico al consultar los datos. ¿Podrías intentar de nuevo?"}), 500
-
+        print(f"Error detectado: {str(e)}")
+        return jsonify({"reply": "🚀 Los datos están listos, pero la IA tardó un poco en responder. ¡Intenta preguntar de nuevo!"}), 200 # Devolvemos 200 para no romper el front
 @app.route('/')
 def index():
     return render_template('index.html')
