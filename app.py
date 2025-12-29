@@ -50,7 +50,8 @@ def procesar_y_cargar_excel(file_path):
         return False, str(e), None
 
 # --- RUTA DE CARGA (UPLOAD) ---
-@app.route('/upload', method=['POST'])
+# CORRECTO
+@app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
         return jsonify({"success": False, "message": "No hay archivo"}), 400
