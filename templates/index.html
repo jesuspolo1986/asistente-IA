@@ -141,47 +141,50 @@
         const btn = document.getElementById('download-pdf');
         const chatWin = document.getElementById('chat-window');
         
-        btn.innerText = "Generando Reporte...";
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Preparando Reporte...`;
 
-        // 1. Guardamos el estado original
+        // 1. Guardar estado original
         const originalHeight = chatWin.style.height;
         const originalOverflow = chatWin.style.overflow;
 
-        // 2. "Estiramos" el contenedor para que se vea TODO el contenido antes de la foto
+        // 2. Forzar expansión total para que nada quede oculto
         chatWin.style.height = 'auto';
         chatWin.style.overflow = 'visible';
 
+        // 3. PEQUEÑA PAUSA (500ms) para asegurar que el navegador renderice todo el texto largo
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         try {
-            // 3. CAPTURA TOTAL (Aquí es donde estaba el cambio importante)
+            // 4. Captura con parámetros de altura máxima forzada
             const canvas = await html2canvas(chatWin, { 
                 scale: 2, 
                 useCORS: true, 
-                scrollY: -window.scrollY,
+                logging: false,
                 windowHeight: chatWin.scrollHeight,
-                height: chatWin.scrollHeight 
+                height: chatWin.scrollHeight,
+                y: window.scrollY // Ajuste de posición
             });
 
             const doc = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = doc.internal.pageSize.getWidth();
             const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-            // Encabezado profesional azul oscuro
+            // Encabezado profesional
             doc.setFillColor(15, 23, 42); 
             doc.rect(0, 0, 210, 20, 'F');
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(14);
-            doc.text("AI PRO ANALYST - REPORTE ESTRATÉGICO", 10, 13);
+            doc.text("AI PRO ANALYST - REPORTE EJECUTIVO FINAL", 10, 13);
 
-            // Añadir la imagen capturada
             const imgData = canvas.toDataURL('image/png');
             doc.addImage(imgData, 'PNG', 0, 25, pdfWidth, pdfHeight);
             
-            doc.save(`Reporte_AI_Pro_${new Date().getTime()}.pdf`);
+            doc.save(`Reporte_Elite_${new Date().getTime()}.pdf`);
         } catch (error) {
-            console.error("Error al generar PDF:", error);
-            alert("Hubo un error al generar el PDF.");
+            console.error(error);
+            alert("Error al capturar el reporte completo.");
         } finally {
-            // 4. Devolvemos el chat a su tamaño normal con scroll
+            // 5. Restaurar vista normal del chat
             chatWin.style.height = originalHeight;
             chatWin.style.overflow = originalOverflow;
             btn.innerHTML = '<i class="fas fa-file-pdf"></i> Descargar Reporte Completo';
