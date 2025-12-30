@@ -27,19 +27,18 @@ def obtener_db_engine():
 engine = obtener_db_engine()
 
 # --- LÓGICA DE SUSCRIPCIÓN Y CRÉDITOS ---
-def obtener_datos_usuario(usuario_id=1):
-    """Consulta créditos y fechas en Supabase."""
+def obtener_datos_usuario():
     with engine.connect() as con:
-        # Asegúrate de tener una tabla 'usuarios' con estas columnas
-        query = text("SELECT creditos, fecha_inicio FROM usuarios WHERE id = :id")
-        return con.execute(query, {"id": usuario_id}).fetchone()
+        # Consultamos la nueva tabla de control
+        query = text("SELECT creditos_usados, fecha_inicio FROM suscripciones LIMIT 1")
+        return con.execute(query).fetchone()
 
-def descontar_credito(usuario_id=1):
-    """Actualiza el contador de créditos (Solución al 0/10)."""
+def descontar_credito():
     with engine.connect() as con:
-        query = text("UPDATE usuarios SET creditos = creditos + 1 WHERE id = :id AND creditos < 10")
-        con.execute(query, {"id": usuario_id})
-        con.commit()
+        with con.begin():
+            # Sumamos 1 al contador de créditos usados
+            query = text("UPDATE suscripciones SET creditos_usados = creditos_usados + 1")
+            con.execute(query)
 
 def calcular_banner():
     """Genera el banner según la fecha actual (30 de diciembre de 2025)."""
