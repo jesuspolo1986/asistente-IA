@@ -12,38 +12,47 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # --- CONFIGURACIÓN ---
-MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "TU_KEY")
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "TU_MISTRAL_KEY")
 client = Mistral(api_key=MISTRAL_API_KEY)
-model_mistral = "mistral-large-latest"
 
-# Conexión confirmada
+# Conexión reconstruida con tu ID de proyecto
 DATABASE_URL = os.environ.get("DATABASE_URL", "").replace("postgres://", "postgresql://", 1)
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+def inicializar_db():
+    """Crea la tabla si no existe al arrancar la app"""
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS public.suscripciones (
+                email TEXT PRIMARY KEY,
+                creditos_usados INTEGER DEFAULT 0,
+                ultimo_uso DATE DEFAULT CURRENT_DATE
+            );
+        """))
 
 def gestionar_creditos(email):
     hoy = datetime.now().date()
     try:
         with engine.connect() as con:
-            # Usamos public. para asegurar que encuentre la tabla
-            res = con.execute(text('SELECT creditos_usados, ultimo_uso FROM public."suscripciones" WHERE email = :e'), {"e": email}).fetchone()
-            
+            res = con.execute(text('SELECT creditos_usados, ultimo_uso FROM public.suscripciones WHERE email = :e'), {"e": email}).fetchone()
             if not res:
                 with con.begin():
-                    con.execute(text('INSERT INTO public."suscripciones" (email, creditos_usados, ultimo_uso) VALUES (:e, 0, :h)'), {"e": email, "h": hoy})
-            
+                    con.execute(text('INSERT INTO public.suscripciones (email, creditos_usados, ultimo_uso) VALUES (:e, 0, :h)'), {"e": email, "h": hoy})
+                return 0
             if res.ultimo_uso != hoy:
                 with con.begin():
-                    con.execute(text('UPDATE public."suscripciones" SET creditos_usados = 0, ultimo_uso = :h WHERE email = :e'), {"e": email, "h": hoy})
+                    con.execute(text('UPDATE public.suscripciones SET creditos_usados = 0, ultimo_uso = :h WHERE email = :e'), {"e": email, "h": hoy})
                 return 0
             return res.creditos_usados
     except Exception as e:
-        print(f"Error Créditos: {e}")
+        print(f"Error DB: {e}")
         return 0
 
 @app.route('/')
 def index():
     if 'user' not in session: return render_template('index.html', login_mode=True)
     creditos = gestionar_creditos(session['user'])
+    # Mañana integraremos aquí el banner de expiración y el día de gracia [cite: 2025-12-30]
     return render_template('index.html', login_mode=False, creditos=creditos, user=session['user'])
 
 @app.route('/login', methods=['POST'])
@@ -61,7 +70,6 @@ def upload():
         df = pd.read_csv(path) if filename.endswith('.csv') else pd.read_excel(path)
         df.columns = [str(c).strip().lower() for c in df.columns]
         with engine.begin() as connection:
-            # Forzamos la tabla ventas al esquema público
             df.to_sql('ventas', con=connection, if_exists='replace', index=False, schema='public')
         return jsonify({"success": True})
     except Exception as e:
@@ -71,20 +79,27 @@ def upload():
 def chat():
     user = session.get('user')
     creditos = gestionar_creditos(user)
-    if creditos >= 10: return jsonify({"reply": "Límite diario alcanzado."})
+    if creditos >= 10: return jsonify({"reply": "Límite de 10 consultas alcanzado por hoy."})
 
     try:
         with engine.connect() as conn:
-            df = pd.read_sql(text("SELECT * FROM public.ventas LIMIT 100"), conn)
+            df = pd.read_sql(text("SELECT * FROM public.ventas LIMIT 50"), conn)
         
         data = request.json
-        prompt = f"Datos:\n{df.to_string()}\n\nPregunta: {data['message']}"
-        resp = client.chat.complete(model=model_mistral, messages=[{"role": "user", "content": prompt}])
+        prompt = f"Datos del negocio:\n{df.to_string()}\n\nPregunta: {data['message']}"
+        resp = client.chat.complete(model="mistral-large-latest", messages=[{"role": "user", "content": prompt}])
         
-       # Cambia el UPDATE por este:
         with engine.begin() as con:
-           con.execute(text('UPDATE public."suscripciones" SET creditos_usados = creditos_usados + 1 WHERE email = :e'), {"e": user})
+            con.execute(text('UPDATE public.suscripciones SET creditos_usados = creditos_usados + 1 WHERE email = :e'), {"e": user})
             
         return jsonify({"reply": resp.choices[0].message.content})
     except Exception as e:
-        return jsonify({"reply": f"Error: {str(e)}"})
+        return jsonify({"reply": f"Error en el análisis: {str(e)}"})
+
+if __name__ == '__main__':
+    # Aseguramos que las tablas existan antes de atender usuarios
+    try:
+        inicializar_db()
+    except:
+        pass
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
