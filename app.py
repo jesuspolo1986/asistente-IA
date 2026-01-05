@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, text
 from werkzeug.utils import secure_filename
 from mistralai import Mistral
 from datetime import datetime, timedelta
-
+import gc
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 # Límite de 16MB para seguridad del servidor
@@ -105,40 +105,42 @@ def chat():
         print(f"Error en chat: {e}")
         return jsonify({"reply": "🚀 La IA está analizando muchos datos. ¡Intenta de nuevo en unos segundos!"})
 
+  # <--- Añade esto al principio del archivo con los otros imports
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
         return jsonify({"success": False, "message": "No hay archivo"}), 400
     
     file = request.files['file']
-    if file.filename == '':
-        return jsonify({"success": False, "message": "No seleccionaste archivo"}), 400
-
     filename = secure_filename(file.filename)
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     
     try:
         file.save(file_path)
 
+        # Leer archivo
         if filename.endswith('.csv'):
             df = pd.read_csv(file_path, encoding='utf-8-sig')
         else:
             df = pd.read_excel(file_path)
 
-        # Inserción por lotes para evitar Timeouts
+        # Subir a DB
         with engine.begin() as connection:
             df.to_sql('ventas', con=connection, if_exists='replace', index=False, chunksize=500)
         
+        # --- LIBERACIÓN CRÍTICA DE MEMORIA ---
+        del df               # Borra el objeto de datos
         if os.path.exists(file_path):
-            os.remove(file_path)
+            os.remove(file_path) # Borra el archivo físico
+        gc.collect()         # Fuerza a Python a limpiar la RAM
+        # -------------------------------------
 
-        return jsonify({"success": True, "message": f"Éxito: {len(df)} registros cargados."})
+        return jsonify({"success": True, "message": "Datos cargados y memoria liberada."})
 
     except Exception as e:
         if os.path.exists(file_path):
             os.remove(file_path)
-        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
-
-if __name__ == '__main__':
+        return jsonify({"success": False, "message": str(e)}), 500
     port = int(os.environ.get("PORT", 8000))
     app.run(host='0.0.0.0', port=port)
