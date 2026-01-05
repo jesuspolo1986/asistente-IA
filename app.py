@@ -85,9 +85,11 @@ def chat():
         data = request.json
         user_message = data.get("message")
         
-        # 1. Extraer contexto de ventas
+        # 1. Extraer contexto (Asegúrate de que los nombres coincidan con ventas_prueba.csv)
         with engine.connect() as conn:
-            df_contexto = pd.read_sql("SELECT producto, SUM(total) as ventas FROM ventas GROUP BY producto LIMIT 10", conn)
+            # Usamos comillas dobles por si SQL se pone estricto con las mayúsculas de Pandas
+            query = text('SELECT "Producto", SUM("Total") as ventas FROM ventas GROUP BY "Producto" LIMIT 10')
+            df_contexto = pd.read_sql(query, conn)
             resumen_datos = df_contexto.to_string(index=False)
 
         prompt_final = f"DATOS REALES:\n{resumen_datos}\nPREGUNTA: {user_message}\nInstrucciones: Eres Visionary AI 🚀."
@@ -102,9 +104,11 @@ def chat():
         return jsonify({"reply": chat_response.choices[0].message.content})
 
     except Exception as e:
-        print(f"Error en chat: {e}")
-        return jsonify({"reply": "🚀 La IA está analizando muchos datos. ¡Intenta de nuevo en unos segundos!"})
-
+        # ESTO APARECERÁ EN LOS LOGS DE KOYEB
+        print(f"DEBUG ERROR CHAT: {type(e).__name__} - {str(e)}") 
+        
+        # Mensaje más informativo para ti mientras desarrollamos
+        return jsonify({"reply": f"Error técnico: {type(e).__name__}. Revisa los logs de Koyeb."})
   # <--- Añade esto al principio del archivo con los otros imports
 
 @app.route('/upload', methods=['POST'])
