@@ -25,16 +25,15 @@ def gestionar_creditos(email):
     try:
         with engine.connect() as con:
             # Usamos public. para asegurar que encuentre la tabla
-            res = con.execute(text("SELECT creditos_usados, ultimo_uso FROM public.suscripciones WHERE email = :e"), {"e": email}).fetchone()
+            res = con.execute(text('SELECT creditos_usados, ultimo_uso FROM public."suscripciones" WHERE email = :e'), {"e": email}).fetchone()
             
             if not res:
                 with con.begin():
-                    con.execute(text("INSERT INTO public.suscripciones (email, creditos_usados, ultimo_uso) VALUES (:e, 0, :h)"), {"e": email, "h": hoy})
-                return 0
+                    con.execute(text('INSERT INTO public."suscripciones" (email, creditos_usados, ultimo_uso) VALUES (:e, 0, :h)'), {"e": email, "h": hoy})
             
             if res.ultimo_uso != hoy:
                 with con.begin():
-                    con.execute(text("UPDATE public.suscripciones SET creditos_usados = 0, ultimo_uso = :h WHERE email = :e"), {"e": email, "h": hoy})
+                    con.execute(text('UPDATE public."suscripciones" SET creditos_usados = 0, ultimo_uso = :h WHERE email = :e'), {"e": email, "h": hoy})
                 return 0
             return res.creditos_usados
     except Exception as e:
@@ -82,8 +81,9 @@ def chat():
         prompt = f"Datos:\n{df.to_string()}\n\nPregunta: {data['message']}"
         resp = client.chat.complete(model=model_mistral, messages=[{"role": "user", "content": prompt}])
         
+       # Cambia el UPDATE por este:
         with engine.begin() as con:
-            con.execute(text("UPDATE public.suscripciones SET creditos_usados = creditos_usados + 1 WHERE email = :e"), {"e": user})
+           con.execute(text('UPDATE public."suscripciones" SET creditos_usados = creditos_usados + 1 WHERE email = :e'), {"e": user})
             
         return jsonify({"reply": resp.choices[0].message.content})
     except Exception as e:
