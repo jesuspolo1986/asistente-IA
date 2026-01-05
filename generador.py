@@ -1,33 +1,29 @@
 import pandas as pd
-import random
-from datetime import datetime, timedelta
 
-# Configuración de datos ficticios
-productos = {
-    'Laptop Pro': 1200, 'Monitor 4K': 350, 'Teclado Mecánico': 80, 
-    'Mouse Gamer': 50, 'Silla Ergonómica': 250, 'Headset Wireless': 120
+# ARCHIVO A: Retail (Tiendas y Ventas)
+retail_data = {
+    'Tienda': ['Norte', 'Sur', 'Este', 'Oeste', 'Centro'],
+    'SKU': ['LAP-001', 'MOU-99', 'KEY-12', 'MON-45', 'SUR-01'],
+    'Ventas_Netas': [15200.50, 8900.00, 12450.75, 21000.00, 5600.20]
 }
-categorias = ['Electrónica', 'Accesorios', 'Muebles']
-vendedores = ['Carlos Ruiz', 'Ana López', 'Beatriz Peña', 'Diego Sosa']
+pd.DataFrame(retail_data).to_csv('retail_test.csv', index=False)
 
-data = []
+# ARCHIVO B: Recursos Humanos (Nómina)
+rrhh_data = {
+    'Empleado': ['Laura Cano', 'Pedro Picapiedra', 'Marta Sánchez', 'Juan Soler'],
+    'Departamento': ['Sistemas', 'Ventas', 'Sistemas', 'Marketing'],
+    'Sueldo': [3500, 2800, 3600, 2200],
+    'Horas_Extra': [10, 5, 12, 0]
+}
+pd.DataFrame(rrhh_data).to_csv('rrhh_test.csv', index=False)
 
-for i in range(1, 101):  # Generamos 100 ventas
-    producto = random.choice(list(productos.keys()))
-    cantidad = random.randint(1, 5)
-    precio = productos[producto]
-    vendedor = random.choice(vendedores)
-    fecha = datetime(2025, 12, 1) + timedelta(days=random.randint(0, 25))
-    
-    data.append([
-        fecha.strftime('%Y-%m-%d'),
-        vendedor,
-        producto,
-        cantidad,
-        precio,
-        cantidad * precio
-    ])
+# ARCHIVO C: Logística (Transporte)
+logistica_data = {
+    'Ruta': ['Madrid-Barcelona', 'Valencia-Sevilla', 'Bilbao-Madrid'],
+    'Conductor': ['Antonio G.', 'Josefa M.', 'Ricardo L.'],
+    'Costo_Combustible': [450.20, 380.00, 210.50],
+    'Kilometros': [620, 540, 400]
+}
+pd.DataFrame(logistica_data).to_csv('logistica_test.csv', index=False)
 
-df = pd.DataFrame(data, columns=['Fecha', 'Vendedor', 'Producto', 'Cantidad', 'Precio_Unitario', 'Total'])
-df.to_csv('ventas_prueba.csv', index=False)
-print("¡Archivo ventas_prueba.csv creado con éxito!")
+print("¡Archivos retail_test.csv, rrhh_test.csv y logistica_test.csv creados!")

@@ -104,19 +104,37 @@ def upload_file():
     
     try:
         file.save(file_path)
-        # Soporte para CSV y Excel
         df = pd.read_csv(file_path) if filename.endswith('.csv') else pd.read_excel(file_path)
 
-        # INSERTAR EN DB (Universal: reemplaza la tabla con la estructura del nuevo archivo)
-        with engine.begin() as connection:
-            df.to_sql('ventas', con=connection, if_exists='replace', index=False, chunksize=500)
+        # --- NUEVA LÓGICA: DETECCIÓN DE CONTEXTO ---
+        muestra_columnas = df.columns.tolist()
+        muestra_datos = df.head(3).to_string()
         
-        # LIBERACIÓN DE MEMORIA
+        prompt_deteccion = (
+            f"Analiza estos encabezados y datos: {muestra_columnas}. "
+            f"Datos: {muestra_datos}. ¿A qué industria pertenece este archivo? "
+            "Responde solo con una o dos palabras (Ej: Logística, Ventas, Nómina, Salud)."
+        )
+        
+        respuesta_ia = client.chat.complete(
+            model=model_mistral,
+            messages=[{"role": "user", "content": prompt_deteccion}]
+        )
+        contexto_detectado = respuesta_ia.choices[0].message.content.strip()
+        # -------------------------------------------
+
+        with engine.begin() as connection:
+            df.to_sql('ventas', con=connection, if_exists='replace', index=False)
+        
         del df
         if os.path.exists(file_path): os.remove(file_path)
         gc.collect()
 
-        return jsonify({"success": True, "message": "Archivo procesado con éxito."})
+        return jsonify({
+            "success": True, 
+            "message": "Archivo procesado",
+            "contexto": contexto_detectado  # Enviamos el contexto a la web
+        })
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
