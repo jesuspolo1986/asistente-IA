@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
-# Límite de 16MB para evitar caídas por falta de memoria
+# Límite de 16MB para seguridad del servidor
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 
 
 # --- CONFIGURACIÓN DE APIS Y DB ---
@@ -23,7 +23,6 @@ def obtener_db_engine():
     DATABASE_URL = os.environ.get("DATABASE_URL", "")
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    # pool_pre_ping y pool_recycle son vitales para conexiones en la nube
     return create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
 
 engine = obtener_db_engine()
@@ -41,16 +40,17 @@ def obtener_datos_suscripcion():
 
 def registrar_uso_credito():
     """Incrementa el contador de créditos_usados."""
-    with engine.connect() as con:
-        with con.begin():
-            query = text("UPDATE suscripciones SET creditos_usados = creditos_usados + 1 WHERE id = 1")
-            con.execute(query)
+    try:
+        with engine.connect() as con:
+            with con.begin():
+                query = text("UPDATE suscripciones SET creditos_usados = creditos_usados + 1 WHERE id = 1")
+                con.execute(query)
+    except Exception as e:
+        print(f"Error al registrar crédito: {e}")
 
 def gestionar_banner():
-    """Lógica: Hoy 30 Dic (Aviso) y 31 Dic (Día de Gracia)."""
-    # Usamos fechas relativas a hoy para que la lógica funcione siempre
+    """Lógica de gracia: Hoy vence (aviso) y mañana (gracia)."""
     hoy = datetime.now().date()
-    # Fecha de vencimiento establecida por tus instrucciones
     vencimiento = datetime(2025, 12, 30).date() 
     
     if hoy == vencimiento:
@@ -66,7 +66,7 @@ def index():
     mensaje_banner, clase_banner = gestionar_banner()
     
     if datos:
-        # Cálculo de días para la barra de progreso
+        # Cálculo de días para la barra de progreso (simulado a 7 días)
         dias_transcurridos = (datetime.now().date() - datos.fecha_inicio).days
         dia_actual = max(0, min(7, dias_transcurridos))
         creditos = datos.creditos_usados
@@ -85,7 +85,7 @@ def chat():
         data = request.json
         user_message = data.get("message")
         
-        # 1. Extraer contexto de ventas (Limitado para no saturar el prompt)
+        # 1. Extraer contexto de ventas
         with engine.connect() as conn:
             df_contexto = pd.read_sql("SELECT producto, SUM(total) as ventas FROM ventas GROUP BY producto LIMIT 10", conn)
             resumen_datos = df_contexto.to_string(index=False)
@@ -108,30 +108,27 @@ def chat():
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
-        return jsonify({"success": False, "message": "No hay archivo en la petición"}), 400
+        return jsonify({"success": False, "message": "No hay archivo"}), 400
     
     file = request.files['file']
     if file.filename == '':
-        return jsonify({"success": False, "message": "No seleccionaste ningún archivo"}), 400
+        return jsonify({"success": False, "message": "No seleccionaste archivo"}), 400
 
     filename = secure_filename(file.filename)
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     
     try:
-        # Guardamos localmente para procesar
         file.save(file_path)
 
-        # Procesamiento optimizado según extensión
         if filename.endswith('.csv'):
             df = pd.read_csv(file_path, encoding='utf-8-sig')
         else:
             df = pd.read_excel(file_path)
 
-        # Subida a DB por lotes (evita Timeouts en conexiones lentas)
+        # Inserción por lotes para evitar Timeouts
         with engine.begin() as connection:
             df.to_sql('ventas', con=connection, if_exists='replace', index=False, chunksize=500)
         
-        # Limpieza de archivo temporal
         if os.path.exists(file_path):
             os.remove(file_path)
 
@@ -140,8 +137,7 @@ def upload_file():
     except Exception as e:
         if os.path.exists(file_path):
             os.remove(file_path)
-        print(f"Error crítico en upload: {e}")
-        return jsonify({"success": False, "message": f"Error al procesar: {str(e)}"}), 500
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
