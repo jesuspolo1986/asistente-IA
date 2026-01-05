@@ -26,28 +26,41 @@ def obtener_db_engine():
 
 engine = obtener_db_engine()
 
-# --- LÓGICA DE SUSCRIPCIÓN ---
-def obtener_datos_suscripcion():
+# --- LÓGICA DE CRÉDITOS DIARIOS ---
+def gestionar_suscripcion_y_creditos():
+    """Reinicia créditos si es un nuevo día y devuelve los datos."""
+    hoy = datetime.now().date()
     try:
         with engine.connect() as con:
-            query = text("SELECT creditos_usados, fecha_inicio, plan FROM suscripciones WHERE id = 1")
-            return con.execute(query).fetchone()
-    except:
-        return None
+            # 1. Obtener datos actuales
+            query = text('SELECT creditos_usados, fecha_inicio, ultimo_uso FROM "suscripciones" WHERE id = 1')
+            res = con.execute(query).fetchone()
+            
+            if res:
+                # 2. Si es un nuevo día, reiniciar créditos en la DB
+                if res.ultimo_uso != hoy:
+                    with con.begin():
+                        con.execute(text('UPDATE "suscripciones" SET creditos_usados = 0, ultimo_uso = :hoy WHERE id = 1'), {"hoy": hoy})
+                    # Refrescar datos tras el reinicio
+                    return {"creditos": 0, "inicio": res.fecha_inicio}
+                
+                return {"creditos": res.creditos_usados, "inicio": res.fecha_inicio}
+    except Exception as e:
+        print(f"Error en gestión de créditos: {e}")
+    return {"creditos": 0, "inicio": hoy}
 
 def registrar_uso_credito():
     try:
         with engine.connect() as con:
             with con.begin():
-                con.execute(text("UPDATE suscripciones SET creditos_usados = creditos_usados + 1 WHERE id = 1"))
-    except:
-        pass
+                con.execute(text('UPDATE "suscripciones" SET creditos_usados = creditos_usados + 1 WHERE id = 1'))
+    except Exception as e:
+        print(f"Error al registrar uso: {e}")
 
 # --- RUTAS ---
 @app.route('/')
 def index():
-    datos = obtener_datos_suscripcion()
-    # Fecha de vencimiento configurada según tus instrucciones (30 Dic + 1 día gracia)
+    datos = gestionar_suscripcion_y_creditos()
     vencimiento = datetime(2025, 12, 30).date()
     hoy = datetime.now().date()
     
@@ -57,8 +70,12 @@ def index():
     elif hoy == vencimiento + timedelta(days=1):
         mensaje_banner, clase_banner = "Tu suscripción venció ayer (Día de Gracia).", "banner-danger"
 
-    creditos = datos.creditos_usados if datos else 0
-    return render_template('index.html', creditos=creditos, banner_msj=mensaje_banner, banner_clase=clase_banner)
+    dias_prueba = (hoy - datos["inicio"]).days
+    return render_template('index.html', 
+                           creditos=datos["creditos"], 
+                           dia_actual=max(0, dias_prueba),
+                           banner_msj=mensaje_banner, 
+                           banner_clase=clase_banner)
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -66,62 +83,38 @@ def chat():
         data = request.json
         user_message = data.get("message")
         
-        # ESTRATEGIA UNIVERSAL:
-        # Leemos las primeras 40 filas de la tabla sin importar cómo se llamen las columnas
+        # Verificar límite de 10 créditos
+        stats = gestionar_suscripcion_y_creditos()
+        if stats["creditos"] >= 10:
+            return jsonify({"reply": "🚫 Has alcanzado el límite de 10 consultas diarias. ¡Vuelve mañana! 🚀"})
+
         with engine.connect() as conn:
+            # SELECT * para ser universal y evitar errores de nombres de columnas
             df_contexto = pd.read_sql(text('SELECT * FROM ventas LIMIT 40'), conn)
-            columnas = df_contexto.columns.tolist()
             resumen_datos = df_contexto.to_string(index=False)
 
-        prompt_final = (
-            f"Eres Visionary AI 🚀. Analiza estos datos empresariales:\n"
-            f"COLUMNAS DETECTADAS: {columnas}\n"
-            f"DATOS:\n{resumen_datos}\n\n"
-            f"PREGUNTA: {user_message}\n"
-            f"INSTRUCCIÓN: Responde basado en los datos. Si necesitas sumar valores, hazlo."
-        )
-
-        chat_response = client.chat.complete(
-            model=model_mistral,
-            messages=[{"role": "user", "content": prompt_final}]
-        )
+        prompt_final = f"Datos:\n{resumen_datos}\nPregunta: {user_message}\nEres Visionary AI 🚀."
+        chat_response = client.chat.complete(model=model_mistral, messages=[{"role": "user", "content": prompt_final}])
         
         registrar_uso_credito()
         return jsonify({"reply": chat_response.choices[0].message.content})
-
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({"reply": "🚀 La IA está procesando los nuevos encabezados. ¡Reintenta!"})
+        return jsonify({"reply": f"Error: Revisa que hayas subido un archivo primero."})
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"success": False, "message": "No hay archivo"}), 400
-    
+    if 'file' not in request.files: return jsonify({"success": False}), 400
     file = request.files['file']
     filename = secure_filename(file.filename)
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    
     try:
         file.save(file_path)
         df = pd.read_csv(file_path) if filename.endswith('.csv') else pd.read_excel(file_path)
-
-        # --- NUEVA LÓGICA: DETECCIÓN DE CONTEXTO ---
-        muestra_columnas = df.columns.tolist()
-        muestra_datos = df.head(3).to_string()
         
-        prompt_deteccion = (
-            f"Analiza estos encabezados y datos: {muestra_columnas}. "
-            f"Datos: {muestra_datos}. ¿A qué industria pertenece este archivo? "
-            "Responde solo con una o dos palabras (Ej: Logística, Ventas, Nómina, Salud)."
-        )
-        
-        respuesta_ia = client.chat.complete(
-            model=model_mistral,
-            messages=[{"role": "user", "content": prompt_deteccion}]
-        )
-        contexto_detectado = respuesta_ia.choices[0].message.content.strip()
-        # -------------------------------------------
+        # Detección de industria para el panel
+        prompt = f"Basado en estas columnas: {df.columns.tolist()}, ¿qué tipo de industria es? Responde en 1 palabra."
+        res_ia = client.chat.complete(model=model_mistral, messages=[{"role": "user", "content": prompt}])
+        contexto = res_ia.choices[0].message.content.strip()
 
         with engine.begin() as connection:
             df.to_sql('ventas', con=connection, if_exists='replace', index=False)
@@ -129,13 +122,7 @@ def upload_file():
         del df
         if os.path.exists(file_path): os.remove(file_path)
         gc.collect()
-
-        return jsonify({
-            "success": True, 
-            "message": "Archivo procesado",
-            "contexto": contexto_detectado  # Enviamos el contexto a la web
-        })
-
+        return jsonify({"success": True, "contexto": contexto})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
