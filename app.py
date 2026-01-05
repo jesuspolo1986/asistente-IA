@@ -4,24 +4,28 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from werkzeug.utils import secure_filename
 from mistralai import Mistral
-from datetime import datetime, timedelta
+from datetime import datetime
+import gc
 
 app = Flask(__name__)
-app.secret_key = "clave_secreta_visionary"
+app.secret_key = "visionary_secure_key_2026"
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "TU_KEY_AQUI")
+# --- CONFIGURACIÓN ---
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "TU_KEY")
 client = Mistral(api_key=MISTRAL_API_KEY)
 model_mistral = "mistral-large-latest"
 
-engine = create_engine(os.environ.get("DATABASE_URL", "").replace("postgres://", "postgresql://", 1), pool_pre_ping=True)
+engine = create_engine(
+    os.environ.get("DATABASE_URL", "").replace("postgres://", "postgresql://", 1),
+    pool_pre_ping=True
+)
 
 def gestionar_creditos(email):
     hoy = datetime.now().date()
     try:
         with engine.connect() as con:
-            # Usamos comillas dobles en "suscripciones" para evitar el error de relación
             res = con.execute(text('SELECT creditos_usados, ultimo_uso FROM "suscripciones" WHERE email = :e'), {"e": email}).fetchone()
             if not res:
                 with con.begin():
@@ -33,7 +37,7 @@ def gestionar_creditos(email):
                 return 0
             return res.creditos_usados
     except Exception as e:
-        print(f"Error Crítico DB: {e}")
+        print(f"DEBUG - Error Créditos: {str(e)}")
         return 0
 
 @app.route('/')
@@ -49,41 +53,54 @@ def login():
 
 @app.route('/upload', methods=['POST'])
 def upload():
+    if 'file' not in request.files: return jsonify({"success": False, "message": "No file"}), 400
     file = request.files['file']
     filename = secure_filename(file.filename)
     path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(path)
+    
     try:
         df = pd.read_csv(path) if filename.endswith('.csv') else pd.read_excel(path)
+        # Normalizamos nombres de columnas para evitar líos de mayúsculas
+        df.columns = [str(c).strip().lower() for c in df.columns]
+        
         with engine.begin() as connection:
-            # Reemplazamos la tabla "ventas" completamente
             df.to_sql('ventas', con=connection, if_exists='replace', index=False)
-        return jsonify({"success": True, "contexto": "Archivo procesado"})
+        
+        os.remove(path)
+        return jsonify({"success": True, "contexto": "Datos cargados y tabla 'ventas' actualizada."})
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
+        print(f"DEBUG - Error Upload: {str(e)}")
+        return jsonify({"success": False, "message": f"Error al procesar: {str(e)}"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
     user = session.get('user')
     creditos = gestionar_creditos(user)
-    if creditos >= 10: return jsonify({"reply": "Límite de 10/10 alcanzado."})
+    if creditos >= 10: return jsonify({"reply": "Límite 10/10 alcanzado."})
 
     try:
         with engine.connect() as conn:
-            # SOLUCIÓN UNIVERSAL: Cargamos los datos en Pandas para evitar errores de SQL
-            df = pd.read_sql(text('SELECT * FROM "ventas" LIMIT 50'), conn)
+            # Intentamos leer la tabla ventas directamente
+            df = pd.read_sql(text('SELECT * FROM "ventas" LIMIT 100'), conn)
         
+        if df.empty:
+            return jsonify({"reply": "La tabla está conectada pero no tiene datos. Sube el archivo de nuevo."})
+
         data = request.json
-        # Le enviamos el DataFrame a la IA para que ella busque las columnas (sin importar mayúsculas)
-        prompt = f"Datos:\n{df.to_string()}\n\nPregunta: {data['message']}"
+        prompt = f"Datos del negocio:\n{df.to_string()}\n\nPregunta: {data['message']}"
         resp = client.chat.complete(model=model_mistral, messages=[{"role": "user", "content": prompt}])
         
         with engine.begin() as con:
             con.execute(text('UPDATE "suscripciones" SET creditos_usados = creditos_usados + 1 WHERE email = :e'), {"e": user})
             
         return jsonify({"reply": resp.choices[0].message.content})
+    
     except Exception as e:
-        return jsonify({"reply": "⚠️ Error: Sube el archivo de nuevo. La tabla no está lista."})
+        # AQUÍ ESTÁ EL CAMBIO: El error te dirá qué pasó exactamente
+        error_msg = str(e)
+        print(f"DEBUG - Error Chat: {error_msg}")
+        return jsonify({"reply": f"⚠️ Error técnico: {error_msg}. Verifica que la tabla 'ventas' exista en Supabase."})
+
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 8000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
