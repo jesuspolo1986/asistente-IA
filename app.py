@@ -79,14 +79,28 @@ def upload():
 def chat():
     user = session.get('user')
     creditos = gestionar_creditos(user)
-    if creditos >= 10: return jsonify({"reply": "Límite de 10 consultas alcanzado por hoy."})
+    if creditos >= 10: return jsonify({"reply": "Límite alcanzado."})
 
     try:
         with engine.connect() as conn:
-            df = pd.read_sql(text("SELECT * FROM public.ventas LIMIT 50"), conn)
+            df = pd.read_sql(text("SELECT * FROM public.ventas LIMIT 100"), conn)
         
         data = request.json
-        prompt = f"Datos del negocio:\n{df.to_string()}\n\nPregunta: {data['message']}"
+        # NUEVA ESTRUCTURA DE PROMPT PARA MAYOR INTELIGENCIA
+        prompt = f"""
+        Actúa como un Analista de Negocios Senior (AI Pro Analyst). 
+        Contexto del negocio (Primeras 100 filas):
+        {df.to_string()}
+
+        Instrucciones:
+        1. No te limites a sumar. Busca patrones, tendencias y anomalías.
+        2. Si el usuario pregunta por ventas totales, da el número pero también menciona quién es el mejor vendedor o qué producto destaca.
+        3. Usa un tono ejecutivo y profesional.
+        4. Si detectas algo preocupante (ej. un vendedor con muy pocas ventas), menciónalo como una 'Oportunidad de Mejora'.
+
+        Pregunta del usuario: {data['message']}
+        """
+        
         resp = client.chat.complete(model="mistral-large-latest", messages=[{"role": "user", "content": prompt}])
         
         with engine.begin() as con:
@@ -95,7 +109,6 @@ def chat():
         return jsonify({"reply": resp.choices[0].message.content})
     except Exception as e:
         return jsonify({"reply": f"Error en el análisis: {str(e)}"})
-
 if __name__ == '__main__':
     # Aseguramos que las tablas existan antes de atender usuarios
     try:
