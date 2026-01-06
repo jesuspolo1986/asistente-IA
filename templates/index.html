@@ -2,32 +2,50 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Visionary AI Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visionary AI Pro Analyst</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         body { background: #0f172a; color: white; font-family: 'Inter', sans-serif; }
         .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 20px; }
-        .banner-warning { background: #f59e0b; color: black; }
-        .banner-danger { background: #ef4444; color: white; }
-        #chat-box { height: 400px; overflow-y: auto; background: #1e293b; border-radius: 10px; padding: 15px; }
-        .user-msg { color: #3b82f6; text-align: right; margin-bottom: 10px; }
-        .ai-msg { color: #10b981; margin-bottom: 10px; border-left: 2px solid #10b981; padding-left: 10px; }
+        
+        #chat-box { height: 500px; overflow-y: auto; background: #1e293b; border-radius: 10px; padding: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        
+        /* Estilos de Mensajes */
+        .user-msg { color: #3b82f6; text-align: right; margin-bottom: 20px; font-weight: 600; }
+        .ai-msg { color: #e2e8f0; margin-bottom: 20px; border-left: 3px solid #10b981; padding-left: 15px; line-height: 1.6; white-space: pre-wrap; }
+        
+        /* Contenedor de Gráficos */
+        .chart-container { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 10px; 
+            margin: 15px auto; 
+            max-width: 90%; 
+            display: block;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .chart-container img { width: 100%; height: auto; border-radius: 8px; }
+        
+        .progress { background-color: #334155; height: 10px; border-radius: 5px; }
+        .progress-bar { background: linear-gradient(90deg, #3b82f6, #10b981); }
     </style>
 </head>
 <body>
 
 {% if banner %}
-<div class="alert {{ banner[1] }} text-center m-0">{{ banner[0] }}</div>
+<div class="alert {{ banner[1] }} text-center m-0 border-0 rounded-0">{{ banner[0] }}</div>
 {% endif %}
 
 <div class="container py-5">
     {% if login_mode %}
     <div class="row justify-content-center">
         <div class="col-md-4 glass text-center">
-            <h3 class="mb-4">Visionary AI</h3>
+            <h3 class="mb-4">Visionary AI Pro</h3>
             <form action="/login" method="post">
-                <input type="email" name="email" class="form-control bg-dark text-white border-secondary mb-3" placeholder="Email" required>
-                <button class="btn btn-primary w-100">Entrar</button>
+                <input type="email" name="email" class="form-control bg-dark text-white border-secondary mb-3" placeholder="Email corporativo" required>
+                <button class="btn btn-primary w-100 fw-bold">Entrar al Panel</button>
             </form>
         </div>
     </div>
@@ -35,30 +53,41 @@
     <div class="row g-4">
         <div class="col-md-4">
             <div class="glass mb-4">
-                <h5>Créditos: {{ creditos }} / 10</h5>
-                <div class="progress"><div class="progress-bar" style="width: {{ creditos*10 }}%"></div></div>
-                <small class="text-muted mt-2 d-block">Usuario: {{ user }}</small>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="m-0">Suscripción</h5>
+                    <a href="/logout" class="btn btn-sm btn-outline-danger">Salir</a>
+                </div>
+                <div class="mb-2 d-flex justify-content-between">
+                    <small>Créditos diarios</small>
+                    <small class="fw-bold">{{ creditos }} / 10</small>
+                </div>
+                <div class="progress mb-3">
+                    <div class="progress-bar" style="width: {{ creditos*10 }}%"></div>
+                </div>
+                <small class="text-muted d-block text-truncate">ID: {{ user }}</small>
             </div>
+
             <div class="glass">
-                <input type="file" id="file" class="form-control bg-dark text-white mb-3">
-                <button onclick="subir()" class="btn btn-primary w-100">Cargar Datos</button>
-                <div id="status" class="mt-2 small text-center"></div>
-                <div class="glass mb-4 d-flex justify-content-between align-items-center">
-    <div>
-        <h5 class="m-0">Créditos: {{ creditos }} / 10</h5>
-        <small class="text-muted">Usuario: {{ user }}</small>
-    </div>
-    <a href="/logout" class="btn btn-sm btn-outline-danger">Cerrar Sesión</a>
-</div>
+                <h6 class="mb-3">Cargar Fuente de Datos</h6>
+                <input type="file" id="file" class="form-control bg-dark text-white border-secondary mb-3">
+                <button onclick="subir()" id="btn-subir" class="btn btn-primary w-100 fw-bold">Procesar Archivo</button>
+                <div id="status" class="mt-3 small text-center"></div>
             </div>
         </div>
+
         <div class="col-md-8">
-            <div class="glass mb-3 text-center" id="panel"><h6 id="ctx">Sube un archivo para detectar industria</h6></div>
+            <div class="glass mb-3 text-center border-primary" style="border-style: dashed;">
+                <h6 id="ctx" class="m-0 text-info">Esperando datos para análisis industrial...</h6>
+            </div>
+            
             <div class="glass">
-                <div id="chat-box" class="mb-3"></div>
+                <div id="chat-box" class="mb-3">
+                    <div class="ai-msg">Bienvenido, Analista. Sube un archivo de Retail, Logística o RRHH para comenzar el análisis ejecutivo.</div>
+                </div>
+                
                 <div class="input-group">
-                    <input type="text" id="msg" class="form-control bg-dark text-white" placeholder="Pregunta algo...">
-                    <button onclick="enviar()" class="btn btn-primary">Enviar</button>
+                    <input type="text" id="msg" class="form-control bg-dark text-white border-secondary" placeholder="Escribe tu consulta analítica..." onkeypress="if(event.key==='Enter') enviar()">
+                    <button onclick="enviar()" class="btn btn-primary px-4 fw-bold">Analizar</button>
                 </div>
             </div>
         </div>
@@ -68,21 +97,62 @@
 
 <script>
     function subir() {
+        let btn = document.getElementById('btn-subir');
         let f = document.getElementById('file').files[0];
-        let d = new FormData(); d.append('file', f);
-        fetch('/upload', {method:'POST', body:d}).then(r=>r.json()).then(data=>{
-            document.getElementById('ctx').innerText = "Industria: " + data.contexto;
-            document.getElementById('status').innerText = "✅ Listo";
+        if(!f) return alert("Selecciona un archivo primero");
+
+        btn.disabled = true;
+        btn.innerText = "Procesando...";
+        
+        let d = new FormData(); 
+        d.append('file', f);
+        
+        fetch('/upload', {method:'POST', body:d})
+        .then(r=>r.json())
+        .then(data=>{
+            if(data.success) {
+                document.getElementById('ctx').innerText = "✅ Base de Datos Sincronizada: " + f.name;
+                document.getElementById('status').innerHTML = '<span class="text-success">¡Datos cargados con éxito!</span>';
+            } else {
+                document.getElementById('status').innerHTML = '<span class="text-danger">Error al cargar datos</span>';
+            }
+            btn.disabled = false;
+            btn.innerText = "Procesar Archivo";
         });
     }
+
     function enviar() {
         let m = document.getElementById('msg').value;
+        if(!m) return;
+
         let box = document.getElementById('chat-box');
         box.innerHTML += `<div class="user-msg">${m}</div>`;
-        fetch('/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:m})})
-        .then(r=>r.json()).then(data=>{
+        document.getElementById('msg').value = "";
+        box.scrollTop = box.scrollHeight;
+
+        fetch('/chat', {
+            method:'POST', 
+            headers:{'Content-Type':'application/json'}, 
+            body:JSON.stringify({message:m})
+        })
+        .then(r=>r.json())
+        .then(data=>{
+            // Añadir respuesta de texto
             box.innerHTML += `<div class="ai-msg">${data.reply}</div>`;
-            document.getElementById('msg').value = "";
+            
+            // Añadir gráfico si existe en la respuesta
+            if(data.chart) {
+                box.innerHTML += `
+                    <div class="chart-container">
+                        <small class="text-dark d-block mb-2 fw-bold text-center">Visualización Generada por AI Pro Analyst</small>
+                        <img src="data:image/png;base64,${data.chart}" alt="Gráfico de Análisis">
+                    </div>`;
+            }
+            
+            box.scrollTop = box.scrollHeight;
+        })
+        .catch(err => {
+            box.innerHTML += `<div class="ai-msg text-danger">Error en el servidor. Por favor, intenta de nuevo.</div>`;
         });
     }
 </script>
