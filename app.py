@@ -2,13 +2,12 @@ from flask import Flask, request, jsonify, render_template, session, redirect, u
 import os
 import pandas as pd
 from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker, scoped_session
 from werkzeug.utils import secure_filename
 from mistralai import Mistral
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
-import io
-import base64
-import matplotlib
+import io, base64, matplotlib
 
 matplotlib.use('Agg')
 
@@ -16,17 +15,22 @@ app = Flask(__name__)
 app.secret_key = "analista_pro_final_2026"
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# --- CONFIGURACIÓN ---
-MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "TU_MISTRAL_KEY")
-client = Mistral(api_key=MISTRAL_API_KEY)
+# --- CONFIGURACIÓN DE DB ROBUSTA ---
 DATABASE_URL = os.environ.get("DATABASE_URL", "").replace("postgres://", "postgresql://", 1)
-
-# Aumentamos el pool para evitar el error de "servidor sobrecargado"
 engine = create_engine(DATABASE_URL, pool_size=10, max_overflow=20, pool_pre_ping=True)
 
+# Creamos un manejador de sesiones seguro para hilos (thread-safe)
+session_factory = sessionmaker(bind=engine)
+Session = scoped_session(session_factory)
+
+# Mistral
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
+client = Mistral(api_key=MISTRAL_API_KEY)
+
 def inicializar_db():
-    with engine.connect() as conn:
-        conn.execute(text("""
+    db = Session()
+    try:
+        db.execute(text("""
             CREATE TABLE IF NOT EXISTS suscripciones (
                 email TEXT PRIMARY KEY,
                 plan TEXT DEFAULT 'Mensual',
@@ -35,20 +39,25 @@ def inicializar_db():
                 creditos_usados INTEGER DEFAULT 0
             );
         """))
-        conn.commit()
+        db.commit()
+    finally:
+        db.close()
 
 def obtener_perfil(email):
-    hoy = datetime.now().date()
-    with engine.connect() as con:
-        res = con.execute(text("SELECT * FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
+    db = Session()
+    try:
+        res = db.execute(text("SELECT * FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
         if not res: return None
         
+        hoy = datetime.now().date()
         vence = res.fecha_vencimiento
         if hoy <= vence: estado = "Activo"
         elif hoy == vence + timedelta(days=1): estado = "Gracia"
         else: estado = "Vencido"
         
         return {"email": res.email, "vence": vence, "estado": estado, "creditos": res.creditos_usados}
+    finally:
+        db.close()
 
 @app.route('/')
 def index():
@@ -58,9 +67,9 @@ def index():
     banner = None
     if perfil:
         if perfil['estado'] == "Gracia":
-            banner = ("⚠️ Período de Gracia: Tu suscripción venció ayer.", "alert-warning")
+            banner = ("⚠️ Día de Gracia: Tu suscripción expiró ayer. Tienes 24h.", "alert-warning")
         elif perfil['estado'] == "Vencido":
-            banner = ("🚫 Suscripción Vencida. Acceso restringido.", "alert-danger")
+            banner = ("🚫 Acceso Bloqueado: Suscripción vencida.", "alert-danger")
             
     return render_template('index.html', login_mode=False, user=perfil, banner=banner)
 
@@ -68,28 +77,33 @@ def index():
 def login():
     email = request.form.get('email').strip().lower()
     session['user'] = email
-    with engine.connect() as con:
-        try:
-            con.execute(text("""
-                INSERT INTO suscripciones (email, fecha_vencimiento) 
-                VALUES (:e, CURRENT_DATE + INTERVAL '30 days') 
-                ON CONFLICT (email) DO NOTHING
-            """), {"e": email})
-            con.commit()
-        except:
-            con.rollback()
+    db = Session()
+    try:
+        db.execute(text("""
+            INSERT INTO suscripciones (email, fecha_vencimiento) 
+            VALUES (:e, CURRENT_DATE + INTERVAL '30 days') 
+            ON CONFLICT (email) DO NOTHING
+        """), {"e": email})
+        db.commit()
+    except:
+        db.rollback()
+    finally:
+        db.close()
     return redirect(url_for('index'))
 
 @app.route('/admin')
 def admin():
-    with engine.connect() as con:
-        usuarios = con.execute(text("SELECT * FROM suscripciones ORDER BY fecha_vencimiento DESC")).fetchall()
-    return render_template('admin.html', usuarios=usuarios)
+    db = Session()
+    try:
+        usuarios = db.execute(text("SELECT * FROM suscripciones ORDER BY fecha_vencimiento DESC")).fetchall()
+        return render_template('admin.html', usuarios=usuarios)
+    finally:
+        db.close()
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('index'))
+# Cierre automático de sesión al terminar cada petición HTTP
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    Session.remove()
 
 if __name__ == '__main__':
     inicializar_db()
