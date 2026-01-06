@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import io
 import base64
-
 import matplotlib
+
 matplotlib.use('Agg')
 
 app = Flask(__name__)
@@ -20,7 +20,9 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "TU_MISTRAL_KEY")
 client = Mistral(api_key=MISTRAL_API_KEY)
 DATABASE_URL = os.environ.get("DATABASE_URL", "").replace("postgres://", "postgresql://", 1)
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=3600)
+
+# Aumentamos el pool para evitar el error de "servidor sobrecargado"
+engine = create_engine(DATABASE_URL, pool_size=10, max_overflow=20, pool_pre_ping=True)
 
 def inicializar_db():
     with engine.connect() as conn:
@@ -35,7 +37,7 @@ def inicializar_db():
         """))
         conn.commit()
 
-def obtener_usuario(email):
+def obtener_perfil(email):
     hoy = datetime.now().date()
     with engine.connect() as con:
         res = con.execute(text("SELECT * FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
@@ -51,28 +53,31 @@ def obtener_usuario(email):
 @app.route('/')
 def index():
     if 'user' not in session: return render_template('index.html', login_mode=True)
-    user_data = obtener_usuario(session['user'])
+    perfil = obtener_perfil(session['user'])
     
     banner = None
-    if user_data:
-        if user_data['estado'] == "Gracia":
+    if perfil:
+        if perfil['estado'] == "Gracia":
             banner = ("⚠️ Período de Gracia: Tu suscripción venció ayer.", "alert-warning")
-        elif user_data['estado'] == "Vencido":
-            banner = ("🚫 Suscripción Vencida: Acceso restringido.", "alert-danger")
+        elif perfil['estado'] == "Vencido":
+            banner = ("🚫 Suscripción Vencida. Acceso restringido.", "alert-danger")
             
-    return render_template('index.html', login_mode=False, user=user_data, banner=banner)
+    return render_template('index.html', login_mode=False, user=perfil, banner=banner)
 
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email').strip().lower()
     session['user'] = email
     with engine.connect() as con:
-        con.execute(text("""
-            INSERT INTO suscripciones (email, fecha_vencimiento) 
-            VALUES (:e, CURRENT_DATE + INTERVAL '30 days') 
-            ON CONFLICT (email) DO NOTHING
-        """), {"e": email})
-        con.commit()
+        try:
+            con.execute(text("""
+                INSERT INTO suscripciones (email, fecha_vencimiento) 
+                VALUES (:e, CURRENT_DATE + INTERVAL '30 days') 
+                ON CONFLICT (email) DO NOTHING
+            """), {"e": email})
+            con.commit()
+        except:
+            con.rollback()
     return redirect(url_for('index'))
 
 @app.route('/admin')
