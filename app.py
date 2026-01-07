@@ -77,48 +77,45 @@ def chat():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # --- MOTOR DE PRE-PROCESAMIENTO SENIOR ---
-        # 1. Facturación Real (Total de Dinero)
+        # --- MATEMÁTICA SENIOR ---
         facturacion = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False).to_dict()
-        lider_facturacion = list(facturacion.keys())[0]
+        eficiencia = (df.groupby('Vendedor')['Total'].sum() / df.groupby('Vendedor')['Cantidad'].sum()).to_dict()
         
-        # 2. Eficiencia Real (Ingreso por cada unidad vendida)
-        eficiencia = (df.groupby('Vendedor')['Total'].sum() / df.groupby('Vendedor')['Cantidad'].sum()).sort_values(ascending=False).to_dict()
-        lider_eficiencia = list(eficiencia.keys())[0]
+        # Análisis de Tendencia Temporal (NUEVO)
+        df['Fecha'] = pd.to_datetime(df['Fecha'])
+        ventas_tiempo = df.groupby(df['Fecha'].dt.date)['Total'].sum().tail(5).to_dict()
 
-        # 3. Auditoría de Precios (¿Precios distintos para el mismo producto?)
-        inconsistencias = df.groupby('Producto')['Precio_Unitario'].nunique()
-        alertas_precio = inconsistencias[inconsistencias > 1].index.tolist()
+        # --- GENERACIÓN DE GRÁFICO (OPCIONAL SEGÚN MENSAJE) ---
+        chart_b64 = None
+        if any(word in user_msg for word in ["gráfico", "visualiza", "barras", "tendencia"]):
+            plt.figure(figsize=(10, 5))
+            df.groupby('Vendedor')['Total'].sum().plot(kind='bar', color='#3b82f6')
+            plt.title("Facturación por Vendedor")
+            plt.tight_layout()
+            
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            chart_b64 = base64.b64encode(buf.getvalue()).decode()
+            plt.close()
 
         prompt_sistema = f"""
-        ERES: Senior Data Strategist. Tu misión es maximizar la rentabilidad.
-        KPIs CRÍTICOS DEL ARCHIVO:
-        - Facturación Total por Vendedor: {facturacion}
-        - Eficiencia (USD por Unidad): {eficiencia}
-        - Líder en DINERO REAL: {lider_facturacion}
-        - Líder en EFICIENCIA: {lider_eficiencia}
-        - Alertas de precios inconsistentes: {alertas_precio}
-        
-        REGLAS DE ORO:
-        1. No menciones promedios genéricos. Sé específico con los líderes.
-        2. Si el líder en dinero NO es el mismo que el líder en eficiencia, destaca el conflicto.
-        3. Predice qué pasará con el flujo de caja si no se corrigen las alertas de precio.
-        4. Responde con autoridad, sin código ni explicaciones técnicas.
+        ERES: Senior Data Strategist. 
+        KPIs: Facturación: {facturacion}, Eficiencia: {eficiencia}, Tendencia Últimos Días: {ventas_tiempo}
+        TAREA: Analiza y da órdenes estratégicas. Sé crítico con el flujo de caja.
         """
         
         response = client.chat.complete(model="mistral-small", messages=[
             {"role": "system", "content": prompt_sistema},
             {"role": "user", "content": user_msg}
         ])
-        
-        with engine.connect() as conn:
-            conn.execute(text("UPDATE suscripciones SET creditos_usados = creditos_usados + 1 WHERE email = :e"), {"e": session['user']})
-            conn.commit()
 
-        return jsonify({"response": response.choices[0].message.content})
+        return jsonify({
+            "response": response.choices[0].message.content,
+            "chart": chart_b64 # Ahora el frontend puede mostrar la imagen
+        })
     except Exception as e:
-        return jsonify({"response": f"Error de análisis: {str(e)}"})
-
+        return jsonify({"response": f"Error: {str(e)}"})
 # --- RUTAS DE ADMINISTRACIÓN ---
 @app.route('/admin')
 def admin_panel():
