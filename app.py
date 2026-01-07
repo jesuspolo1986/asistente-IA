@@ -1,110 +1,62 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import os
-import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, scoped_session
-from werkzeug.utils import secure_filename
-from mistralai import Mistral
 from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
-import io, base64, matplotlib
-
-matplotlib.use('Agg')
 
 app = Flask(__name__)
 app.secret_key = "analista_pro_final_2026"
-app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# --- CONFIGURACIÓN DE DB ROBUSTA ---
+# --- CONFIGURACIÓN DE DB SEGURA ---
 DATABASE_URL = os.environ.get("DATABASE_URL", "").replace("postgres://", "postgresql://", 1)
-engine = create_engine(DATABASE_URL, pool_size=10, max_overflow=20, pool_pre_ping=True)
+engine = create_engine(DATABASE_URL, pool_size=5, max_overflow=10, pool_pre_ping=True)
 
-# Creamos un manejador de sesiones seguro para hilos (thread-safe)
-session_factory = sessionmaker(bind=engine)
-Session = scoped_session(session_factory)
+# Scoped Session: Garantiza que cada petición tenga su propia conexión limpia
+db_session = scoped_session(sessionmaker(bind=engine))
 
-# Mistral
-MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
-client = Mistral(api_key=MISTRAL_API_KEY)
-
-def inicializar_db():
-    db = Session()
+def obtener_estado_suscripcion(email):
+    # La sesión se abre y se cierra automáticamente con el bloque try/finally
     try:
-        db.execute(text("""
-            CREATE TABLE IF NOT EXISTS suscripciones (
-                email TEXT PRIMARY KEY,
-                plan TEXT DEFAULT 'Mensual',
-                fecha_vencimiento DATE DEFAULT (CURRENT_DATE + INTERVAL '30 days'),
-                estado TEXT DEFAULT 'Activo',
-                creditos_usados INTEGER DEFAULT 0
-            );
-        """))
-        db.commit()
-    finally:
-        db.close()
-
-def obtener_perfil(email):
-    db = Session()
-    try:
-        res = db.execute(text("SELECT * FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
-        if not res: return None
+        res = db_session.execute(text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
+        if not res: return "Inexistente"
         
         hoy = datetime.now().date()
         vence = res.fecha_vencimiento
-        if hoy <= vence: estado = "Activo"
-        elif hoy == vence + timedelta(days=1): estado = "Gracia"
-        else: estado = "Vencido"
         
-        return {"email": res.email, "vence": vence, "estado": estado, "creditos": res.creditos_usados}
+        if hoy <= vence: return "Activo"
+        if hoy == vence + timedelta(days=1): return "Gracia" # Lógica de día de gracia [cite: 2025-12-30]
+        return "Vencido"
     finally:
-        db.close()
+        db_session.remove() # LIMPIEZA OBLIGATORIA
 
 @app.route('/')
 def index():
     if 'user' not in session: return render_template('index.html', login_mode=True)
-    perfil = obtener_perfil(session['user'])
-    
-    banner = None
-    if perfil:
-        if perfil['estado'] == "Gracia":
-            banner = ("⚠️ Día de Gracia: Tu suscripción expiró ayer. Tienes 24h.", "alert-warning")
-        elif perfil['estado'] == "Vencido":
-            banner = ("🚫 Acceso Bloqueado: Suscripción vencida.", "alert-danger")
-            
-    return render_template('index.html', login_mode=False, user=perfil, banner=banner)
+    estado = obtener_estado_suscripcion(session['user'])
+    return render_template('index.html', login_mode=False, user=session['user'], estado=estado)
 
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email').strip().lower()
     session['user'] = email
-    db = Session()
     try:
-        db.execute(text("""
+        db_session.execute(text("""
             INSERT INTO suscripciones (email, fecha_vencimiento) 
             VALUES (:e, CURRENT_DATE + INTERVAL '30 days') 
             ON CONFLICT (email) DO NOTHING
         """), {"e": email})
-        db.commit()
-    except:
-        db.rollback()
+        db_session.commit()
+    except Exception as e:
+        db_session.rollback()
+        print(f"Error en login: {e}")
     finally:
-        db.close()
+        db_session.remove()
     return redirect(url_for('index'))
 
-@app.route('/admin')
-def admin():
-    db = Session()
-    try:
-        usuarios = db.execute(text("SELECT * FROM suscripciones ORDER BY fecha_vencimiento DESC")).fetchall()
-        return render_template('admin.html', usuarios=usuarios)
-    finally:
-        db.close()
-
-# Cierre automático de sesión al terminar cada petición HTTP
 @app.teardown_appcontext
 def shutdown_session(exception=None):
-    Session.remove()
+    # Este es el guardián final: si Flask olvida cerrar una conexión, esto la cierra.
+    db_session.remove()
 
 if __name__ == '__main__':
-    inicializar_db()
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))

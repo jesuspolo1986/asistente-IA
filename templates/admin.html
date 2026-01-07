@@ -1,42 +1,27 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Panel de Administración</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #0f172a; color: white; font-family: 'Inter', sans-serif; }
-        .glass-table { background: rgba(30, 41, 59, 0.7); border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); }
-    </style>
-</head>
-<body class="p-5">
-    <div class="container glass-table p-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="text-info">Gestión de Usuarios</h2>
-            <a href="/" class="btn btn-outline-light">Regresar al App</a>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-dark table-hover">
-                <thead>
-                    <tr>
-                        <th>Email</th>
-                        <th>Vencimiento</th>
-                        <th>Plan</th>
-                        <th>Créditos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for u in usuarios %}
-                    <tr>
-                        <td>{{ u.email }}</td>
-                        <td>{{ u.fecha_vencimiento }}</td>
-                        <td>{{ u.plan }}</td>
-                        <td>{{ u.creditos_usados }} / 10</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+<div class="container mt-5">
+    <div class="card bg-dark text-light p-4">
+        <h3>Panel Admin: AI Pro Analyst</h3>
+        <table class="table table-dark mt-3">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Estado Actual</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in usuarios %}
+                <tr>
+                    <td>{{ u.email }}</td>
+                    <td>
+                        <span class="badge {{ 'bg-success' if u.estado == 'Activo' else 'bg-warning text-dark' }}">
+                            {{ u.estado }}
+                        </span>
+                    </td>
+                    <td><button class="btn btn-primary btn-sm">Validar Pago</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-</body>
-</html>
+</div>
