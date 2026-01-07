@@ -1,62 +1,58 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import os
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, scoped_session
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-app.secret_key = "analista_pro_final_2026"
+app.secret_key = "analista_pro_2026_key"
 
 # --- CONFIGURACIÓN DE DB SEGURA ---
+# Usamos pool_size=1 para que en el despliegue no saturemos las conexiones de Supabase
 DATABASE_URL = os.environ.get("DATABASE_URL", "").replace("postgres://", "postgresql://", 1)
-engine = create_engine(DATABASE_URL, pool_size=5, max_overflow=10, pool_pre_ping=True)
-
-# Scoped Session: Garantiza que cada petición tenga su propia conexión limpia
-db_session = scoped_session(sessionmaker(bind=engine))
-
-def obtener_estado_suscripcion(email):
-    # La sesión se abre y se cierra automáticamente con el bloque try/finally
-    try:
-        res = db_session.execute(text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
-        if not res: return "Inexistente"
-        
-        hoy = datetime.now().date()
-        vence = res.fecha_vencimiento
-        
-        if hoy <= vence: return "Activo"
-        if hoy == vence + timedelta(days=1): return "Gracia" # Lógica de día de gracia [cite: 2025-12-30]
-        return "Vencido"
-    finally:
-        db_session.remove() # LIMPIEZA OBLIGATORIA
+engine = create_engine(DATABASE_URL, pool_size=1, max_overflow=0, pool_pre_ping=True)
 
 @app.route('/')
 def index():
     if 'user' not in session: return render_template('index.html', login_mode=True)
-    estado = obtener_estado_suscripcion(session['user'])
-    return render_template('index.html', login_mode=False, user=session['user'], estado=estado)
+    
+    email = session['user']
+    hoy = datetime.now().date()
+    
+    # Abrimos conexión, consultamos y cerramos inmediatamente
+    with engine.connect() as conn:
+        res = conn.execute(text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
+        
+    if not res: return redirect(url_for('logout'))
+    
+    vence = res[0]
+    # Lógica de estados para el banner [cite: 2025-12-30]
+    if hoy <= vence: estado = "Activo"
+    elif hoy == vence + timedelta(days=1): estado = "Gracia"
+    else: estado = "Vencido"
+        
+    return render_template('index.html', login_mode=False, user=email, estado=estado)
 
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email').strip().lower()
     session['user'] = email
-    try:
-        db_session.execute(text("""
+    
+    with engine.connect() as conn:
+        # Usamos execute directo sin bloques begin() para evitar el error de transacción
+        conn.execute(text("""
             INSERT INTO suscripciones (email, fecha_vencimiento) 
             VALUES (:e, CURRENT_DATE + INTERVAL '30 days') 
             ON CONFLICT (email) DO NOTHING
         """), {"e": email})
-        db_session.commit()
-    except Exception as e:
-        db_session.rollback()
-        print(f"Error en login: {e}")
-    finally:
-        db_session.remove()
+        conn.commit() # Confirmación manual
+        
     return redirect(url_for('index'))
 
-@app.teardown_appcontext
-def shutdown_session(exception=None):
-    # Este es el guardián final: si Flask olvida cerrar una conexión, esto la cierra.
-    db_session.remove()
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
+    # No inicializamos la DB aquí para evitar colisiones en el arranque de Koyeb
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
