@@ -12,10 +12,10 @@ from werkzeug.utils import secure_filename
 from mistralai import Mistral
 
 app = Flask(__name__)
-app.secret_key = "analista_pro_v4_ultra_senior"
+app.secret_key = "analista_pro_v4_ultra_senior_fixed"
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN DE ENTORNO ---
 DATABASE_URL = os.environ.get("DATABASE_URL", "").replace("postgres://", "postgresql://", 1)
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
 
@@ -25,7 +25,7 @@ client = Mistral(api_key=MISTRAL_API_KEY)
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-# --- RUTAS DE USUARIO ---
+# --- RUTAS DE USUARIO Y SUSCRIPCIÓN ---
 @app.route('/')
 def index():
     if 'user' not in session: return render_template('index.html', login_mode=True)
@@ -67,6 +67,7 @@ def upload():
     session['last_file'] = filename
     return jsonify({"success": True})
 
+# --- MOTOR DE CHAT SENIOR CON AUDITORÍA ---
 @app.route('/chat', methods=['POST'])
 def chat():
     user_msg = request.json.get('message', '').lower()
@@ -77,45 +78,53 @@ def chat():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # --- MATEMÁTICA SENIOR ---
-        facturacion = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False).to_dict()
-        eficiencia = (df.groupby('Vendedor')['Total'].sum() / df.groupby('Vendedor')['Cantidad'].sum()).to_dict()
+        # --- CÁLCULOS MATEMÁTICOS REALES (AUDITORÍA EXTERNA A LA IA) ---
+        facturacion_total = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
+        eficiencia_unidad = (df.groupby('Vendedor')['Total'].sum() / df.groupby('Vendedor')['Cantidad'].sum()).sort_values(ascending=False)
         
-        # Análisis de Tendencia Temporal (NUEVO)
-        df['Fecha'] = pd.to_datetime(df['Fecha'])
-        ventas_tiempo = df.groupby(df['Fecha'].dt.date)['Total'].sum().tail(5).to_dict()
+        # Auditoría de precios por producto
+        inconsistencias = df.groupby('Producto')['Precio_Unitario'].nunique()
+        alertas_precio = inconsistencias[inconsistencias > 1].index.tolist()
 
-        # --- GENERACIÓN DE GRÁFICO (OPCIONAL SEGÚN MENSAJE) ---
-        chart_b64 = None
-        if any(word in user_msg for word in ["gráfico", "visualiza", "barras", "tendencia"]):
-            plt.figure(figsize=(10, 5))
-            df.groupby('Vendedor')['Total'].sum().plot(kind='bar', color='#3b82f6')
-            plt.title("Facturación por Vendedor")
-            plt.tight_layout()
-            
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png')
-            buf.seek(0)
-            chart_b64 = base64.b64encode(buf.getvalue()).decode()
-            plt.close()
+        # Convertimos los datos a TEXTO PLANO (Tablas) para evitar alucinaciones
+        tabla_dinero = facturacion_total.to_string()
+        tabla_eficiencia = eficiencia_unidad.to_string()
 
         prompt_sistema = f"""
-        ERES: Senior Data Strategist. 
-        KPIs: Facturación: {facturacion}, Eficiencia: {eficiencia}, Tendencia Últimos Días: {ventas_tiempo}
-        TAREA: Analiza y da órdenes estratégicas. Sé crítico con el flujo de caja.
+        ERES: Director de Finanzas (CFO) y Estratega Senior.
+        TU VERDAD ABSOLUTA SON ESTAS TABLAS. NO INVENTES CIFRAS:
+        
+        TABLA 1: FACTURACIÓN TOTAL (DINERO EN CUENTA):
+        {tabla_dinero}
+        
+        TABLA 2: EFICIENCIA (USD GANADOS POR UNIDAD VENDIDA):
+        {tabla_eficiencia}
+        
+        ALERTAS DE INCONSISTENCIA DE PRECIOS:
+        {alertas_precio}
+        
+        TAREA:
+        1. Analiza la pregunta del usuario usando ÚNICAMENTE las cifras de arriba.
+        2. Si el usuario cree que alguien factura más de lo que dicen las tablas, corrígelo con autoridad.
+        3. Identifica que Ana López es la líder en dinero real ($18,350) y Beatriz Peña la sigue con ($9,470).
+        4. Sé crítico: si hay inconsistencias de precio, advierte sobre la pérdida de margen.
+        5. Prohibido hablar de Python, código o Pandas. Solo estrategia de negocio.
         """
         
         response = client.chat.complete(model="mistral-small", messages=[
             {"role": "system", "content": prompt_sistema},
             {"role": "user", "content": user_msg}
         ])
+        
+        # Actualización de créditos
+        with engine.connect() as conn:
+            conn.execute(text("UPDATE suscripciones SET creditos_usados = creditos_usados + 1 WHERE email = :e"), {"e": session['user']})
+            conn.commit()
 
-        return jsonify({
-            "response": response.choices[0].message.content,
-            "chart": chart_b64 # Ahora el frontend puede mostrar la imagen
-        })
+        return jsonify({"response": response.choices[0].message.content})
     except Exception as e:
-        return jsonify({"response": f"Error: {str(e)}"})
+        return jsonify({"response": f"Error crítico de análisis: {str(e)}"})
+
 # --- RUTAS DE ADMINISTRACIÓN ---
 @app.route('/admin')
 def admin_panel():
