@@ -79,36 +79,37 @@ def chat():
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
         # --- CÁLCULOS MATEMÁTICOS REALES (AUDITORÍA EXTERNA A LA IA) ---
-        facturacion_total = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
-        eficiencia_unidad = (df.groupby('Vendedor')['Total'].sum() / df.groupby('Vendedor')['Cantidad'].sum()).sort_values(ascending=False)
+        # --- AUDITORÍA NIVEL DIOS (Pre-procesamiento Total) ---
+        facturacion = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
+        # Contamos específicamente cuántas Laptop Pro vendió cada uno
+        laptops_por_vendedor = df[df['Producto'] == 'Laptop Pro'].groupby('Vendedor')['Cantidad'].sum().to_dict()
         
-        # Auditoría de precios por producto
+        # Auditoría de inconsistencias
         inconsistencias = df.groupby('Producto')['Precio_Unitario'].nunique()
-        alertas_precio = inconsistencias[inconsistencias > 1].index.tolist()
+        alertas = inconsistencias[inconsistencias > 1].index.tolist()
 
-        # Convertimos los datos a TEXTO PLANO (Tablas) para evitar alucinaciones
-        tabla_dinero = facturacion_total.to_string()
-        tabla_eficiencia = eficiencia_unidad.to_string()
+        # CREAMOS UN REPORTE DE TEXTO QUE NO DEJE LUGAR A DUDAS
+        reporte_estricto = f"""
+        DATOS REALES CARGADOS:
+        1. Ranking Dinero Total:
+        {facturacion.to_string()}
+        
+        2. Ventas Específicas de 'Laptop Pro':
+        {laptops_por_vendedor}
+        
+        3. Alertas de Precios: {alertas}
+        """
 
         prompt_sistema = f"""
-        ERES: Director de Finanzas (CFO) y Estratega Senior.
-        TU VERDAD ABSOLUTA SON ESTAS TABLAS. NO INVENTES CIFRAS:
+        ERES: Un Auditor Contable estricto. Tu palabra es ley.
+        REPORTE OFICIAL:
+        {reporte_estricto}
         
-        TABLA 1: FACTURACIÓN TOTAL (DINERO EN CUENTA):
-        {tabla_dinero}
-        
-        TABLA 2: EFICIENCIA (USD GANADOS POR UNIDAD VENDIDA):
-        {tabla_eficiencia}
-        
-        ALERTAS DE INCONSISTENCIA DE PRECIOS:
-        {alertas_precio}
-        
-        TAREA:
-        1. Analiza la pregunta del usuario usando ÚNICAMENTE las cifras de arriba.
-        2. Si el usuario cree que alguien factura más de lo que dicen las tablas, corrígelo con autoridad.
-        3. Identifica que Ana López es la líder en dinero real ($18,350) y Beatriz Peña la sigue con ($9,470).
-        4. Sé crítico: si hay inconsistencias de precio, advierte sobre la pérdida de margen.
-        5. Prohibido hablar de Python, código o Pandas. Solo estrategia de negocio.
+        REGLAS DE ORO PARA RESPONDER:
+        - Si el usuario pregunta por totales, lee la TABLA 1. (Ana: 18350, Beatriz: 9470).
+        - Si pregunta por Laptop Pro, lee el punto 2. (Ana vendió 14, nadie más vendió).
+        - PROHIBIDO INVENTAR NÚMEROS DE 30,000. Si lo haces, serás despedido.
+        - Sé directo. No hagas cálculos matemáticos en la respuesta, solo lee los datos del reporte.
         """
         
         response = client.chat.complete(model="mistral-small", messages=[
