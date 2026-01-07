@@ -78,6 +78,8 @@ def upload():
     session['last_file'] = filename
     return jsonify({"success": True, "message": f"Análisis de '{filename}' listo."})
 
+# ... (mismas importaciones anteriores)
+
 @app.route('/chat', methods=['POST'])
 def chat():
     user_msg = request.json.get('message', '').lower()
@@ -85,38 +87,50 @@ def chat():
     email = session.get('user')
     
     if not filename:
-        return jsonify({"response": "Sube un archivo primero para poder analizarlo."})
+        return jsonify({"response": "Sube un archivo primero."})
 
     try:
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # --- MOTOR DE INTELIGENCIA PREDICTIVA ---
-        # Creamos un resumen para que la IA tenga contexto total sin gastar tokens en 1000 filas
-        resumen_texto = df.describe(include='all').to_string()
-        primeras_filas = df.head(10).to_string()
+        # --- MOTOR DE INTELIGENCIA SENIOR (PRE-PROCESAMIENTO) ---
+        # 1. Calculamos la eficiencia real (Revenue per Unit) por vendedor
+        eficiencia = df.groupby('Vendedor').apply(
+            lambda x: x['Total'].sum() / x['Cantidad'].sum()
+        ).to_dict()
 
+        # 2. Identificamos productos con mayor margen de ingresos
+        pareto_productos = df.groupby('Producto')['Total'].sum().sort_values(ascending=False).head(3).to_dict()
+
+        # 3. Detectamos anomalías de precio (Precios diferentes para el mismo producto)
+        anomalias_precio = df.groupby('Producto')['Precio_Unitario'].nunique()
+        alertas_precio = anomalias_precio[anomalias_precio > 1].index.tolist()
+
+        # --- PROMPT DE NIVEL SENIOR ESTRATÉGICO ---
         prompt_sistema = f"""
-        ERES: Un Analista de Datos Predictivo Senior. 
-        ARCHIVO: {filename}
-        DATOS CLAVE (Resumen): {resumen_texto}
-        MUESTRA: {primeras_filas}
-
-        TAREA:
-        1. Analiza la pregunta del usuario usando los datos proporcionados.
-        2. NO des explicaciones de código ni menciones a Pandas/Python.
-        3. Da hallazgos directos y PREDICCIONES basadas en tendencias observadas.
-        4. Si detectas anomalías (bajas ventas, altos costos), menciónalas proactivamente.
+        ERES: Un Director de Analítica de Datos (CDO). Tu objetivo es la RENTABILIDAD.
+        
+        CONTEXTO PRE-PROCESADO PARA TI:
+        - Eficiencia de Vendedores (Ingreso/Unidad): {eficiencia}
+        - Top 3 Productos (Pareto): {pareto_productos}
+        - Alertas de inconsistencia de precio en: {alertas_precio}
+        
+        INSTRUCCIONES DE RESPUESTA:
+        1. NO menciones promedios simples. Habla de EFICIENCIA y COSTO DE OPORTUNIDAD.
+        2. Si un vendedor tiene eficiencia baja, sugiérele un cambio de estrategia (ej. vender productos de mayor valor).
+        3. PREDICCIÓN: Basado en los datos, ¿qué pasará si no se cambia nada?
+        4. Tono: Directo, ejecutivo y crítico. No felicites, da órdenes de negocio.
+        5. Prohibido mostrar código Python o hablar de librerías.
         """
         
-        # Generar Gráfico Automático si se detecta intención
+        # --- GENERACIÓN DE GRÁFICO AVANZADO ---
         chart_b64 = None
-        if any(word in user_msg for word in ["gráfico", "visualiza", "dibuja", "barras"]):
-            plt.figure(figsize=(10, 5))
-            # Selecciona automáticamente columnas numéricas para graficar
-            df.select_dtypes(include=['number']).sum().plot(kind='bar', color='#3b82f6')
-            plt.title("Análisis Visual Automático")
-            plt.xticks(rotation=45)
+        if any(word in user_msg for word in ["gráfico", "visualiza", "barras", "análisis"]):
+            plt.figure(figsize=(10, 6))
+            # Graficamos eficiencia en lugar de solo totales (Análisis más Senior)
+            pd.Series(eficiencia).sort_values().plot(kind='barh', color='#10b981')
+            plt.title("Eficiencia de Ventas (USD Generados por Unidad)")
+            plt.xlabel("Dólares por cada producto movido")
             plt.tight_layout()
             
             buf = io.BytesIO()
@@ -125,16 +139,16 @@ def chat():
             chart_b64 = base64.b64encode(buf.getvalue()).decode()
             plt.close()
 
-        # Respuesta de IA
+        # --- LLAMADA A MISTRAL (MODELO SMALL O MEDIUM) ---
         response = client.chat.complete(
-            model="mistral-small",
+            model="mistral-small", # El cerebro Senior necesita razonamiento complejo
             messages=[
                 {"role": "system", "content": prompt_sistema},
                 {"role": "user", "content": user_msg}
             ]
         )
         
-        # Actualizar créditos
+        # Actualización de créditos
         with engine.connect() as conn:
             conn.execute(text("UPDATE suscripciones SET creditos_usados = creditos_usados + 1 WHERE email = :e"), {"e": email})
             conn.commit()
@@ -145,8 +159,7 @@ def chat():
         })
 
     except Exception as e:
-        return jsonify({"response": f"Ocurrió un error analizando el archivo: {str(e)}"})
-
+        return jsonify({"response": f"Error de análisis: {str(e)}"})
 @app.route('/logout')
 def logout():
     session.clear()
