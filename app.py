@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 from mistralai import Mistral
 
 app = Flask(__name__)
-app.secret_key = "analista_pro_v4_ultra"
+app.secret_key = "analista_pro_v4_ultra_senior"
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # --- CONFIGURACIÓN ---
@@ -34,15 +34,18 @@ def index():
     with engine.connect() as conn:
         res = conn.execute(text("SELECT fecha_vencimiento, creditos_usados FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
     if not res: return redirect(url_for('logout'))
+    
     vence, usados = res[0], res[1] or 0
     banner = None
-    if hoy <= vence: estado = "Activo"
+    if hoy <= vence: 
+        estado = "Activo"
     elif hoy == vence + timedelta(days=1): 
         estado = "Gracia"
         banner = ("⚠️ Tu suscripción venció ayer. Hoy es tu último día de gracia.", "alert-warning")
     else: 
         estado = "Vencido"
         banner = ("🚫 Suscripción expirada. Acceso restringido.", "alert-danger")
+    
     return render_template('index.html', login_mode=False, user=email, estado=estado, creditos=usados, banner=banner)
 
 @app.route('/login', methods=['POST'])
@@ -74,28 +77,39 @@ def chat():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # PRE-PROCESAMIENTO SENIOR
-        ingresos_totales = df['Total'].sum()
-        eficiencia = (df.groupby('Vendedor')['Total'].sum() / df.groupby('Vendedor')['Cantidad'].sum()).to_dict()
-        top_ventas = df.groupby('Vendedor')['Total'].sum().idxmax()
-        alertas_precio = df.groupby('Producto')['Precio_Unitario'].nunique()
-        inconsistencias = alertas_precio[alertas_precio > 1].index.tolist()
+        # --- MOTOR DE PRE-PROCESAMIENTO SENIOR ---
+        # 1. Facturación Real (Total de Dinero)
+        facturacion = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False).to_dict()
+        lider_facturacion = list(facturacion.keys())[0]
+        
+        # 2. Eficiencia Real (Ingreso por cada unidad vendida)
+        eficiencia = (df.groupby('Vendedor')['Total'].sum() / df.groupby('Vendedor')['Cantidad'].sum()).sort_values(ascending=False).to_dict()
+        lider_eficiencia = list(eficiencia.keys())[0]
+
+        # 3. Auditoría de Precios (¿Precios distintos para el mismo producto?)
+        inconsistencias = df.groupby('Producto')['Precio_Unitario'].nunique()
+        alertas_precio = inconsistencias[inconsistencias > 1].index.tolist()
 
         prompt_sistema = f"""
-        ERES: Director Estratégico de Datos.
-        KPIs REALES:
-        - Ingresos: ${ingresos_totales}
-        - Eficiencia (Ticket Promedio): {eficiencia}
-        - Líder en Facturación: {top_ventas}
-        - Alerta de Precios Variables: {inconsistencias}
+        ERES: Senior Data Strategist. Tu misión es maximizar la rentabilidad.
+        KPIs CRÍTICOS DEL ARCHIVO:
+        - Facturación Total por Vendedor: {facturacion}
+        - Eficiencia (USD por Unidad): {eficiencia}
+        - Líder en DINERO REAL: {lider_facturacion}
+        - Líder en EFICIENCIA: {lider_eficiencia}
+        - Alertas de precios inconsistentes: {alertas_precio}
         
-        INSTRUCCIONES:
-        1. Responde con visión de negocio, no menciones código.
-        2. Si preguntan por eficiencia, prioriza el 'Ingreso por Unidad'.
-        3. Sé predictivo: menciona qué pasará con el stock o flujo de caja según los datos.
+        REGLAS DE ORO:
+        1. No menciones promedios genéricos. Sé específico con los líderes.
+        2. Si el líder en dinero NO es el mismo que el líder en eficiencia, destaca el conflicto.
+        3. Predice qué pasará con el flujo de caja si no se corrigen las alertas de precio.
+        4. Responde con autoridad, sin código ni explicaciones técnicas.
         """
         
-        response = client.chat.complete(model="mistral-small", messages=[{"role": "system", "content": prompt_sistema}, {"role": "user", "content": user_msg}])
+        response = client.chat.complete(model="mistral-small", messages=[
+            {"role": "system", "content": prompt_sistema},
+            {"role": "user", "content": user_msg}
+        ])
         
         with engine.connect() as conn:
             conn.execute(text("UPDATE suscripciones SET creditos_usados = creditos_usados + 1 WHERE email = :e"), {"e": session['user']})
@@ -103,7 +117,7 @@ def chat():
 
         return jsonify({"response": response.choices[0].message.content})
     except Exception as e:
-        return jsonify({"response": f"Error: {str(e)}"})
+        return jsonify({"response": f"Error de análisis: {str(e)}"})
 
 # --- RUTAS DE ADMINISTRACIÓN ---
 @app.route('/admin')

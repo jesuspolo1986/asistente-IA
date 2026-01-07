@@ -2,48 +2,59 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Comando Central AI</title>
+    <title>Control de Mando AI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background: #020617; color: #f8fafc; }
-        .card-meta { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; }
-        .badge-active { background: #059669; }
-        .badge-grace { background: #d97706; }
-        .badge-expired { background: #dc2626; }
-        .table { --bs-table-bg: transparent; color: white; }
+        body { background: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .card-stat { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 25px; transition: transform 0.3s; }
+        .card-stat:hover { transform: translateY(-5px); border-color: #3b82f6; }
+        .badge-active { background: #10b981; } /* Verde Esmeralda */
+        .badge-grace { background: #f59e0b; }  /* Ámbar */
+        .badge-expired { background: #ef4444; } /* Rojo */
+        .table-container { background: #0f172a; border-radius: 15px; padding: 20px; border: 1px solid #1e293b; }
+        .table { --bs-table-bg: transparent; color: white; border-color: #1e293b; }
     </style>
 </head>
 <body>
 <div class="container py-5">
-    <h2 class="mb-4">Monitor Global del Proyecto</h2>
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="h3">Panel de Control Admin</h1>
+        <span class="text-muted small">Estado del Sistema: <span class="text-success">Online</span></span>
+    </div>
     
-    <div class="row g-3 mb-5 text-center">
-        <div class="col-md-3"><div class="card-meta"><h6>Usuarios</h6><h3>{{ stats.total }}</h3></div></div>
-        <div class="col-md-3"><div class="card-meta text-warning"><h6>En Gracia</h6><h3>{{ stats.gracia }}</h3></div></div>
-        <div class="col-md-3"><div class="card-meta text-danger"><h6>Expirados</h6><h3>{{ stats.expirados }}</h3></div></div>
-        <div class="col-md-3"><div class="card-meta text-info"><h6>Consultas IA</h6><h3>{{ stats.consultas }}</h3></div></div>
+    <div class="row g-4 mb-5">
+        <div class="col-md-3"><div class="card-stat"><h6>Usuarios Totales</h6><h2 class="fw-bold">{{ stats.total }}</h2></div></div>
+        <div class="col-md-3"><div class="card-stat text-warning"><h6>En Periodo Gracia</h6><h2 class="fw-bold">{{ stats.gracia }}</h2></div></div>
+        <div class="col-md-3"><div class="card-stat text-danger"><h6>Cuentas Expiradas</h6><h2 class="fw-bold">{{ stats.expirados }}</h2></div></div>
+        <div class="col-md-3"><div class="card-stat text-info"><h6>Consultas IA</h6><h2 class="fw-bold">{{ stats.consultas }}</h2></div></div>
     </div>
 
-    <div class="card-meta">
+    <div class="table-container">
+        <h5 class="mb-4">Gestión de Suscriptores</h5>
         <table class="table align-middle">
             <thead>
                 <tr>
                     <th>Usuario</th>
                     <th>Vencimiento</th>
-                    <th>Uso IA</th>
-                    <th>Acción</th>
+                    <th>Actividad</th>
+                    <th class="text-end">Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for u in users %}
                 <tr>
-                    <td>{{ u.email }} <span class="badge {{ u.clase }} ms-2">●</span></td>
-                    <td>{{ u.vence }}</td>
-                    <td>{{ u.creditos }} consultas</td>
                     <td>
-                        <form action="/admin/extend" method="post">
+                        <div class="d-flex align-items-center">
+                            <span class="badge {{ u.clase }} p-2 me-3" title="Estado"> </span>
+                            {{ u.email }}
+                        </div>
+                    </td>
+                    <td>{{ u.vence }}</td>
+                    <td><span class="text-info">{{ u.creditos }}</span> peticiones</td>
+                    <td class="text-end">
+                        <form action="/admin/extend" method="post" class="d-inline">
                             <input type="hidden" name="email" value="{{ u.email }}">
-                            <button class="btn btn-sm btn-primary">Renovar +30d</button>
+                            <button class="btn btn-sm btn-outline-primary">Renovar Suscripción</button>
                         </form>
                     </td>
                 </tr>
