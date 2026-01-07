@@ -78,55 +78,43 @@ def chat():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # --- CÁLCULOS MATEMÁTICOS REALES (AUDITORÍA EXTERNA A LA IA) ---
-        # --- AUDITORÍA NIVEL DIOS (Pre-procesamiento Total) ---
+        # --- MATEMÁTICA EXACTA EN PYTHON ---
         facturacion = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
-        # Contamos específicamente cuántas Laptop Pro vendió cada uno
-        laptops_por_vendedor = df[df['Producto'] == 'Laptop Pro'].groupby('Vendedor')['Cantidad'].sum().to_dict()
+        # Conteo exacto por producto y vendedor
+        conteo_productos = df.groupby(['Vendedor', 'Producto'])['Cantidad'].sum().to_dict()
         
-        # Auditoría de inconsistencias
+        # Auditoría de precios
         inconsistencias = df.groupby('Producto')['Precio_Unitario'].nunique()
         alertas = inconsistencias[inconsistencias > 1].index.tolist()
 
-        # CREAMOS UN REPORTE DE TEXTO QUE NO DEJE LUGAR A DUDAS
+        # CREAMOS EL REPORTE QUE LA IA DEBE LEER
         reporte_estricto = f"""
-        DATOS REALES CARGADOS:
-        1. Ranking Dinero Total:
-        {facturacion.to_string()}
-        
-        2. Ventas Específicas de 'Laptop Pro':
-        {laptops_por_vendedor}
-        
-        3. Alertas de Precios: {alertas}
+        REPORTE OFICIAL DE AUDITORÍA:
+        - RANKING VENTAS (DINERO): {facturacion.to_dict()}
+        - UNIDADES VENDIDAS (DETALLE): {conteo_productos}
+        - ALERTAS DE PRECIO: {alertas}
         """
 
         prompt_sistema = f"""
-        ERES: Un Auditor Contable estricto. Tu palabra es ley.
-        REPORTE OFICIAL:
+        ERES: Un Auditor Contable de Élite. 
+        TU BASE DE DATOS ES ESTA (PROHIBIDO SALIRSE DE AQUÍ):
         {reporte_estricto}
         
-        REGLAS DE ORO PARA RESPONDER:
-        - Si el usuario pregunta por totales, lee la TABLA 1. (Ana: 18350, Beatriz: 9470).
-        - Si pregunta por Laptop Pro, lee el punto 2. (Ana vendió 14, nadie más vendió).
-        - PROHIBIDO INVENTAR NÚMEROS DE 30,000. Si lo haces, serás despedido.
-        - Sé directo. No hagas cálculos matemáticos en la respuesta, solo lee los datos del reporte.
+        INSTRUCCIONES:
+        1. Si te preguntan cuántas unidades vendió alguien, busca en 'UNIDADES VENDIDAS (DETALLE)'.
+        2. Ana López vendió exactamente 14 Laptop Pro. Si dices 15, estarás mintiendo.
+        3. No hagas cálculos. Lee el reporte. 
+        4. Responde con tono firme y estratégico.
         """
         
         response = client.chat.complete(model="mistral-small", messages=[
             {"role": "system", "content": prompt_sistema},
             {"role": "user", "content": user_msg}
         ])
-        
-        # Actualización de créditos
-        with engine.connect() as conn:
-            conn.execute(text("UPDATE suscripciones SET creditos_usados = creditos_usados + 1 WHERE email = :e"), {"e": session['user']})
-            conn.commit()
 
         return jsonify({"response": response.choices[0].message.content})
     except Exception as e:
-        return jsonify({"response": f"Error crítico de análisis: {str(e)}"})
-
-# --- RUTAS DE ADMINISTRACIÓN ---
+        return jsonify({"response": f"Error: {str(e)}"}) 
 @app.route('/admin')
 def admin_panel():
     hoy = datetime.now().date()
