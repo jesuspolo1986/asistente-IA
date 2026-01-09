@@ -78,46 +78,41 @@ def chat():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # --- DETECTOR UNIVERSAL DE COLUMNAS ---
+        # --- 1. IDENTIFICACIÓN DINÁMICA ---
         cols = df.columns.tolist()
-        # Buscamos la columna de identidad (Sujeto)
-        col_sujeto = next((c for c in cols if c.lower() in ['vendedor', 'conductor', 'tienda', 'sku', 'empleado']), cols[0])
-        # Buscamos la columna de valor (Métrica)
-        col_valor = next((c for c in cols if c.lower() in ['total', 'ventas_netas', 'kilometros', 'monto', 'cantidad']), cols[-1])
+        col_sujeto = next((c for c in cols if c.lower() in ['vendedor', 'conductor', 'tienda', 'sku', 'empleado', 'departamento']), cols[0])
+        col_valor = next((c for c in cols if c.lower() in ['total', 'ventas_netas', 'kilometros', 'monto', 'sueldo', 'cantidad']), cols[-1])
         
-        # --- CÁLCULOS DINÁMICOS ---
+        # --- 2. CÁLCULOS DE AUDITORÍA ---
         ranking = df.groupby(col_sujeto)[col_valor].sum().sort_values(ascending=False)
-        lider = ranking.index[0]
-        monto_lider = ranking.iloc[0]
+        # Muestra de datos para que la IA vea columnas secundarias (como SKU o Ruta)
+        muestra_dict = df.head(10).to_dict(orient='records')
 
-        # Mapa de verdad que cambia según el archivo
+        # --- 3. MAPA DE VERDAD EXTENDIDO ---
         contexto_servidor = f"""
-        [DATOS REALES DEL ARCHIVO]
-        - ENTIDAD PRINCIPAL: {col_sujeto}
-        - MÉTRICA ANALIZADA: {col_valor}
-        - LÍDER ACTUAL: {lider} ({monto_lider:,.2f})
-        - LISTADO COMPLETO:
-        {ranking.to_string()}
+        [ESTRUCTURA]
+        Columnas disponibles: {cols}
+        Muestra de datos (JSON): {muestra_dict}
+        
+        [RANKING PRINCIPAL]
+        Líder en {col_valor}: {ranking.index[0]} con {ranking.iloc[0]:,.2f}
+        Todos los {col_sujeto}s: {ranking.to_dict()}
         [/DATOS REALES]
         """
 
-        # INTERCEPTOR INTELIGENTE
-        if any(word in user_msg for word in ["mejor", "ganador", "mas vendio", "lider"]):
-            return jsonify({"response": f"📊 **Análisis del Servidor:** El líder en **{col_sujeto}** es **{lider}** con un total de **{monto_lider:,.2f}** en **{col_valor}**."})
-
-        # IA PARA ANÁLISIS DE SOPORTE
+        # IA CON VISIÓN TOTAL
         response = client.chat.complete(
             model="mistral-small",
             temperature=0,
             messages=[
-                {"role": "system", "content": f"Eres un Analista Experto. Datos actuales: {contexto_servidor}. Si el usuario pregunta por algo que no está en los datos (como Beatriz Peña o Kilómetros en un archivo de Tiendas), aclara que no existen esos datos en este archivo."},
+                {"role": "system", "content": f"Eres un Analista Experto. Usa el [ESTRUCTURA] para saber qué columnas existen y el [RANKING] para cálculos rápidos. Si te preguntan por algo que está en la muestra pero no en el ranking (como un SKU específico), búscalo en la muestra. Si no existe en ningún lado, niégalo."},
                 {"role": "user", "content": user_msg}
             ]
         )
         return jsonify({"response": response.choices[0].message.content})
 
     except Exception as e:
-        return jsonify({"response": f"Error de procesamiento: Columna no encontrada o archivo corrupto."})
+        return jsonify({"response": f"Error técnico: {str(e)}"})
 @app.route('/admin')
 def admin_panel():
     hoy = datetime.now().date()
@@ -153,6 +148,19 @@ def extend_user():
 def logout():
     session.clear()
     return redirect(url_for('index'))
+def generar_grafico(df, col_x, col_y):
+    plt.figure(figsize=(10, 6))
+    df.groupby(col_x)[col_y].sum().sort_values().plot(kind='barh', color='skyblue')
+    plt.title(f'Ranking de {col_y} por {col_x}')
+    plt.tight_layout()
+    
+    # Guardar en buffer para enviar como imagen base64
+    img = io.BytesIO()
+    plt.savefig(img, format='png')
+    img.seek(0)
+    plot_url = base64.b64encode(img.getvalue()).decode()
+    plt.close()
+    return plot_url
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
