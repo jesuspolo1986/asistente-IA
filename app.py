@@ -78,33 +78,44 @@ def chat():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # --- CÁLCULO REAL E INAPELABLE ---
-        ranking = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
-        mejor_vendedor = ranking.index[0]
-        monto_mejor = ranking.iloc[0]
+        # --- AUDITORÍA AUTOMÁTICA (DINÁMICA) ---
+        # 1. Ranking Dinero
+        ranking_dinero = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
+        # 2. Ranking Unidades
+        ranking_unidades = df.groupby('Vendedor')['Cantidad'].sum().sort_values(ascending=False)
+        # 3. Producto Estrella
+        top_prod = df.groupby('Producto')['Cantidad'].sum().idxmax()
 
-        # 🛡️ INTERCEPTOR: Si pregunta por el mejor, respondemos con Python, NO con la IA
-        palabras_clave = ["mejor", "quien gano", "mas vendio", "mayor venta", "ranking"]
-        if any(palabra in user_msg for palabra in palabras_clave):
-            return jsonify({
-                "response": f"📊 **Análisis del Servidor:** El mejor vendedor es **{mejor_vendedor}** con un total de **${monto_mejor:,.2f}**."
-            })
-
-        # Para otras preguntas, usamos la IA con el reporte anclado
-        reporte_estricto = f"Líder real: {mejor_vendedor} (${monto_mejor:,.2f})."
+        # CONSTRUIR EL "MAPA DE VERDAD" PARA LA IA
+        contexto_servidor = f"""
+        [DATOS REALES DEL ARCHIVO]
+        - LÍDER DINERO: {ranking_dinero.index[0]} (${ranking_dinero.iloc[0]:,.2f})
+        - LÍDER UNIDADES: {ranking_unidades.index[0]} ({ranking_unidades.iloc[0]} unidades)
+        - PRODUCTO MÁS VENDIDO: {top_prod}
         
+        DETALLE DE UNIDADES POR VENDEDOR:
+        {ranking_unidades.to_string()}
+        [/DATOS REALES]
+        """
+
+        # INTERCEPTOR PARA EL MEJOR VENDEDOR (DINERO)
+        if "mejor vendedor" in user_msg or "vendio mas" in user_msg:
+            if "unidades" not in user_msg and "cantidad" not in user_msg:
+                return jsonify({"response": f"📊 **Análisis:** El mejor vendedor por ingresos es **{ranking_dinero.index[0]}** con **${ranking_dinero.iloc[0]:,.2f}**."})
+
+        # IA PARA ANÁLISIS COMPLEJO
         response = client.chat.complete(
-            model="mistral-small", 
-            temperature=0, 
+            model="mistral-small",
+            temperature=0,
             messages=[
-                {"role": "system", "content": f"Eres un auditor. No inventes datos. {reporte_estricto}"},
+                {"role": "system", "content": f"Eres un Analista Experto. Usa estos datos: {contexto_servidor}. Si te preguntan algo que no está aquí, di que no tienes el dato, pero NO inventes."},
                 {"role": "user", "content": user_msg}
             ]
         )
         return jsonify({"response": response.choices[0].message.content})
 
     except Exception as e:
-        return jsonify({"response": f"Error de procesamiento: {str(e)}"})
+        return jsonify({"response": f"Error: {str(e)}"})
 @app.route('/admin')
 def admin_panel():
     hoy = datetime.now().date()
