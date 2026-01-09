@@ -1,18 +1,13 @@
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import os
 import pandas as pd
-import io
-import base64
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from sqlalchemy import create_engine, text
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 from mistralai import Mistral
 
 app = Flask(__name__)
-app.secret_key = "analista_pro_v4_ultra_senior_fixed"
+app.secret_key = "analista_pro_v5_monitoreo_total"
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # --- CONFIGURACIÓN DE ENTORNO ---
@@ -25,7 +20,17 @@ client = Mistral(api_key=MISTRAL_API_KEY)
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-# --- RUTAS DE USUARIO Y SUSCRIPCIÓN ---
+# --- FUNCIÓN DE MONITOREO (LOGS) ---
+def registrar_log(email, accion, detalle):
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("INSERT INTO logs_actividad (email, accion, detalle) VALUES (:e, :a, :d)"),
+                         {"e": email, "a": accion, "d": detalle})
+            conn.commit()
+    except Exception as e:
+        print(f"Error al registrar log: {e}")
+
+# --- RUTAS PRINCIPALES ---
 @app.route('/')
 def index():
     if 'user' not in session: return render_template('index.html', login_mode=True)
@@ -33,6 +38,7 @@ def index():
     hoy = datetime.now().date()
     with engine.connect() as conn:
         res = conn.execute(text("SELECT fecha_vencimiento, creditos_usados FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
+    
     if not res: return redirect(url_for('logout'))
     
     vence, usados = res[0], res[1] or 0
@@ -55,22 +61,26 @@ def login():
     with engine.connect() as conn:
         conn.execute(text("INSERT INTO suscripciones (email, fecha_vencimiento) VALUES (:e, CURRENT_DATE + INTERVAL '30 days') ON CONFLICT (email) DO NOTHING"), {"e": email})
         conn.commit()
+    registrar_log(email, "LOGIN", "El usuario ingresó al sistema")
     return redirect(url_for('index'))
 
 @app.route('/upload', methods=['POST'])
 def upload():
     file = request.files.get('file')
     if not file: return jsonify({"error": "No file"}), 400
+    email = session.get('user', 'unknown')
     filename = secure_filename(file.filename)
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
     session['last_file'] = filename
+    registrar_log(email, "UPLOAD", f"Subió el archivo: {filename}")
     return jsonify({"success": True})
 
-# --- MOTOR DE CHAT SENIOR CON AUDITORÍA ---
+# --- MOTOR DE CHAT CON VISIÓN TOTAL ---
 @app.route('/chat', methods=['POST'])
 def chat():
     user_msg = request.json.get('message', '').lower()
+    email = session.get('user', 'unknown')
     filename = session.get('last_file')
     if not filename: return jsonify({"response": "Sube un archivo primero."})
 
@@ -78,51 +88,62 @@ def chat():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # --- 1. IDENTIFICACIÓN DINÁMICA ---
+        # --- DETECTOR UNIVERSAL DE COLUMNAS ---
         cols = df.columns.tolist()
         col_sujeto = next((c for c in cols if c.lower() in ['vendedor', 'conductor', 'tienda', 'sku', 'empleado', 'departamento']), cols[0])
         col_valor = next((c for c in cols if c.lower() in ['total', 'ventas_netas', 'kilometros', 'monto', 'sueldo', 'cantidad']), cols[-1])
         
-        # --- 2. CÁLCULOS DE AUDITORÍA ---
+        # --- CÁLCULOS DINÁMICOS ---
         ranking = df.groupby(col_sujeto)[col_valor].sum().sort_values(ascending=False)
-        # Muestra de datos para que la IA vea columnas secundarias (como SKU o Ruta)
         muestra_dict = df.head(10).to_dict(orient='records')
 
-        # --- 3. MAPA DE VERDAD EXTENDIDO ---
         contexto_servidor = f"""
         [ESTRUCTURA]
-        Columnas disponibles: {cols}
-        Muestra de datos (JSON): {muestra_dict}
-        
-        [RANKING PRINCIPAL]
+        Columnas: {cols}
+        Muestra Datos: {muestra_dict}
+        [RANKING]
         Líder en {col_valor}: {ranking.index[0]} con {ranking.iloc[0]:,.2f}
-        Todos los {col_sujeto}s: {ranking.to_dict()}
-        [/DATOS REALES]
+        Todos: {ranking.to_dict()}
         """
 
-        # IA CON VISIÓN TOTAL
+        # INTERCEPTOR DE SEGURIDAD (Cálculos directos de Python)
+        if any(w in user_msg for w in ["mejor", "ganador", "mas vendio", "lider"]):
+             res_directo = f"📊 **Monitor:** El líder en {col_sujeto} es {ranking.index[0]} con {ranking.iloc[0]:,.2f}."
+             registrar_log(email, "CHAT_AUTO", f"Pregunta: {user_msg} | Resp: Liderazgo")
+             return jsonify({"response": res_directo})
+
+        # LLAMADA A IA
         response = client.chat.complete(
             model="mistral-small",
             temperature=0,
             messages=[
-                {"role": "system", "content": f"Eres un Analista Experto. Usa el [ESTRUCTURA] para saber qué columnas existen y el [RANKING] para cálculos rápidos. Si te preguntan por algo que está en la muestra pero no en el ranking (como un SKU específico), búscalo en la muestra. Si no existe en ningún lado, niégalo."},
+                {"role": "system", "content": f"Eres un Analista Experto. Datos: {contexto_servidor}. Si no encuentras un dato, di que no está en este archivo."},
                 {"role": "user", "content": user_msg}
             ]
         )
-        return jsonify({"response": response.choices[0].message.content})
+        respuesta_ia = response.choices[0].message.content
+        registrar_log(email, "CHAT_IA", f"Pregunta: {user_msg}")
+        
+        return jsonify({"response": respuesta_ia})
 
     except Exception as e:
+        registrar_log(email, "ERROR", str(e))
         return jsonify({"response": f"Error técnico: {str(e)}"})
+
+# --- PANEL ADMIN CON MONITOREO TOTAL ---
 @app.route('/admin')
 def admin_panel():
     hoy = datetime.now().date()
     with engine.connect() as conn:
-        res = conn.execute(text("SELECT email, fecha_vencimiento, creditos_usados FROM suscripciones")).fetchall()
+        # 1. Obtener Usuarios
+        users_res = conn.execute(text("SELECT email, fecha_vencimiento, creditos_usados FROM suscripciones")).fetchall()
+        # 2. Obtener Logs de Actividad (últimos 20)
+        logs_res = conn.execute(text("SELECT email, accion, detalle, fecha FROM logs_actividad ORDER BY fecha DESC LIMIT 20")).fetchall()
     
     users_list = []
     stats = {"total": 0, "gracia": 0, "expirados": 0, "consultas": 0}
     
-    for u in res:
+    for u in users_res:
         vence = u[1]
         clase = "badge-active"
         if hoy > vence + timedelta(days=1): 
@@ -134,34 +155,12 @@ def admin_panel():
         stats["total"] += 1
         stats["consultas"] += (u[2] or 0)
         
-    return render_template('admin.html', users=users_list, stats=stats)
-
-@app.route('/admin/extend', methods=['POST'])
-def extend_user():
-    email = request.form.get('email')
-    with engine.connect() as conn:
-        conn.execute(text("UPDATE suscripciones SET fecha_vencimiento = CURRENT_DATE + INTERVAL '30 days' WHERE email = :e"), {"e": email})
-        conn.commit()
-    return redirect(url_for('admin_panel'))
+    return render_template('admin.html', users=users_list, stats=stats, logs=logs_res)
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('index'))
-def generar_grafico(df, col_x, col_y):
-    plt.figure(figsize=(10, 6))
-    df.groupby(col_x)[col_y].sum().sort_values().plot(kind='barh', color='skyblue')
-    plt.title(f'Ranking de {col_y} por {col_x}')
-    plt.tight_layout()
-    
-    # Guardar en buffer para enviar como imagen base64
-    img = io.BytesIO()
-    plt.savefig(img, format='png')
-    img.seek(0)
-    plot_url = base64.b64encode(img.getvalue()).decode()
-    plt.close()
-    return plot_url
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
-    #
