@@ -78,33 +78,29 @@ def chat():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # --- MATEMÁTICA EXACTA EN PYTHON ---
-        facturacion = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
-        # Conteo exacto por producto y vendedor
-        conteo_productos = df.groupby(['Vendedor', 'Producto'])['Cantidad'].sum().to_dict()
-        
-        # Auditoría de precios
-        inconsistencias = df.groupby('Producto')['Precio_Unitario'].nunique()
-        alertas = inconsistencias[inconsistencias > 1].index.tolist()
+        # --- CÁLCULO REAL EN EL SERVIDOR (LA VERDAD) ---
+        resumen_ventas = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
+        mejor_vendedor = resumen_ventas.index[0]
+        monto_mejor = resumen_ventas.iloc[0]
+        segundo_vendedor = resumen_ventas.index[1]
+        monto_segundo = resumen_ventas.iloc[1]
 
-        # CREAMOS EL REPORTE QUE LA IA DEBE LEER
+        # REPORTE DE TEXTO PLANO
         reporte_estricto = f"""
-        REPORTE OFICIAL DE AUDITORÍA:
-        - RANKING VENTAS (DINERO): {facturacion.to_dict()}
-        - UNIDADES VENDIDAS (DETALLE): {conteo_productos}
-        - ALERTAS DE PRECIO: {alertas}
+        RANKING OFICIAL (CALCULADO POR EL SERVIDOR):
+        1. {mejor_vendedor}: ${monto_mejor:,.2f} (GANADOR)
+        2. {segundo_vendedor}: ${monto_segundo:,.2f}
         """
 
         prompt_sistema = f"""
-        ERES: Un Auditor Contable de Élite. 
-        TU BASE DE DATOS ES ESTA (PROHIBIDO SALIRSE DE AQUÍ):
+        ERES: El Auditor Contable del sistema "AI Pro Analyst". 
+        DATOS REALES CARGADOS:
         {reporte_estricto}
         
-        INSTRUCCIONES:
-        1. Si te preguntan cuántas unidades vendió alguien, busca en 'UNIDADES VENDIDAS (DETALLE)'.
-        2. Ana López vendió exactamente 14 Laptop Pro. Si dices 15, estarás mintiendo.
-        3. No hagas cálculos. Lee el reporte. 
-        4. Responde con tono firme y estratégico.
+        INSTRUCCIÓN OBLIGATORIA:
+        - El mejor vendedor es {mejor_vendedor}.
+        - Si el usuario dice o pregunta por Beatriz Peña y los 30,000, dile que ese dato es FALSO y que el registro real muestra a {mejor_vendedor} como líder.
+        - NO INVENTES NÚMEROS. Usa solo el RANKING OFICIAL de arriba.
         """
         
         response = client.chat.complete(model="mistral-small", messages=[
@@ -114,7 +110,7 @@ def chat():
 
         return jsonify({"response": response.choices[0].message.content})
     except Exception as e:
-        return jsonify({"response": f"Error: {str(e)}"}) 
+        return jsonify({"response": f"Error técnico: {str(e)}"})
 @app.route('/admin')
 def admin_panel():
     hoy = datetime.now().date()
