@@ -78,44 +78,46 @@ def chat():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # --- AUDITORÍA AUTOMÁTICA (DINÁMICA) ---
-        # 1. Ranking Dinero
-        ranking_dinero = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
-        # 2. Ranking Unidades
-        ranking_unidades = df.groupby('Vendedor')['Cantidad'].sum().sort_values(ascending=False)
-        # 3. Producto Estrella
-        top_prod = df.groupby('Producto')['Cantidad'].sum().idxmax()
+        # --- DETECTOR UNIVERSAL DE COLUMNAS ---
+        cols = df.columns.tolist()
+        # Buscamos la columna de identidad (Sujeto)
+        col_sujeto = next((c for c in cols if c.lower() in ['vendedor', 'conductor', 'tienda', 'sku', 'empleado']), cols[0])
+        # Buscamos la columna de valor (Métrica)
+        col_valor = next((c for c in cols if c.lower() in ['total', 'ventas_netas', 'kilometros', 'monto', 'cantidad']), cols[-1])
+        
+        # --- CÁLCULOS DINÁMICOS ---
+        ranking = df.groupby(col_sujeto)[col_valor].sum().sort_values(ascending=False)
+        lider = ranking.index[0]
+        monto_lider = ranking.iloc[0]
 
-        # CONSTRUIR EL "MAPA DE VERDAD" PARA LA IA
+        # Mapa de verdad que cambia según el archivo
         contexto_servidor = f"""
         [DATOS REALES DEL ARCHIVO]
-        - LÍDER DINERO: {ranking_dinero.index[0]} (${ranking_dinero.iloc[0]:,.2f})
-        - LÍDER UNIDADES: {ranking_unidades.index[0]} ({ranking_unidades.iloc[0]} unidades)
-        - PRODUCTO MÁS VENDIDO: {top_prod}
-        
-        DETALLE DE UNIDADES POR VENDEDOR:
-        {ranking_unidades.to_string()}
+        - ENTIDAD PRINCIPAL: {col_sujeto}
+        - MÉTRICA ANALIZADA: {col_valor}
+        - LÍDER ACTUAL: {lider} ({monto_lider:,.2f})
+        - LISTADO COMPLETO:
+        {ranking.to_string()}
         [/DATOS REALES]
         """
 
-        # INTERCEPTOR PARA EL MEJOR VENDEDOR (DINERO)
-        if "mejor vendedor" in user_msg or "vendio mas" in user_msg:
-            if "unidades" not in user_msg and "cantidad" not in user_msg:
-                return jsonify({"response": f"📊 **Análisis:** El mejor vendedor por ingresos es **{ranking_dinero.index[0]}** con **${ranking_dinero.iloc[0]:,.2f}**."})
+        # INTERCEPTOR INTELIGENTE
+        if any(word in user_msg for word in ["mejor", "ganador", "mas vendio", "lider"]):
+            return jsonify({"response": f"📊 **Análisis del Servidor:** El líder en **{col_sujeto}** es **{lider}** con un total de **{monto_lider:,.2f}** en **{col_valor}**."})
 
-        # IA PARA ANÁLISIS COMPLEJO
+        # IA PARA ANÁLISIS DE SOPORTE
         response = client.chat.complete(
             model="mistral-small",
             temperature=0,
             messages=[
-                {"role": "system", "content": f"Eres un Analista Experto. Usa estos datos: {contexto_servidor}. Si te preguntan algo que no está aquí, di que no tienes el dato, pero NO inventes."},
+                {"role": "system", "content": f"Eres un Analista Experto. Datos actuales: {contexto_servidor}. Si el usuario pregunta por algo que no está en los datos (como Beatriz Peña o Kilómetros en un archivo de Tiendas), aclara que no existen esos datos en este archivo."},
                 {"role": "user", "content": user_msg}
             ]
         )
         return jsonify({"response": response.choices[0].message.content})
 
     except Exception as e:
-        return jsonify({"response": f"Error: {str(e)}"})
+        return jsonify({"response": f"Error de procesamiento: Columna no encontrada o archivo corrupto."})
 @app.route('/admin')
 def admin_panel():
     hoy = datetime.now().date()
