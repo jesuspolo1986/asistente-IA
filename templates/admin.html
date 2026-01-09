@@ -2,66 +2,200 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Control de Mando AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel | AI Pro Analyst</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; }
-        .card-stat { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 25px; transition: transform 0.3s; }
-        .card-stat:hover { transform: translateY(-5px); border-color: #3b82f6; }
-        .badge-active { background: #10b981; } /* Verde Esmeralda */
-        .badge-grace { background: #f59e0b; }  /* Ámbar */
-        .badge-expired { background: #ef4444; } /* Rojo */
-        .table-container { background: #0f172a; border-radius: 15px; padding: 20px; border: 1px solid #1e293b; }
-        .table { --bs-table-bg: transparent; color: white; border-color: #1e293b; }
+        :root {
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #3b82f6;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+        }
+
+        .navbar {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid #334155;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+        }
+
+        .icon-shape {
+            width: 48px;
+            height: 48px;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .table-container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid #334155;
+        }
+
+        .table { color: var(--text-main); margin-bottom: 0; }
+        .table thead th { border-bottom: 1px solid #334155; color: var(--text-muted); font-weight: 500; }
+        .table tbody td { border-bottom: 1px solid #334155; vertical-align: middle; padding: 1rem 0.5rem; }
+
+        .badge-active { background: rgba(34, 197, 94, 0.1); color: #4ade80; border: 1px solid #166534; }
+        .badge-grace { background: rgba(234, 179, 8, 0.1); color: #facc15; border: 1px solid #854d0e; }
+        .badge-expired { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid #991b1b; }
+
+        .btn-extend {
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.4rem 1rem;
+            font-size: 0.85rem;
+            transition: 0.2s;
+        }
+
+        .btn-extend:hover { background: #2563eb; color: white; }
     </style>
 </head>
 <body>
-<div class="container py-5">
-    <div class="d-flex justify-content-between align-items-center mb-5">
-        <h1 class="h3">Panel de Control Admin</h1>
-        <span class="text-muted small">Estado del Sistema: <span class="text-success">Online</span></span>
-    </div>
-    
-    <div class="row g-4 mb-5">
-        <div class="col-md-3"><div class="card-stat"><h6>Usuarios Totales</h6><h2 class="fw-bold">{{ stats.total }}</h2></div></div>
-        <div class="col-md-3"><div class="card-stat text-warning"><h6>En Periodo Gracia</h6><h2 class="fw-bold">{{ stats.gracia }}</h2></div></div>
-        <div class="col-md-3"><div class="card-stat text-danger"><h6>Cuentas Expiradas</h6><h2 class="fw-bold">{{ stats.expirados }}</h2></div></div>
-        <div class="col-md-3"><div class="card-stat text-info"><h6>Consultas IA</h6><h2 class="fw-bold">{{ stats.consultas }}</h2></div></div>
+
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand text-white fw-bold" href="#"><i class="fas fa-chart-line me-2"></i>AI Pro Analyst <span class="text-primary">Admin</span></a>
+            <div class="d-flex">
+                <a href="/" class="btn btn-outline-light btn-sm"><i class="fas fa-arrow-left me-1"></i> Ver App</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <h4 class="mb-4 fw-bold text-white">Resumen de la Plataforma</h4>
+        
+        <div class="row g-4 mb-5">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Usuarios Totales</p>
+                            <h3 class="mb-0 fw-bold">{{ stats.total }}</h3>
+                        </div>
+                        <div class="icon-shape"><i class="fas fa-users"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Días de Gracia</p>
+                            <h3 class="mb-0 fw-bold text-warning">{{ stats.gracia }}</h3>
+                        </div>
+                        <div class="icon-shape text-warning" style="background: rgba(234, 179, 8, 0.1);"><i class="fas fa-clock"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Total Consultas</p>
+                            <h3 class="mb-0 fw-bold text-info">{{ stats.consultas }}</h3>
+                        </div>
+                        <div class="icon-shape text-info" style="background: rgba(6, 182, 212, 0.1);"><i class="fas fa-robot"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Archivos Subidos</p>
+                            <h3 class="mb-0 fw-bold" style="color: #a78bfa;">{{ stats.total_archivos | default('0') }}</h3>
+                        </div>
+                        <div class="icon-shape" style="background: rgba(167, 139, 250, 0.1); color: #a78bfa;"><i class="fas fa-file-csv"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-user-shield me-2 text-primary"></i>Gestión de Usuarios</h5>
+                <input type="text" class="form-control form-control-sm w-25 bg-dark border-secondary text-white" placeholder="Buscar usuario...">
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Estado</th>
+                            <th>Vencimiento</th>
+                            <th>Consultas AI</th>
+                            <th>Archivos</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ u.email }}</div>
+                                <small class="text-muted">ID: {{ loop.index }}</small>
+                            </td>
+                            <td>
+                                <span class="badge {{ u.clase }} px-3 py-2 rounded-pill">
+                                    {{ 'Activo' if u.clase == 'badge-active' else 'En Gracia' if u.clase == 'badge-grace' else 'Expirado' }}
+                                </span>
+                            </td>
+                            <td>{{ u.vence }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="me-2">{{ u.creditos }}</span>
+                                    <div class="progress w-50" style="height: 4px; background: #334155;">
+                                        <div class="progress-bar bg-primary" style="width: {{ (u.creditos / 50 * 100) if u.creditos < 50 else 100 }}%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><i class="fas fa-file-alt me-1 text-muted"></i> {{ u.archivos_count | default('0') }}</td>
+                            <td>
+                                <form action="/admin/extend" method="POST" class="d-inline">
+                                    <input type="hidden" name="email" value="{{ u.email }}">
+                                    <button type="submit" class="btn btn-extend">
+                                        <i class="fas fa-plus-circle me-1"></i> +30 Días
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <div class="table-container">
-        <h5 class="mb-4">Gestión de Suscriptores</h5>
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th>Usuario</th>
-                    <th>Vencimiento</th>
-                    <th>Actividad</th>
-                    <th class="text-end">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for u in users %}
-                <tr>
-                    <td>
-                        <div class="d-flex align-items-center">
-                            <span class="badge {{ u.clase }} p-2 me-3" title="Estado"> </span>
-                            {{ u.email }}
-                        </div>
-                    </td>
-                    <td>{{ u.vence }}</td>
-                    <td><span class="text-info">{{ u.creditos }}</span> peticiones</td>
-                    <td class="text-end">
-                        <form action="/admin/extend" method="post" class="d-inline">
-                            <input type="hidden" name="email" value="{{ u.email }}">
-                            <button class="btn btn-sm btn-outline-primary">Renovar Suscripción</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

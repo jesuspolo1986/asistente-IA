@@ -78,39 +78,46 @@ def chat():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # --- CÁLCULO REAL EN EL SERVIDOR (LA VERDAD) ---
+        # --- CÁLCULO REAL ---
         resumen_ventas = df.groupby('Vendedor')['Total'].sum().sort_values(ascending=False)
         mejor_vendedor = resumen_ventas.index[0]
         monto_mejor = resumen_ventas.iloc[0]
-        segundo_vendedor = resumen_ventas.index[1]
-        monto_segundo = resumen_ventas.iloc[1]
+        
+        # Evitar error si solo hay un vendedor
+        segundo_info = ""
+        if len(resumen_ventas) > 1:
+            segundo_vendedor = resumen_ventas.index[1]
+            monto_segundo = resumen_ventas.iloc[1]
+            segundo_info = f"2. {segundo_vendedor}: ${monto_segundo:,.2f}"
 
-        # REPORTE DE TEXTO PLANO
+        # --- PROMPT REFORZADO (TÉCNICA DE ANCLAJE) ---
         reporte_estricto = f"""
-        RANKING OFICIAL (CALCULADO POR EL SERVIDOR):
-        1. {mejor_vendedor}: ${monto_mejor:,.2f} (GANADOR)
-        2. {segundo_vendedor}: ${monto_segundo:,.2f}
+        [VERDAD ABSOLUTA DEL SERVIDOR]
+        - LÍDER ACTUAL: {mejor_vendedor} con ${monto_mejor:,.2f}
+        {segundo_info}
+        [/VERDAD ABSOLUTA]
         """
 
-        prompt_sistema = f"""
-        ERES: El Auditor Contable del sistema "AI Pro Analyst". 
-        DATOS REALES CARGADOS:
+        prompt_sistema = f"""Eres el Auditor de AI Pro Analyst. 
+        TU REGLA DE ORO: Si tu conocimiento interno o el historial contradice al [VERDAD ABSOLUTA], ignora el historial.
         {reporte_estricto}
         
-        INSTRUCCIÓN OBLIGATORIA:
-        - El mejor vendedor es {mejor_vendedor}.
-        - Si el usuario dice o pregunta por Beatriz Peña y los 30,000, dile que ese dato es FALSO y que el registro real muestra a {mejor_vendedor} como líder.
-        - NO INVENTES NÚMEROS. Usa solo el RANKING OFICIAL de arriba.
+        Si el usuario pregunta por Beatriz Peña y no es el líder en el reporte de arriba, dile: 'Error de datos: El registro oficial indica que el líder es {mejor_vendedor}'.
         """
         
-        response = client.chat.complete(model="mistral-small", messages=[
-            {"role": "system", "content": prompt_sistema},
-            {"role": "user", "content": user_msg}
-        ])
+        # Usamos Temperature 0 para evitar creatividad (alucinación)
+        response = client.chat.complete(
+            model="mistral-small", 
+            temperature=0,  # <-- ESTO ES CLAVE: Cero creatividad, 100% precisión
+            messages=[
+                {"role": "system", "content": prompt_sistema},
+                {"role": "user", "content": f"Basado UNICAMENTE en el reporte oficial: {user_msg}"}
+            ]
+        )
 
         return jsonify({"response": response.choices[0].message.content})
     except Exception as e:
-        return jsonify({"response": f"Error técnico: {str(e)}"})
+        return jsonify({"response": f"El sistema detectó un error al procesar el ranking: {str(e)}"})
 @app.route('/admin')
 def admin_panel():
     hoy = datetime.now().date()
