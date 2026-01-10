@@ -21,3 +21,5 @@ openpyxl
 sqlalchemy>=2.0.0
 pg8000
 fpdf
+streamlit
+plotly
