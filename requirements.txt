@@ -23,3 +23,4 @@ pg8000
 fpdf
 streamlit
 plotly
+streamlit
