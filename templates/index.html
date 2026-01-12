@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -8,13 +8,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        /* Estilos rápidos para el Login si no están en tu CSS */
         .login-overlay {
             height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             background: #f4f7f6;
+            width: 100%;
         }
         .login-card {
             background: white;
@@ -22,12 +22,13 @@
             border-radius: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.05);
             max-width: 400px;
-            width: 100%;
+            width: 90%;
             text-align: center;
         }
         .login-card i { font-size: 3rem; color: #1a5276; margin-bottom: 1rem; }
         .login-card h2 { color: #2e4053; font-weight: 700; margin-bottom: 0.5rem; }
-        .login-card p { color: #7f8c8d; margin-bottom: 2rem; }
+        .btn-login { background: #1a5276; border: none; padding: 12px; font-weight: 600; color: white; transition: 0.3s; }
+        .btn-login:hover { background: #154360; transform: translateY(-2px); color: white; }
     </style>
 </head>
 <body>
@@ -40,22 +41,22 @@
             <p>Introduce tu email para acceder a tus reportes estratégicos.</p>
             
             <form action="/login" method="POST">
-                <div class="mb-3">
+                <div class="mb-3 text-start">
+                    <label class="form-label small fw-bold text-muted">Correo Electrónico</label>
                     <input type="email" name="email" class="form-control form-control-lg" placeholder="correo@ejemplo.com" required>
                 </div>
-                <button type="submit" class="btn btn-primary btn-lg w-100" style="background: #1a5276; border: none;">
+                <button type="submit" class="btn btn-login w-100 btn-lg">
                     Iniciar Sesión
                 </button>
             </form>
 
             {% if error %}
-            <div class="alert alert-danger mt-3" role="alert">
-                {{ error }}
+            <div class="alert alert-danger mt-3 small" role="alert">
+                <i class="fas fa-exclamation-circle"></i> {{ error }}
             </div>
             {% endif %}
         </div>
     </div>
-
     {% else %}
     <div class="app-container">
         <nav class="sidebar">
@@ -72,9 +73,11 @@
                 <div id="fileStatus" class="file-status">No hay archivo activo</div>
             </div>
             <div class="actions mt-auto">
-                <p class="text-white-50 small mb-2 text-center"><i class="fas fa-user-circle"></i> {{ user }}</p>
-                <a href="/download_pdf" class="btn-download w-100 mb-2 text-decoration-none">
-                    <i class="fas fa-file-pdf"></i> Generar Reporte
+                <div class="user-info mb-3 text-center">
+                    <small class="text-white-50"><i class="fas fa-user-shield"></i> {{ user }}</small>
+                </div>
+                <a href="/download_pdf" class="btn-download w-100 mb-2 text-decoration-none d-flex align-items-center justify-content-center">
+                    <i class="fas fa-file-pdf me-2"></i> Generar Reporte
                 </a>
                 <a href="/logout" class="btn btn-sm btn-outline-light w-100 opacity-50">Cerrar Sesión</a>
             </div>
@@ -89,7 +92,7 @@
             <div id="chatBox" class="chat-box">
                 <div class="message ai">
                     <div class="bubble">
-                        Hola {{ user.split('@')[0]|capitalize }}. Sube un archivo CSV o Excel y pregúntame lo que necesites analizar.
+                        Hola {{ user.split('@')[0]|capitalize }}. Sube un archivo CSV o Excel para comenzar el análisis.
                     </div>
                 </div>
             </div>

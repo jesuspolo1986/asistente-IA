@@ -1,18 +1,34 @@
+// --- UTILIDADES DE UI ---
+function appendMessage(text, sender) {
+    const chatBox = document.getElementById('chatBox');
+    if (!chatBox) return; // Blindaje: Evita error si no estamos en el dashboard
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${sender}`;
+    // Usamos innerText para seguridad o convertimos markdown simple
+    msgDiv.innerHTML = `<div class="bubble">${text.replace(/\n/g, '<br>')}</div>`;
+    
+    chatBox.appendChild(msgDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// --- LÓGICA DE CHAT ---
 async function sendMessage() {
     const input = document.getElementById('userInput');
     const chatBox = document.getElementById('chatBox');
-    const message = input.value.trim();
+    if (!input || !chatBox) return;
 
+    const message = input.value.trim();
     if (!message) return;
 
-    // 1. Añadir mensaje del usuario a la pantalla
+    // 1. Interfaz de usuario inmediata
     appendMessage(message, 'user');
     input.value = '';
 
-    // 2. Mostrar indicador de "IA pensando..."
+    // 2. Indicador de carga
     const typingDiv = document.createElement('div');
     typingDiv.className = 'message ai typing';
-    typingDiv.innerHTML = `<div class="bubble">...</div>`;
+    typingDiv.innerHTML = `<div class="bubble"><i class="fas fa-spinner fa-spin"></i> Analizando datos...</div>`;
     chatBox.appendChild(typingDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 
@@ -22,50 +38,62 @@ async function sendMessage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: message })
         });
-        const data = await response.json();
         
-        // Remover indicador de carga y añadir respuesta real
-        chatBox.removeChild(typingDiv);
-        appendMessage(data.response, 'ai');
-    } catch (error) {
-        chatBox.removeChild(typingDiv);
-        appendMessage("Error al conectar con el servidor.", 'ai');
-    }
-}
-
-function appendMessage(text, sender) {
-    const chatBox = document.getElementById('chatBox');
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `message ${sender}`;
-    msgDiv.innerHTML = `<div class="bubble">${text}</div>`;
-    chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-// Escuchar el evento de subida de archivo
-document.getElementById('fileInput').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    document.getElementById('fileStatus').innerText = "Subiendo...";
-
-    try {
-        const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
         const data = await response.json();
-        document.getElementById('fileStatus').innerHTML = `<i class="fas fa-check-circle"></i> ${file.name}`;
-        appendMessage(`Archivo "${file.name}" cargado con éxito. ¿Qué quieres analizar?`, 'ai');
+        chatBox.removeChild(typingDiv);
+        
+        if (data.response) {
+            appendMessage(data.response, 'ai');
+        } else {
+            appendMessage("El analista no pudo procesar la respuesta.", 'ai');
+        }
     } catch (error) {
-        document.getElementById('fileStatus').innerText = "Error al subir";
+        if (chatBox.contains(typingDiv)) chatBox.removeChild(typingDiv);
+        appendMessage("Error de conexión con el servidor.", 'ai');
+        console.error("Chat Error:", error);
     }
-});
+}
 
-// Permitir enviar con la tecla Enter
-document.getElementById('userInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage();
-});
+// --- EVENT LISTENERS (CON VERIFICACIÓN DE EXISTENCIA) ---
+
+// 1. Subida de Archivos
+const fileInput = document.getElementById('fileInput');
+if (fileInput) {
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const statusLabel = document.getElementById('fileStatus');
+        if (statusLabel) statusLabel.innerHTML = `<i class="fas fa-sync fa-spin"></i> Procesando...`;
+
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                if (statusLabel) statusLabel.innerHTML = `<i class="fas fa-check-circle text-success"></i> ${file.name}`;
+                appendMessage(`✅ **${file.name}** cargado. ¿Qué insight deseas extraer?`, 'ai');
+            }
+        } catch (error) {
+            if (statusLabel) statusLabel.innerText = "Error al subir";
+            console.error("Upload Error:", error);
+        }
+    });
+}
+
+// 2. Tecla Enter
+const userInput = document.getElementById('userInput');
+if (userInput) {
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Evita saltos de línea innecesarios
+            sendMessage();
+        }
+    });
+}

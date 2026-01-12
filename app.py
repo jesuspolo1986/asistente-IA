@@ -233,7 +233,7 @@ def download_pdf():
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
     # Verificación de seguridad simple por parámetro o podrías usar un login más formal
-    auth_pass = request.args.get('pass')
+    auth_pass = request.args.get('auth')
     if auth_pass != ADMIN_PASSWORD:
         return "Acceso denegado. Contraseña administrativa incorrecta.", 403
 
@@ -252,7 +252,7 @@ def admin_panel():
                 ON CONFLICT(email) DO UPDATE SET fecha_vencimiento = :v
             """), {"e": nuevo_email, "v": vencimiento})
             conn.commit()
-        return redirect(url_for('admin_panel', pass=ADMIN_PASSWORD))
+        return redirect(url_for('admin_panel', auth=ADMIN_PASSWORD))
 
     # Obtener lista de usuarios para mostrar en el panel
     with engine.connect() as conn:
