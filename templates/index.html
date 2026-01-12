@@ -82,7 +82,18 @@
                 <a href="/logout" class="btn btn-sm btn-outline-light w-100 opacity-50">Cerrar Sesión</a>
             </div>
         </nav>
-
+        {% if dias_restantes is defined %}
+    {% if dias_restantes == 0 %}
+    <div class="alert alert-warning alert-dismissible fade show m-3" role="alert">
+        <strong>⚠️ Recordatorio:</strong> Tu acceso expira hoy. Mañana será tu último día de gracia.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% elif dias_restantes < 0 %}
+    <div class="alert alert-danger m-3" role="alert">
+        <strong>⚡ Día de Gracia:</strong> Tu suscripción expiró ayer. Por favor, contacta al administrador para renovar.
+    </div>
+    {% endif %}
+{% endif %}
         <main class="chat-area">
             <header class="chat-header">
                 <h2>Análisis Estratégico</h2>

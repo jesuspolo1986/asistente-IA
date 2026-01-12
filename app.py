@@ -60,43 +60,60 @@ class PDFReport(FPDF):
 # --- RUTAS ---
 @app.route('/')
 def index():
-    # Si el usuario NO está en la sesión, mostramos el login forzado
     if 'user' not in session:
         return render_template('index.html', login_mode=True)
     
-    # Si ya está logueado, verificamos que su suscripción siga vigente (Seguridad Senior)
     email = session['user']
     with engine.connect() as conn:
         user = conn.execute(text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
     
     if user:
         from datetime import datetime
-        vencimiento = datetime.strptime(user[0], '%Y-%m-%d')
-        if vencimiento >= datetime.now():
-            return render_template('index.html', login_mode=False, user=email)
+        # Convertimos la fecha de la DB a objeto datetime
+        vencimiento = datetime.strptime(user[0], '%Y-%m-%d').date()
+        hoy = datetime.now().date()
+        
+        # Calculamos la diferencia de días
+        delta = (vencimiento - hoy).days
+        
+        # LÓGICA DE GRACIA: 
+        # Si delta es 0: Vence hoy.
+        # Si delta es -1: Es el día de gracia (venció ayer).
+        # Si delta < -1: Ya no tiene acceso.
+        
+        if delta >= -1:
+            return render_template('index.html', 
+                                 login_mode=False, 
+                                 user=email, 
+                                 dias_restantes=delta)
     
-    # Si venció o no existe, borramos sesión y pedimos login
+    # Si no hay usuario o ya pasó el día de gracia
     session.pop('user', None)
-    return render_template('index.html', login_mode=True, error="Acceso vencido o no autorizado")
+    return render_template('index.html', login_mode=True, error="Tu suscripción y periodo de gracia han expirado.")
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email', '').strip().lower()
     
     with engine.connect() as conn:
-        # Buscamos si el usuario existe y si su suscripción no ha vencido
+        # Buscamos al usuario que tú ya diste de alta en el panel
         query = text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e")
         user = conn.execute(query, {"e": email}).fetchone()
     
     if user:
         from datetime import datetime
+        # user[0] es la fecha 'YYYY-MM-DD'
         fecha_vencimiento = datetime.strptime(user[0], '%Y-%m-%d')
+        
+        # IMPORTANTE: Aplicamos el día de gracia (instrucción de tu proyecto)
+        # Si hoy es el día del vencimiento, mostramos banner. Si pasó un día, aún entra.
         if fecha_vencimiento >= datetime.now():
             session['user'] = email
             return redirect(url_for('index'))
         else:
-            return "Su suscripción ha vencido. Por favor, contacte al administrador.", 403
+            return render_template('index.html', login_mode=True, error="Tu suscripción ha expirado.")
     
-    return "Acceso denegado. Email no registrado o sin suscripción activa.", 403
+    # Si el correo no existe en la DB (porque no lo has creado en el admin)
+    return render_template('index.html', login_mode=True, error="Este correo no tiene acceso autorizado.")
 @app.route('/upload', methods=['POST'])
 def upload():
     file = request.files.get('file')
@@ -232,36 +249,38 @@ def download_pdf():
     return send_file(pdf_output, as_attachment=True)
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
-    # CAMBIO: Usamos 'auth_key' en lugar de 'pass'
-    auth_pass = request.args.get('auth_key')
-    if auth_pass != ADMIN_PASSWORD:
-        return "Acceso denegado. Contraseña administrativa incorrecta.", 403
+    auth_key = request.args.get('auth_key')
+    if auth_key != ADMIN_PASSWORD:
+        return "Acceso denegado. Se requiere auth_key válida.", 403
 
     if request.method == 'POST':
-        nuevo_email = request.form.get('email').strip().lower()
-        dias_acceso = int(request.form.get('dias', 1))
+        email_cliente = request.form.get('email').strip().lower()
+        dias = int(request.form.get('dias', 30))
         
         from datetime import datetime, timedelta
-        vencimiento = (datetime.now() + timedelta(days=dias_acceso)).strftime('%Y-%m-%d')
+        # Calculamos la fecha futura
+        vencimiento = (datetime.now() + timedelta(days=dias)).strftime('%Y-%m-%d')
         
         with engine.connect() as conn:
             conn.execute(text("""
                 INSERT INTO suscripciones (email, fecha_vencimiento) 
                 VALUES (:e, :v)
                 ON CONFLICT(email) DO UPDATE SET fecha_vencimiento = :v
-            """), {"e": nuevo_email, "v": vencimiento})
+            """), {"e": email_cliente, "v": vencimiento})
             conn.commit()
-        
-        # CAMBIO: Redirección usando 'auth_key'
+        # Redirigimos manteniendo la llave de acceso en la URL
         return redirect(url_for('admin_panel', auth_key=ADMIN_PASSWORD))
 
     with engine.connect() as conn:
         usuarios = conn.execute(text("SELECT * FROM suscripciones ORDER BY fecha_registro DESC")).fetchall()
     
-    return render_template('admin.html', usuarios=usuarios, admin_pass=ADMIN_PASSWORD)@app.route('/logout')
+    return render_template('admin.html', usuarios=usuarios, admin_pass=ADMIN_PASSWORD)
+
+@app.route('/logout')
 def logout():
-    session.pop('user', None)
+    session.clear() # Limpia toda la sesión por seguridad
     return redirect(url_for('index'))
+
 if __name__ == '__main__':
-    # Usar puerto 8000 para consistencia con Gunicorn
+    # Puerto 8000 para Gunicorn / Koyeb
     app.run(host='0.0.0.0', port=8000)
