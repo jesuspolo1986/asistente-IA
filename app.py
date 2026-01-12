@@ -232,8 +232,8 @@ def download_pdf():
     return send_file(pdf_output, as_attachment=True)
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
-    # Verificación de seguridad simple por parámetro o podrías usar un login más formal
-    auth_pass = request.args.get('auth')
+    # CAMBIO: Usamos 'auth_key' en lugar de 'pass'
+    auth_pass = request.args.get('auth_key')
     if auth_pass != ADMIN_PASSWORD:
         return "Acceso denegado. Contraseña administrativa incorrecta.", 403
 
@@ -241,7 +241,6 @@ def admin_panel():
         nuevo_email = request.form.get('email').strip().lower()
         dias_acceso = int(request.form.get('dias', 1))
         
-        # Calcular fecha de vencimiento
         from datetime import datetime, timedelta
         vencimiento = (datetime.now() + timedelta(days=dias_acceso)).strftime('%Y-%m-%d')
         
@@ -252,14 +251,14 @@ def admin_panel():
                 ON CONFLICT(email) DO UPDATE SET fecha_vencimiento = :v
             """), {"e": nuevo_email, "v": vencimiento})
             conn.commit()
-        return redirect(url_for('admin_panel', auth=ADMIN_PASSWORD))
+        
+        # CAMBIO: Redirección usando 'auth_key'
+        return redirect(url_for('admin_panel', auth_key=ADMIN_PASSWORD))
 
-    # Obtener lista de usuarios para mostrar en el panel
     with engine.connect() as conn:
         usuarios = conn.execute(text("SELECT * FROM suscripciones ORDER BY fecha_registro DESC")).fetchall()
     
-    return render_template('admin.html', usuarios=usuarios, admin_pass=ADMIN_PASSWORD)
-@app.route('/logout')
+    return render_template('admin.html', usuarios=usuarios, admin_pass=ADMIN_PASSWORD)@app.route('/logout')
 def logout():
     session.pop('user', None)
     return redirect(url_for('index'))
