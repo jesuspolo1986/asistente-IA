@@ -21,17 +21,21 @@ MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "p2KCokd08zRypMAZQxMbC4ImxkM
 
 engine = create_engine(DATABASE_URL)
 client = Mistral(api_key=MISTRAL_API_KEY)
-
+# --- CONFIGURACIÓN DE SEGURIDAD ADMIN ---
+ADMIN_PASSWORD = "18364982" # Cambia esto por uno real
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
 # --- INICIALIZACIÓN DE DB ---
+# Actualiza tu bloque de INICIALIZACIÓN DE BASE DE DATOS
 with engine.connect() as conn:
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS suscripciones (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE,
-            fecha_vencimiento TEXT
+            fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+            fecha_vencimiento TEXT,
+            plan TEXT DEFAULT 'Individual'
         )
     """))
     conn.commit()
@@ -61,12 +65,22 @@ def index():
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email', '').strip().lower()
-    session['user'] = email
+    
     with engine.connect() as conn:
-        conn.execute(text("INSERT OR IGNORE INTO suscripciones (email, fecha_vencimiento) VALUES (:e, '2026-12-31')"), {"e": email})
-        conn.commit()
-    return redirect(url_for('index'))
-
+        # Buscamos si el usuario existe y si su suscripción no ha vencido
+        query = text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e")
+        user = conn.execute(query, {"e": email}).fetchone()
+    
+    if user:
+        from datetime import datetime
+        fecha_vencimiento = datetime.strptime(user[0], '%Y-%m-%d')
+        if fecha_vencimiento >= datetime.now():
+            session['user'] = email
+            return redirect(url_for('index'))
+        else:
+            return "Su suscripción ha vencido. Por favor, contacte al administrador.", 403
+    
+    return "Acceso denegado. Email no registrado o sin suscripción activa.", 403
 @app.route('/upload', methods=['POST'])
 def upload():
     file = request.files.get('file')
@@ -200,7 +214,35 @@ def download_pdf():
     pdf.output(pdf_output)
     if os.path.exists(graph_path): os.remove(graph_path)
     return send_file(pdf_output, as_attachment=True)
+@app.route('/admin', methods=['GET', 'POST'])
+def admin_panel():
+    # Verificación de seguridad simple por parámetro o podrías usar un login más formal
+    auth_pass = request.args.get('pass')
+    if auth_pass != ADMIN_PASSWORD:
+        return "Acceso denegado. Contraseña administrativa incorrecta.", 403
 
+    if request.method == 'POST':
+        nuevo_email = request.form.get('email').strip().lower()
+        dias_acceso = int(request.form.get('dias', 1))
+        
+        # Calcular fecha de vencimiento
+        from datetime import datetime, timedelta
+        vencimiento = (datetime.now() + timedelta(days=dias_acceso)).strftime('%Y-%m-%d')
+        
+        with engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO suscripciones (email, fecha_vencimiento) 
+                VALUES (:e, :v)
+                ON CONFLICT(email) DO UPDATE SET fecha_vencimiento = :v
+            """), {"e": nuevo_email, "v": vencimiento})
+            conn.commit()
+        return redirect(url_for('admin_panel', pass=ADMIN_PASSWORD))
+
+    # Obtener lista de usuarios para mostrar en el panel
+    with engine.connect() as conn:
+        usuarios = conn.execute(text("SELECT * FROM suscripciones ORDER BY fecha_registro DESC")).fetchall()
+    
+    return render_template('admin.html', usuarios=usuarios, admin_pass=ADMIN_PASSWORD)
 if __name__ == '__main__':
     # Usar puerto 8000 para consistencia con Gunicorn
     app.run(host='0.0.0.0', port=8000)
