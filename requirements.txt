@@ -20,7 +20,7 @@ pandas>=2.2.2
 openpyxl
 sqlalchemy>=2.0.0
 pg8000
-fpdf
+fpdf2
 streamlit
 plotly
 streamlit
