@@ -3,12 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Pro Analyst | Dashboard</title>
+    <title>AI Pro Analyst | {% if login_mode %}Ingreso{% else %}Dashboard{% endif %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Estilos rápidos para el Login si no están en tu CSS */
+        .login-overlay {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f4f7f6;
+        }
+        .login-card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        .login-card i { font-size: 3rem; color: #1a5276; margin-bottom: 1rem; }
+        .login-card h2 { color: #2e4053; font-weight: 700; margin-bottom: 0.5rem; }
+        .login-card p { color: #7f8c8d; margin-bottom: 2rem; }
+    </style>
 </head>
 <body>
+
+    {% if login_mode %}
+    <div class="login-overlay">
+        <div class="login-card">
+            <i class="fas fa-chart-pie"></i>
+            <h2>AI Pro Analyst</h2>
+            <p>Introduce tu email para acceder a tus reportes estratégicos.</p>
+            
+            <form action="/login" method="POST">
+                <div class="mb-3">
+                    <input type="email" name="email" class="form-control form-control-lg" placeholder="correo@ejemplo.com" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100" style="background: #1a5276; border: none;">
+                    Iniciar Sesión
+                </button>
+            </form>
+
+            {% if error %}
+            <div class="alert alert-danger mt-3" role="alert">
+                {{ error }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% else %}
     <div class="app-container">
         <nav class="sidebar">
             <div class="brand">
@@ -24,9 +72,11 @@
                 <div id="fileStatus" class="file-status">No hay archivo activo</div>
             </div>
             <div class="actions mt-auto">
-                <a href="/download_pdf" class="btn-download w-100">
+                <p class="text-white-50 small mb-2 text-center"><i class="fas fa-user-circle"></i> {{ user }}</p>
+                <a href="/download_pdf" class="btn-download w-100 mb-2 text-decoration-none">
                     <i class="fas fa-file-pdf"></i> Generar Reporte
                 </a>
+                <a href="/logout" class="btn btn-sm btn-outline-light w-100 opacity-50">Cerrar Sesión</a>
             </div>
         </nav>
 
@@ -39,7 +89,7 @@
             <div id="chatBox" class="chat-box">
                 <div class="message ai">
                     <div class="bubble">
-                        Hola. Sube un archivo CSV o Excel y pregúntame lo que necesites analizar.
+                        Hola {{ user.split('@')[0]|capitalize }}. Sube un archivo CSV o Excel y pregúntame lo que necesites analizar.
                     </div>
                 </div>
             </div>
@@ -50,6 +100,7 @@
             </div>
         </main>
     </div>
+    {% endif %}
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>

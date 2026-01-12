@@ -60,8 +60,24 @@ class PDFReport(FPDF):
 # --- RUTAS ---
 @app.route('/')
 def index():
-    return render_template('index.html', login_mode='user' not in session, user=session.get('user'))
-
+    # Si el usuario NO está en la sesión, mostramos el login forzado
+    if 'user' not in session:
+        return render_template('index.html', login_mode=True)
+    
+    # Si ya está logueado, verificamos que su suscripción siga vigente (Seguridad Senior)
+    email = session['user']
+    with engine.connect() as conn:
+        user = conn.execute(text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
+    
+    if user:
+        from datetime import datetime
+        vencimiento = datetime.strptime(user[0], '%Y-%m-%d')
+        if vencimiento >= datetime.now():
+            return render_template('index.html', login_mode=False, user=email)
+    
+    # Si venció o no existe, borramos sesión y pedimos login
+    session.pop('user', None)
+    return render_template('index.html', login_mode=True, error="Acceso vencido o no autorizado")
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email', '').strip().lower()
@@ -243,6 +259,10 @@ def admin_panel():
         usuarios = conn.execute(text("SELECT * FROM suscripciones ORDER BY fecha_registro DESC")).fetchall()
     
     return render_template('admin.html', usuarios=usuarios, admin_pass=ADMIN_PASSWORD)
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('index'))
 if __name__ == '__main__':
     # Usar puerto 8000 para consistencia con Gunicorn
     app.run(host='0.0.0.0', port=8000)
