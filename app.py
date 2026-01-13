@@ -9,7 +9,7 @@ from werkzeug.utils import secure_filename
 from mistralai import Mistral
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
-
+from datetime import datetime, date
 app = Flask(__name__)
 # SENIOR: Priorizar variables de entorno para seguridad
 app.secret_key = os.environ.get("FLASK_SECRET", "analista_pro_2026_top_secret")
@@ -70,33 +70,29 @@ def index():
     if 'user' not in session:
         return render_template('index.html', login_mode=True)
     
-    email = session['user']
+    from datetime import datetime, date
+    
     with engine.connect() as conn:
-        user = conn.execute(text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e"), {"e": email}).fetchone()
-    
+        query = text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e")
+        result = conn.execute(query, {"e": session['user']})
+        user = result.fetchone()
+
     if user:
-        from datetime import datetime
-        # Convertimos la fecha de la DB a objeto datetime
-        vencimiento = datetime.strptime(user[0], '%Y-%m-%d').date()
-        hoy = datetime.now().date()
-        
-        # Calculamos la diferencia de días
-        delta = (vencimiento - hoy).days
-        
-        # LÓGICA DE GRACIA: 
-        # Si delta es 0: Vence hoy.
-        # Si delta es -1: Es el día de gracia (venció ayer).
-        # Si delta < -1: Ya no tiene acceso.
-        
-        if delta >= -1:
-            return render_template('index.html', 
-                                 login_mode=False, 
-                                 user=email, 
-                                 dias_restantes=delta)
+        venc_raw = user[0]
+        # VALIDACIÓN INTELIGENTE: Si es texto lo convierte, si es fecha lo usa directo
+        if isinstance(venc_raw, str):
+            vencimiento = datetime.strptime(venc_raw, '%Y-%m-%d').date()
+        elif isinstance(venc_raw, (datetime, date)):
+            vencimiento = venc_raw if isinstance(venc_raw, date) else venc_raw.date()
+        else:
+            vencimiento = date.today() # Por seguridad si algo falla
+            
+        hoy = date.today()
+        # Aquí aplicamos tu regla del banner de recordatorio el día 0
+        expirado = hoy > vencimiento
+        return render_template('index.html', login_mode=False, user=session['user'], expirado=expirado, vencimiento=vencimiento)
     
-    # Si no hay usuario o ya pasó el día de gracia
-    session.pop('user', None)
-    return render_template('index.html', login_mode=True, error="Tu suscripción y periodo de gracia han expirado.")
+    return redirect(url_for('login'))
 @app.route('/login', methods=['POST'])
 def login():
     # 1. Limpiamos el correo de espacios y lo pasamos a minúsculas
