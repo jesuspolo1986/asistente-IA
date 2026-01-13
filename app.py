@@ -261,26 +261,37 @@ def admin_panel():
         # Calculamos la fecha futura
         vencimiento = (datetime.now() + timedelta(days=dias)).strftime('%Y-%m-%d')
         
-        with engine.connect() as conn:
+        # Usamos engine.begin() para asegurar que Supabase guarde (Commit automático)
+        with engine.begin() as conn:
             conn.execute(text("""
-                INSERT INTO suscripciones (email, fecha_vencimiento) 
-                VALUES (:e, :v)
-                ON CONFLICT(email) DO UPDATE SET fecha_vencimiento = :v
+                INSERT INTO suscripciones (email, fecha_vencimiento, activo) 
+                VALUES (:e, :v, 1)
+                ON CONFLICT(email) DO UPDATE SET 
+                    fecha_vencimiento = EXCLUDED.fecha_vencimiento,
+                    activo = 1
             """), {"e": email_cliente, "v": vencimiento})
-            conn.commit()
-        # Redirigimos manteniendo la llave de acceso en la URL
+        
         return redirect(url_for('admin_panel', auth_key=ADMIN_PASSWORD))
 
+    # Lectura de datos optimizada para el HTML
     with engine.connect() as conn:
-        usuarios = conn.execute(text("SELECT * FROM suscripciones ORDER BY fecha_registro DESC")).fetchall()
+        result = conn.execute(text("SELECT id, email, fecha_registro, fecha_vencimiento, activo FROM suscripciones ORDER BY id DESC"))
+        # .mappings() permite que en el HTML uses u.email en lugar de u[1]
+        usuarios = result.mappings().all() 
     
     return render_template('admin.html', usuarios=usuarios, admin_pass=ADMIN_PASSWORD)
-
 @app.route('/logout')
 def logout():
     session.clear() # Limpia toda la sesión por seguridad
     return redirect(url_for('index'))
-
+@app.route('/admin/toggle/<int:user_id>')
+def toggle_user(user_id):
+    auth_key = request.args.get('auth_key')
+    if auth_key != ADMIN_PASSWORD: return "No autorizado", 403
+    
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE suscripciones SET activo = 1 - activo WHERE id = :id"), {"id": user_id})
+    return redirect(url_for('admin_panel', auth_key=ADMIN_PASSWORD))
 if __name__ == '__main__':
     # Puerto 8000 para Gunicorn / Koyeb
     app.run(host='0.0.0.0', port=8000)
