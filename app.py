@@ -92,28 +92,39 @@ def index():
     return render_template('index.html', login_mode=True, error="Tu suscripción y periodo de gracia han expirado.")
 @app.route('/login', methods=['POST'])
 def login():
-    email = request.form.get('email', '').strip().lower()
+    # 1. Limpiamos el correo de espacios y lo pasamos a minúsculas
+    email_ingresado = request.form.get('email', '').strip().lower()
     
     with engine.connect() as conn:
-        # Buscamos al usuario que tú ya diste de alta en el panel
-        query = text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e")
-        user = conn.execute(query, {"e": email}).fetchone()
+        # 2. Buscamos al usuario (usamos mappings para evitar errores de índice)
+        query = text("SELECT email, fecha_vencimiento, activo FROM suscripciones WHERE LOWER(email) = :e")
+        result = conn.execute(query, {"e": email_ingresado})
+        user = result.mappings().fetchone()
     
     if user:
-        from datetime import datetime
-        # user[0] es la fecha 'YYYY-MM-DD'
-        fecha_vencimiento = datetime.strptime(user[0], '%Y-%m-%d')
-        
-        # IMPORTANTE: Aplicamos el día de gracia (instrucción de tu proyecto)
-        # Si hoy es el día del vencimiento, mostramos banner. Si pasó un día, aún entra.
-        if fecha_vencimiento >= datetime.now():
-            session['user'] = email
-            return redirect(url_for('index'))
-        else:
-            return render_template('index.html', login_mode=True, error="Tu suscripción ha expirado.")
-    
-    # Si el correo no existe en la DB (porque no lo has creado en el admin)
-    return render_template('index.html', login_mode=True, error="Este correo no tiene acceso autorizado.")
+        # 3. Verificamos si está bloqueado manualmente
+        if user['activo'] == 0:
+            return render_template('index.html', login_mode=True, error="Cuenta suspendida.")
+
+        # 4. Verificación de fecha con margen de gracia
+        from datetime import datetime, timedelta
+        try:
+            # Convertimos la fecha de la DB (texto) a objeto date
+            hoy = datetime.now().date()
+            vencimiento_db = datetime.strptime(user['fecha_vencimiento'], '%Y-%m-%d').date()
+
+# Con el día de gracia (vencimiento + 1), el usuario debería entrar sin problema
+            if hoy <= (vencimiento_db + timedelta(days=1)):
+                session['user'] = user['email']
+                return redirect(url_for('index'))
+            else:
+                return render_template('index.html', login_mode=True, error="Suscripción expirada.")
+        except Exception as e:
+            print(f"Error procesando fecha: {e}")
+            return render_template('index.html', login_mode=True, error="Error en formato de fecha.")
+
+    # 5. Si no se encuentra el correo
+    return render_template('index.html', login_mode=True, error="Correo no autorizado.")
 @app.route('/upload', methods=['POST'])
 def upload():
     file = request.files.get('file')
