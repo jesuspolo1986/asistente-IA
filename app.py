@@ -210,6 +210,19 @@ def chat():
                 SET creditos_usados = COALESCE(creditos_usados, 0) + 1 
                 WHERE email = :e
             """), {"e": session['user']})
+        # ... (después de hacer el UPDATE en la base de datos) ...
+        
+        # 4. OBTENER EL NUEVO CONTEO PARA EL FRONTEND
+        with engine.connect() as conn:
+            res_actualizado = conn.execute(text("SELECT creditos_usados FROM suscripciones WHERE email = :e"), 
+                                           {"e": session['user']})
+            user_info = res_actualizado.mappings().fetchone()
+            nuevo_conteo = user_info['creditos_usados']
+
+        return jsonify({
+            "response": full_response,
+            "nuevo_conteo": nuevo_conteo  # <--- Enviamos el dato fresco
+        })
 
         # Guardar en sesión para el PDF
         session['ultima_pregunta'] = user_msg

@@ -1,11 +1,10 @@
 // --- UTILIDADES DE UI ---
 function appendMessage(text, sender) {
     const chatBox = document.getElementById('chatBox');
-    if (!chatBox) return; // Blindaje: Evita error si no estamos en el dashboard
+    if (!chatBox) return;
 
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${sender}`;
-    // Usamos innerText para seguridad o convertimos markdown simple
     msgDiv.innerHTML = `<div class="bubble">${text.replace(/\n/g, '<br>')}</div>`;
     
     chatBox.appendChild(msgDiv);
@@ -21,11 +20,9 @@ async function sendMessage() {
     const message = input.value.trim();
     if (!message) return;
 
-    // 1. Interfaz de usuario inmediata
     appendMessage(message, 'user');
     input.value = '';
 
-    // 2. Indicador de carga
     const typingDiv = document.createElement('div');
     typingDiv.className = 'message ai typing';
     typingDiv.innerHTML = `<div class="bubble"><i class="fas fa-spinner fa-spin"></i> Analizando datos...</div>`;
@@ -44,6 +41,24 @@ async function sendMessage() {
         
         if (data.response) {
             appendMessage(data.response, 'ai');
+            
+            // --- NUEVO: ACTUALIZACIÓN DINÁMICA DE CRÉDITOS ---
+            if (data.nuevo_conteo !== undefined) {
+                const creditElement = document.querySelector('.credits-value');
+                if (creditElement) {
+                    // Extraemos el total del texto actual (ejemplo: "1 / 5" extrae el "5")
+                    const currentText = creditElement.innerText;
+                    const total = currentText.split('/')[1] || '5'; 
+                    
+                    // Actualizamos el HTML manteniendo el icono
+                    creditElement.innerHTML = `<i class="fas fa-bolt text-warning me-1"></i> ${data.nuevo_conteo} / ${total.trim()}`;
+                    
+                    // Efecto visual de parpadeo para indicar actualización
+                    creditElement.style.transition = "color 0.3s";
+                    creditElement.style.color = "#f1c40f";
+                    setTimeout(() => { creditElement.style.color = "white"; }, 500);
+                }
+            }
         } else {
             appendMessage("El analista no pudo procesar la respuesta.", 'ai');
         }
@@ -54,7 +69,7 @@ async function sendMessage() {
     }
 }
 
-// --- EVENT LISTENERS (CON VERIFICACIÓN DE EXISTENCIA) ---
+// --- EVENT LISTENERS ---
 
 // 1. Subida de Archivos
 const fileInput = document.getElementById('fileInput');
@@ -92,7 +107,7 @@ const userInput = document.getElementById('userInput');
 if (userInput) {
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-            e.preventDefault(); // Evita saltos de línea innecesarios
+            e.preventDefault();
             sendMessage();
         }
     });
