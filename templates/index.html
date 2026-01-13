@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -29,6 +29,38 @@
         .login-card h2 { color: #2e4053; font-weight: 700; margin-bottom: 0.5rem; }
         .btn-login { background: #1a5276; border: none; padding: 12px; font-weight: 600; color: white; transition: 0.3s; }
         .btn-login:hover { background: #154360; transform: translateY(-2px); color: white; }
+
+        /* Estilos Nuevos: Créditos y WhatsApp */
+        .credits-counter {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .credits-label { font-size: 0.75rem; color: #aeb6bf; text-transform: uppercase; letter-spacing: 1px; }
+        .credits-value { font-size: 1.2rem; font-weight: 700; color: #fff; display: block; }
+
+        .btn-whatsapp {
+            background: #25d366;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: 0.3s;
+            width: 100%;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+        .btn-whatsapp:hover {
+            background: #128c7e;
+            transform: translateY(-2px);
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -64,6 +96,15 @@
                 <i class="fas fa-chart-pie"></i>
                 <span>AI Pro Analyst</span>
             </div>
+
+            <div class="credits-counter mx-3 text-center">
+                <span class="credits-label">Créditos Usados</span>
+                <span class="credits-value">
+                    <i class="fas fa-bolt text-warning"></i> 
+                    {{ creditos_usados if creditos_usados is defined else 0 }}
+                </span>
+            </div>
+
             <div class="upload-section">
                 <p class="section-title">Base de Datos</p>
                 <input type="file" id="fileInput" hidden>
@@ -72,47 +113,58 @@
                 </button>
                 <div id="fileStatus" class="file-status">No hay archivo activo</div>
             </div>
+
             <div class="actions mt-auto">
+                <a href="https://wa.me/584128598727?text=Hola,%20adjunto%20mi%20comprobante%20de%20pago%20para%20AI%20Pro%20Analyst" 
+                   target="_blank" class="btn-whatsapp">
+                    <i class="fab fa-whatsapp me-2 fs-5"></i> Enviar Pago
+                </a>
+
                 <div class="user-info mb-3 text-center">
                     <small class="text-white-50"><i class="fas fa-user-shield"></i> {{ user }}</small>
                 </div>
+                
                 <a href="/download_pdf" class="btn-download w-100 mb-2 text-decoration-none d-flex align-items-center justify-content-center">
                     <i class="fas fa-file-pdf me-2"></i> Generar Reporte
                 </a>
                 <a href="/logout" class="btn btn-sm btn-outline-light w-100 opacity-50">Cerrar Sesión</a>
             </div>
         </nav>
-        {% if dias_restantes is defined %}
-    {% if dias_restantes == 0 %}
-    <div class="alert alert-warning alert-dismissible fade show m-3" role="alert">
-        <strong>⚠️ Recordatorio:</strong> Tu acceso expira hoy. Mañana será tu último día de gracia.
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    {% elif dias_restantes < 0 %}
-    <div class="alert alert-danger m-3" role="alert">
-        <strong>⚡ Día de Gracia:</strong> Tu suscripción expiró ayer. Por favor, contacta al administrador para renovar.
-    </div>
-    {% endif %}
-{% endif %}
-        <main class="chat-area">
-            <header class="chat-header">
-                <h2>Análisis Estratégico</h2>
-                <span class="status-badge"><i class="fas fa-robot"></i> Mistral-Small Online</span>
-            </header>
 
-            <div id="chatBox" class="chat-box">
-                <div class="message ai">
-                    <div class="bubble">
-                        Hola {{ user.split('@')[0]|capitalize }}. Sube un archivo CSV o Excel para comenzar el análisis.
+        <div class="main-content">
+            {% if dias_restantes is defined %}
+                {% if dias_restantes == 0 %}
+                <div class="alert alert-warning alert-dismissible fade show m-3" role="alert">
+                    <strong>⚠️ Recordatorio:</strong> Tu acceso expira hoy. Mañana será tu último día de gracia.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% elif dias_restantes < 0 %}
+                <div class="alert alert-danger m-3" role="alert">
+                    <strong>⚡ Día de Gracia:</strong> Tu suscripción expiró ayer. Por favor, contacta al administrador para renovar.
+                </div>
+                {% endif %}
+            {% endif %}
+
+            <main class="chat-area">
+                <header class="chat-header">
+                    <h2>Análisis Estratégico</h2>
+                    <span class="status-badge"><i class="fas fa-robot"></i> Mistral-Small Online</span>
+                </header>
+
+                <div id="chatBox" class="chat-box">
+                    <div class="message ai">
+                        <div class="bubble">
+                            Hola {{ user.split('@')[0]|capitalize if user else 'Usuario' }}. Sube un archivo CSV o Excel para comenzar el análisis.
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="input-container">
-                <input type="text" id="userInput" placeholder="Escribe tu consulta analítica aquí..." autocomplete="off">
-                <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
-            </div>
-        </main>
+                <div class="input-container">
+                    <input type="text" id="userInput" placeholder="Escribe tu consulta analítica aquí..." autocomplete="off">
+                    <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </main>
+        </div>
     </div>
     {% endif %}
 
