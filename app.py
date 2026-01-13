@@ -221,6 +221,7 @@ def chat():
     except Exception as e:
         print(f"Error en chat: {e}")
         return jsonify({"response": f"Error en el análisis: {str(e)}"})@app.route('/download_pdf')
+@app.route('/download_pdf')
 def download_pdf():
     filename = session.get('last_file')
     pregunta = session.get('ultima_pregunta', 'Análisis General')
