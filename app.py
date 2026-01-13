@@ -70,29 +70,35 @@ def index():
     if 'user' not in session:
         return render_template('index.html', login_mode=True)
     
-    from datetime import datetime, date
-    
     with engine.connect() as conn:
-        query = text("SELECT fecha_vencimiento FROM suscripciones WHERE email = :e")
+        # CONSULTA CLAVE: Traemos la fecha y los créditos actualizados
+        query = text("SELECT fecha_vencimiento, creditos_usados FROM suscripciones WHERE email = :e")
         result = conn.execute(query, {"e": session['user']})
-        user = result.fetchone()
+        user_data = result.mappings().fetchone()
 
-    if user:
-        venc_raw = user[0]
-        # VALIDACIÓN INTELIGENTE: Si es texto lo convierte, si es fecha lo usa directo
+    if user_data:
+        venc_raw = user_data['fecha_vencimiento']
+        # Si por alguna razón la DB devuelve None, ponemos 0 por defecto
+        creditos = user_data['creditos_usados'] if user_data['creditos_usados'] is not None else 0
+        
+        # Validación de fecha para el banner
         if isinstance(venc_raw, str):
             vencimiento = datetime.strptime(venc_raw, '%Y-%m-%d').date()
-        elif isinstance(venc_raw, (datetime, date)):
-            vencimiento = venc_raw if isinstance(venc_raw, date) else venc_raw.date()
         else:
-            vencimiento = date.today() # Por seguridad si algo falla
+            vencimiento = venc_raw
             
         hoy = date.today()
-        # Aquí aplicamos tu regla del banner de recordatorio el día 0
-        expirado = hoy > vencimiento
-        return render_template('index.html', login_mode=False, user=session['user'], expirado=expirado, vencimiento=vencimiento)
+        dias_restantes = (vencimiento - hoy).days
+
+        # PASAMOS creditos_usados AL HTML
+        return render_template('index.html', 
+                               login_mode=False, 
+                               user=session['user'], 
+                               creditos_usados=creditos,
+                               dias_restantes=dias_restantes)
     
-    return redirect(url_for('login'))
+    # Si el usuario no existe en la tabla (raro), lo sacamos
+    return redirect(url_for('logout'))
 @app.route('/login', methods=['POST'])
 def login():
     # 1. Limpiamos el correo de espacios y lo pasamos a minúsculas
@@ -171,7 +177,6 @@ def chat():
         if any(w in msg_lower for w in ["pastel", "pie", "dona", "participación"]): tipo_grafico = "pie"
         elif any(w in msg_lower for w in ["linea", "evolucion", "tendencia"]): tipo_grafico = "line"
 
-        # SENIOR: Prompt blindado para evitar código en el PDF
         prompt_sistema = (
             f"Eres un Director de Consultoría Estratégica. Analizando: {filename}.\n"
             f"Estructura de datos: {list(df.columns)}.\n"
@@ -187,6 +192,16 @@ def chat():
         )
         
         full_response = response.choices[0].message.content
+
+        # --- NUEVO: ACTUALIZACIÓN DE CRÉDITOS EN SUPABASE ---
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE suscripciones 
+                SET creditos_usados = COALESCE(creditos_usados, 0) + 1 
+                WHERE email = :e
+            """), {"e": session['user']})
+        # ---------------------------------------------------
+
         session['ultima_pregunta'] = user_msg
         session['ultima_respuesta_ia'] = full_response
         session['tipo_grafico'] = tipo_grafico
@@ -194,7 +209,6 @@ def chat():
         return jsonify({"response": full_response})
     except Exception as e:
         return jsonify({"response": f"Error en el análisis: {str(e)}"})
-
 @app.route('/download_pdf')
 def download_pdf():
     filename = session.get('last_file')
