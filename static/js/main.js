@@ -42,36 +42,29 @@ async function sendMessage() {
         if (data.response) {
             appendMessage(data.response, 'ai');
             
-            // --- NUEVO: ACTUALIZACIÓN DINÁMICA DE CRÉDITOS ---
+            // ACTUALIZACIÓN DINÁMICA DE CRÉDITOS
             if (data.nuevo_conteo !== undefined) {
                 const creditElement = document.querySelector('.credits-value');
                 if (creditElement) {
-                    // Extraemos el total del texto actual (ejemplo: "1 / 5" extrae el "5")
                     const currentText = creditElement.innerText;
                     const total = currentText.split('/')[1] || '5'; 
-                    
-                    // Actualizamos el HTML manteniendo el icono
                     creditElement.innerHTML = `<i class="fas fa-bolt text-warning me-1"></i> ${data.nuevo_conteo} / ${total.trim()}`;
                     
-                    // Efecto visual de parpadeo para indicar actualización
-                    creditElement.style.transition = "color 0.3s";
+                    // Efecto de feedback visual
                     creditElement.style.color = "#f1c40f";
                     setTimeout(() => { creditElement.style.color = "white"; }, 500);
                 }
             }
-        } else {
-            appendMessage("El analista no pudo procesar la respuesta.", 'ai');
         }
     } catch (error) {
         if (chatBox.contains(typingDiv)) chatBox.removeChild(typingDiv);
         appendMessage("Error de conexión con el servidor.", 'ai');
-        console.error("Chat Error:", error);
     }
 }
 
 // --- EVENT LISTENERS ---
 
-// 1. Subida de Archivos
+// Subida de Archivos con Manejo de Errores (Créditos)
 const fileInput = document.getElementById('fileInput');
 if (fileInput) {
     fileInput.addEventListener('change', async (e) => {
@@ -89,20 +82,25 @@ if (fileInput) {
                 method: 'POST',
                 body: formData
             });
+            
             const data = await response.json();
             
-            if (data.success) {
+            if (response.ok && data.success) {
                 if (statusLabel) statusLabel.innerHTML = `<i class="fas fa-check-circle text-success"></i> ${file.name}`;
                 appendMessage(`✅ **${file.name}** cargado. ¿Qué insight deseas extraer?`, 'ai');
+            } else {
+                // AQUÍ CAPTURAMOS EL ERROR DE CRÉDITOS AGOTADOS
+                if (statusLabel) statusLabel.innerHTML = `<i class="fas fa-exclamation-triangle text-danger"></i> Error`;
+                appendMessage(`❌ ${data.message || data.error || "No se pudo subir el archivo"}`, 'ai');
             }
         } catch (error) {
-            if (statusLabel) statusLabel.innerText = "Error al subir";
+            if (statusLabel) statusLabel.innerText = "Error de conexión";
             console.error("Upload Error:", error);
         }
     });
 }
 
-// 2. Tecla Enter
+// Tecla Enter
 const userInput = document.getElementById('userInput');
 if (userInput) {
     userInput.addEventListener('keypress', (e) => {

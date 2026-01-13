@@ -8,6 +8,8 @@ from sqlalchemy import create_engine, text
 from werkzeug.utils import secure_filename
 from mistralai import Mistral
 from fpdf import FPDF
+import io
+from werkzeug.utils import secure_filename
 from fpdf.enums import XPos, YPos
 from datetime import datetime, date
 app = Flask(__name__)
@@ -139,21 +141,77 @@ def login():
 
     # 5. Si no se encuentra el correo
     return render_template('index.html', login_mode=True, error="Correo no autorizado.")
+
 @app.route('/upload', methods=['POST'])
 def upload():
+    if 'user' not in session:
+        return jsonify({"error": "Sesión no iniciada"}), 401
+
+    # 1. VALIDACIÓN DE SALDO EN SUPABASE
+    user_email = session['user']
+    try:
+        user_data = supabase.table("usuarios").select("creditos_totales, creditos_usados").eq("email", user_email).single().execute()
+        
+        if user_data.data:
+            if user_data.data['creditos_usados'] >= user_data.data['creditos_totales']:
+                return jsonify({
+                    "error": "Créditos agotados", 
+                    "message": "Has alcanzado el límite de tu plan. Por favor, recarga para continuar."
+                }), 403
+    except Exception as e:
+        print(f"Error consultando créditos: {e}")
+        # Si hay error en DB, por seguridad permitimos o bloqueamos según prefieras
+
+    # 2. RECEPCIÓN DEL ARCHIVO
     file = request.files.get('file')
-    if not file: return jsonify({"error": "No hay archivo"}), 400
+    if not file: 
+        return jsonify({"error": "No hay archivo"}), 400
+    
     filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
-    session['last_file'] = filename
-    return jsonify({"success": True, "filename": filename})
+    
+    # 3. PROCESAMIENTO INTELIGENTE (Sin guardar en disco necesariamente)
+    try:
+        # Leemos el archivo a memoria (Stream) para no saturar el disco de Koyeb
+        stream = io.BytesIO(file.read())
+        if filename.endswith('.csv'):
+            df = pd.read_csv(stream)
+        else:
+            df = pd.read_excel(stream)
+
+        # Extraemos el resumen estructural (El "ADN" de los datos)
+        resumen = {
+            "columnas": df.columns.tolist(),
+            "tipos": df.dtypes.astype(str).to_dict(),
+            "muestras": df.head(5).to_dict(orient='records'), # 5 filas de ejemplo
+            "total_filas": len(df),
+            "resumen_numerico": df.describe().to_dict() # Conteo, media, max, min de columnas numéricas
+        }
+
+        # Guardamos en sesión el resumen y el nombre
+        session['resumen_datos'] = resumen
+        session['last_file'] = filename
+        
+        # Opcional: Si aún quieres guardar el archivo físicamente
+        # file.seek(0) # Resetear puntero
+        # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+        return jsonify({
+            "success": True, 
+            "filename": filename, 
+            "message": "Archivo analizado y listo para consultas"
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"No se pudo procesar el archivo: {str(e)}"}), 500
 
 @app.route('/chat', methods=['POST'])
 def chat():
     user_msg = request.json.get('message', '')
     filename = session.get('last_file')
-    if not filename: return jsonify({"response": "Por favor, sube un archivo primero."})
+    resumen = session.get('resumen_datos') # <--- Obtenemos el resumen ligero
+    
+    if not filename or not resumen: 
+        return jsonify({"response": "Por favor, sube un archivo primero."})
     
     try:
         # 1. VALIDACIÓN PREVENTIVA DE CRÉDITOS
@@ -171,29 +229,26 @@ def chat():
             
             if usados >= totales:
                 return jsonify({
-                    "response": f"⚠️ Has agotado tus créditos ({usados}/{totales}). Por favor, contacta al administrador para renovar tu suscripción."
+                    "response": f"⚠️ Has agotado tus créditos ({usados}/{totales}). Por favor, contacta al administrador."
                 })
 
-        # 2. PROCESAMIENTO DE DATOS (Tu lógica actual)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
-        
+        # 2. PROCESAMIENTO USANDO EL RESUMEN (Sin leer el archivo de nuevo)
         msg_lower = user_msg.lower()
-        resumen_temporal = ""
-        if 'Fecha' in df.columns and any(w in msg_lower for w in ["día", "fecha", "evolución"]):
-            df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce').dt.strftime('%Y-%m-%d')
-            v_max = df.groupby('Fecha')['Total'].sum().idxmax()
-            resumen_temporal = f"Contexto histórico: El pico de ingresos fue el {v_max}."
-
+        
+        # Detectamos el tipo de gráfico para el reporte PDF
         tipo_grafico = "bar"
         if any(w in msg_lower for w in ["pastel", "pie", "dona", "participación"]): tipo_grafico = "pie"
         elif any(w in msg_lower for w in ["linea", "evolucion", "tendencia"]): tipo_grafico = "line"
 
+        # Construimos el prompt usando los datos del resumen
         prompt_sistema = (
-            f"Eres un Director de Consultoría Estratégica. Analizando: {filename}.\n"
-            f"Estructura de datos: {list(df.columns)}.\n"
-            f"Muestra: {df.head(3).to_dict()}.\n{resumen_temporal}\n"
-            "REGLA DE ORO: Responde solo con INSIGHTS DE NEGOCIO. PROHIBIDO incluir código Python o explicaciones técnicas."
+            f"Eres un Director de Consultoría Estratégica. Analizando el archivo: {filename}.\n"
+            f"Estructura de columnas: {resumen['columnas']}.\n"
+            f"Tipos de datos: {resumen['tipos']}.\n"
+            f"Muestra representativa de los datos: {resumen['muestras']}.\n"
+            f"Total de registros analizados: {resumen['total_filas']}.\n"
+            "REGLA DE ORO: Responde solo con INSIGHTS DE NEGOCIO de alto nivel. "
+            "PROHIBIDO incluir código Python o explicaciones técnicas."
         )
 
         # 3. LLAMADA A LA IA
@@ -203,37 +258,35 @@ def chat():
         )
         full_response = response.choices[0].message.content
 
-        # 4. ACTUALIZACIÓN DE CRÉDITOS (Solo si la IA respondió con éxito)
+        # 4. ACTUALIZACIÓN DE CRÉDITOS
         with engine.begin() as conn:
             conn.execute(text("""
                 UPDATE suscripciones 
                 SET creditos_usados = COALESCE(creditos_usados, 0) + 1 
                 WHERE email = :e
             """), {"e": session['user']})
-        # ... (después de hacer el UPDATE en la base de datos) ...
         
-        # 4. OBTENER EL NUEVO CONTEO PARA EL FRONTEND
+        # Obtener el nuevo conteo para actualizar el frontend
         with engine.connect() as conn:
             res_actualizado = conn.execute(text("SELECT creditos_usados FROM suscripciones WHERE email = :e"), 
                                            {"e": session['user']})
             user_info = res_actualizado.mappings().fetchone()
             nuevo_conteo = user_info['creditos_usados']
 
-        return jsonify({
-            "response": full_response,
-            "nuevo_conteo": nuevo_conteo  # <--- Enviamos el dato fresco
-        })
-
-        # Guardar en sesión para el PDF
+        # 5. GUARDAR EN SESIÓN PARA EL REPORTE PDF
         session['ultima_pregunta'] = user_msg
         session['ultima_respuesta_ia'] = full_response
         session['tipo_grafico'] = tipo_grafico
-        
-        return jsonify({"response": full_response})
+        session.modified = True # Asegura que Flask guarde los cambios
+
+        return jsonify({
+            "response": full_response,
+            "nuevo_conteo": nuevo_conteo
+        })
 
     except Exception as e:
         print(f"Error en chat: {e}")
-        return jsonify({"response": f"Error en el análisis: {str(e)}"})@app.route('/download_pdf')
+        return jsonify({"response": f"Error en el análisis: {str(e)}"})
 @app.route('/download_pdf')
 def download_pdf():
     filename = session.get('last_file')
