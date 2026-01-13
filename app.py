@@ -16,7 +16,13 @@ app.secret_key = os.environ.get("FLASK_SECRET", "analista_pro_2026_top_secret")
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # --- CONFIGURACIÓN DE SERVICIOS ---
-DATABASE_URL = "sqlite:///local_analista.db"
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    DATABASE_URL = "postgresql://postgres:aSxRZ3rVrMu2Oasu@db.kebpamfydhnxeaeegulx.supabase.co:6543/postgres"
+
+# 3. Corrección técnica para SQLAlchemy + Postgres
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "p2KCokd08zRypMAZQxMbC4ImxkM5DPK1")
 
 engine = create_engine(DATABASE_URL)
