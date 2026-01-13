@@ -8,9 +8,53 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        /* --- AJUSTES DE ESPACIO Y BOTONES --- */
-        
-        /* Botones más pequeños y profesionales */
+        /* --- ESTRUCTURA FIJA (LO NUEVO) --- */
+        html, body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden; /* Evita scroll en toda la pantalla */
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Contiene el chat y el input */
+        }
+
+        /* ÁREA DE CHAT CON SCROLL PROPIO */
+        .chat-box {
+            flex: 1;
+            overflow-y: auto; /* Activa el scroll solo aquí */
+            padding: 30px 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background: #f8f9fa;
+        }
+
+        /* BARRA DE PREGUNTAS SIEMPRE ABAJO */
+        .input-container {
+            background: white;
+            border-top: 1px solid #eee;
+            flex-shrink: 0; /* No permite que se encoja */
+        }
+
+        /* --- TUS AJUSTES DE BOTONES Y ESTILO (MANTENIDOS) --- */
         .btn-upload, .btn-download, .btn-whatsapp, .btn-outline-light {
             padding: 8px 12px !important;
             font-size: 0.85rem !important;
@@ -19,32 +63,22 @@
             font-weight: 500 !important;
         }
 
-        /* Sidebar optimizada */
         .sidebar {
             width: 260px;
             padding: 1.5rem 1rem;
-        }
-
-        /* ÁREA DE CHAT: Más espacio para respuestas */
-        .chat-box {
-            flex: 1;
-            padding: 30px 40px; /* Más aire a los lados */
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            background: #f8f9fa;
+            flex-shrink: 0; /* Evita que la sidebar se achique */
         }
 
         .message.ai .bubble {
-            max-width: 90%; /* Respuesta más ancha */
+            max-width: 90%;
             padding: 20px 25px;
-            line-height: 1.7; /* Texto más legible */
+            line-height: 1.7;
             font-size: 1rem;
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
             border-radius: 2px 20px 20px 20px;
+            background: white;
         }
 
-        /* Contador de créditos estilizado */
         .credits-counter {
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.15);
@@ -52,24 +86,16 @@
             padding: 12px 5px;
             margin-bottom: 20px;
         }
-        .credits-label { 
-            font-size: 0.65rem; 
-            color: #bdc3c7; 
-            text-transform: uppercase; 
-            letter-spacing: 1px;
-            display: block;
-            margin-bottom: 4px;
-        }
-        .credits-value { 
-            font-size: 1.1rem; 
-            font-weight: 700; 
-            color: #ffffff; 
-        }
+        .credits-label { font-size: 0.65rem; color: #bdc3c7; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px; }
+        .credits-value { font-size: 1.1rem; font-weight: 700; color: #ffffff; }
 
-        /* Login Card */
         .login-overlay { height: 100vh; display: flex; align-items: center; justify-content: center; background: #f4f7f6; width: 100%; }
         .login-card { background: white; padding: 2.5rem; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 400px; width: 90%; text-align: center; }
         .btn-login { background: #1a5276; color: white; border: none; padding: 12px; font-weight: 600; }
+        
+        /* Scrollbar estética */
+        .chat-box::-webkit-scrollbar { width: 6px; }
+        .chat-box::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -145,7 +171,7 @@
             {% endif %}
 
             <main class="chat-area">
-                <header class="chat-header px-4">
+                <header class="chat-header px-4 py-3 border-bottom bg-white">
                     <div>
                         <h4 class="mb-0">Panel de Inteligencia</h4>
                         <small class="text-success"><i class="fas fa-circle fa-xs"></i> Sistema Activo</small>
@@ -161,8 +187,8 @@
                 </div>
 
                 <div class="input-container p-3">
-                    <div class="input-group shadow-sm" style="border-radius: 15px; overflow: hidden;">
-                        <input type="text" id="userInput" class="form-control border-0 py-3 px-4" placeholder="¿Qué insights deseas obtener hoy?">
+                    <div class="input-group shadow-sm" style="border-radius: 15px; overflow: hidden; background: #f1f3f4;">
+                        <input type="text" id="userInput" class="form-control border-0 py-3 px-4" placeholder="¿Qué insights deseas obtener hoy?" style="background: transparent;">
                         <button class="btn btn-primary px-4" onclick="sendMessage()">
                             <i class="fas fa-paper-plane"></i>
                         </button>
