@@ -35,16 +35,17 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 # --- INICIALIZACIÓN DE DB ---
 # Actualiza tu bloque de INICIALIZACIÓN DE BASE DE DATOS
 with engine.connect() as conn:
+    # Cambia tu código actual por este:
     conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS suscripciones (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE,
-            fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
-            fecha_vencimiento TEXT,
-            plan TEXT DEFAULT 'Individual'
-        )
+       CREATE TABLE IF NOT EXISTS suscripciones (
+        id SERIAL PRIMARY KEY,
+        email TEXT UNIQUE,
+        fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        fecha_vencimiento TEXT,
+        plan TEXT DEFAULT 'Individual',
+        activo INTEGER DEFAULT 1
+       )
     """))
-    conn.commit()
 
 # --- UTILIDADES ---
 def limpiar_texto_pdf(texto):
