@@ -71,33 +71,27 @@ def index():
         return render_template('index.html', login_mode=True)
     
     with engine.connect() as conn:
-        # CONSULTA CLAVE: Traemos la fecha y los créditos actualizados
-        query = text("SELECT fecha_vencimiento, creditos_usados FROM suscripciones WHERE email = :e")
+        query = text("SELECT fecha_vencimiento, creditos_usados, creditos_totales FROM suscripciones WHERE email = :e")
         result = conn.execute(query, {"e": session['user']})
         user_data = result.mappings().fetchone()
 
     if user_data:
-        venc_raw = user_data['fecha_vencimiento']
-        # Si por alguna razón la DB devuelve None, ponemos 0 por defecto
-        creditos = user_data['creditos_usados'] if user_data['creditos_usados'] is not None else 0
+        # Extraer datos con valores por defecto por seguridad
+        vencimiento = user_data['fecha_vencimiento']
+        usados = user_data['creditos_usados'] if user_data['creditos_usados'] is not None else 0
+        totales = user_data['creditos_totales'] if user_data['creditos_totales'] is not None else 5
         
-        # Validación de fecha para el banner
-        if isinstance(venc_raw, str):
-            vencimiento = datetime.strptime(venc_raw, '%Y-%m-%d').date()
-        else:
-            vencimiento = venc_raw
+        if isinstance(vencimiento, str):
+            vencimiento = datetime.strptime(vencimiento, '%Y-%m-%d').date()
             
-        hoy = date.today()
-        dias_restantes = (vencimiento - hoy).days
+        dias_restantes = (vencimiento - date.today()).days
 
-        # PASAMOS creditos_usados AL HTML
         return render_template('index.html', 
                                login_mode=False, 
                                user=session['user'], 
-                               creditos_usados=creditos,
+                               creditos_usados=usados,
+                               creditos_totales=totales,
                                dias_restantes=dias_restantes)
-    
-    # Si el usuario no existe en la tabla (raro), lo sacamos
     return redirect(url_for('logout'))
 @app.route('/login', methods=['POST'])
 def login():
@@ -162,10 +156,28 @@ def chat():
     if not filename: return jsonify({"response": "Por favor, sube un archivo primero."})
     
     try:
+        # 1. VALIDACIÓN PREVENTIVA DE CRÉDITOS
+        with engine.connect() as conn:
+            res = conn.execute(text("""
+                SELECT creditos_usados, creditos_totales 
+                FROM suscripciones 
+                WHERE email = :e
+            """), {"e": session['user']})
+            user_db = res.mappings().fetchone()
+        
+        if user_db:
+            usados = user_db['creditos_usados'] if user_db['creditos_usados'] is not None else 0
+            totales = user_db['creditos_totales'] if user_db['creditos_totales'] is not None else 5
+            
+            if usados >= totales:
+                return jsonify({
+                    "response": f"⚠️ Has agotado tus créditos ({usados}/{totales}). Por favor, contacta al administrador para renovar tu suscripción."
+                })
+
+        # 2. PROCESAMIENTO DE DATOS (Tu lógica actual)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
         
-        # Lógica de detección de gráfico y fechas
         msg_lower = user_msg.lower()
         resumen_temporal = ""
         if 'Fecha' in df.columns and any(w in msg_lower for w in ["día", "fecha", "evolución"]):
@@ -181,35 +193,34 @@ def chat():
             f"Eres un Director de Consultoría Estratégica. Analizando: {filename}.\n"
             f"Estructura de datos: {list(df.columns)}.\n"
             f"Muestra: {df.head(3).to_dict()}.\n{resumen_temporal}\n"
-            "REGLA DE ORO: Responde solo con INSIGHTS DE NEGOCIO. "
-            "PROHIBIDO incluir código Python, bloques de Pandas o explicaciones técnicas. "
-            "Usa un tono ejecutivo, enfocado en rentabilidad y porcentajes."
+            "REGLA DE ORO: Responde solo con INSIGHTS DE NEGOCIO. PROHIBIDO incluir código Python o explicaciones técnicas."
         )
 
+        # 3. LLAMADA A LA IA
         response = client.chat.complete(
             model="mistral-small",
             messages=[{"role": "system", "content": prompt_sistema}, {"role": "user", "content": user_msg}]
         )
-        
         full_response = response.choices[0].message.content
 
-        # --- NUEVO: ACTUALIZACIÓN DE CRÉDITOS EN SUPABASE ---
+        # 4. ACTUALIZACIÓN DE CRÉDITOS (Solo si la IA respondió con éxito)
         with engine.begin() as conn:
             conn.execute(text("""
                 UPDATE suscripciones 
                 SET creditos_usados = COALESCE(creditos_usados, 0) + 1 
                 WHERE email = :e
             """), {"e": session['user']})
-        # ---------------------------------------------------
 
+        # Guardar en sesión para el PDF
         session['ultima_pregunta'] = user_msg
         session['ultima_respuesta_ia'] = full_response
         session['tipo_grafico'] = tipo_grafico
         
         return jsonify({"response": full_response})
+
     except Exception as e:
-        return jsonify({"response": f"Error en el análisis: {str(e)}"})
-@app.route('/download_pdf')
+        print(f"Error en chat: {e}")
+        return jsonify({"response": f"Error en el análisis: {str(e)}"})@app.route('/download_pdf')
 def download_pdf():
     filename = session.get('last_file')
     pregunta = session.get('ultima_pregunta', 'Análisis General')
