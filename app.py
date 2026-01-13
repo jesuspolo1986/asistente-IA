@@ -103,7 +103,7 @@ def login():
     email_ingresado = request.form.get('email', '').strip().lower()
     
     with engine.connect() as conn:
-        # 2. Buscamos al usuario (usamos mappings para evitar errores de índice)
+        # 2. Buscamos al usuario
         query = text("SELECT email, fecha_vencimiento, activo FROM suscripciones WHERE LOWER(email) = :e")
         result = conn.execute(query, {"e": email_ingresado})
         user = result.mappings().fetchone()
@@ -114,21 +114,32 @@ def login():
             return render_template('index.html', login_mode=True, error="Cuenta suspendida.")
 
         # 4. Verificación de fecha con margen de gracia
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, date
         try:
-            # Convertimos la fecha de la DB (texto) a objeto date
             hoy = datetime.now().date()
-            vencimiento_db = datetime.strptime(user['fecha_vencimiento'], '%Y-%m-%d').date()
+            venc_raw = user['fecha_vencimiento']
 
-# Con el día de gracia (vencimiento + 1), el usuario debería entrar sin problema
+            # --- VALIDACIÓN INTELIGENTE DE FECHA ---
+            if isinstance(venc_raw, str):
+                # Si es texto (viejos datos o SQLite), convertir
+                vencimiento_db = datetime.strptime(venc_raw, '%Y-%m-%d').date()
+            elif isinstance(venc_raw, (datetime, date)):
+                # Si es objeto (Supabase/Postgres), usar directamente
+                vencimiento_db = venc_raw if isinstance(venc_raw, date) else venc_raw.date()
+            else:
+                raise ValueError("Formato de fecha no reconocido")
+            # ---------------------------------------
+
+            # Aplicamos el margen de gracia (vencimiento + 1 día)
             if hoy <= (vencimiento_db + timedelta(days=1)):
                 session['user'] = user['email']
                 return redirect(url_for('index'))
             else:
                 return render_template('index.html', login_mode=True, error="Suscripción expirada.")
+                
         except Exception as e:
             print(f"Error procesando fecha: {e}")
-            return render_template('index.html', login_mode=True, error="Error en formato de fecha.")
+            return render_template('index.html', login_mode=True, error="Error técnico con la fecha.")
 
     # 5. Si no se encuentra el correo
     return render_template('index.html', login_mode=True, error="Correo no autorizado.")
