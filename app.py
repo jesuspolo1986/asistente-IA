@@ -1,5 +1,5 @@
 import os
-from supabase import create_client, Client
+
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg')  # Necesario para entornos de servidor (Koyeb/Heroku)
@@ -215,51 +215,59 @@ def chat():
     if not filename or not resumen: 
         return jsonify({"response": "Por favor, sube un archivo primero."})
     
-    user_email = session['user']
+    user_email = session.get('user')
+    if not user_email:
+        return jsonify({"response": "Sesión expirada. Por favor, inicia sesión de nuevo."})
 
     try:
-        # 1. DEFINICIÓN DEL PROMPT BASE (Evita el UnboundLocalError)
+        # 1. DEFINICIÓN DEL PROMPT BASE
         prompt_sistema = (
             f"Eres un Director de Consultoría Estratégica. Analizando el archivo: {filename}.\n"
             f"Estructura de columnas: {resumen['columnas']}.\n"
             f"Muestra de datos: {resumen['muestras']}.\n\n"
             "INSTRUCCIONES CRÍTICAS:\n"
-            "1. Analiza tendencias: no solo menciones caídas, identifica recuperaciones o 'rebotes'.\n"
-            "2. Usa los KPIs reales que se te proporcionan a continuación.\n"
-            "3. Responde con insights de negocio, PROHIBIDO incluir código o tecnicismos.\n"
+            "1. Analiza tendencias: identifica recuperaciones o 'rebotes' después de caídas.\n"
+            "2. Usa los KPIs reales que se te proporcionan abajo.\n"
+            "3. Responde con insights de negocio claros, sin código.\n"
         )
 
-        # 2. CÁLCULO E INYECCIÓN DE KPIs REALES (Python ayuda a la IA)
-        if 'Total' in resumen['columnas'] and 'Cantidad' in resumen['columnas']:
-            # Extraemos del resumen numérico generado en el upload
-            res_num = resumen.get('resumen_numerico', {})
-            # Intentamos sacar la suma de la columna 'Total' y 'Cantidad'
-            # Nota: Asegúrate que en el upload usaste df.describe().to_dict() o calculaste las sumas
+        # 2. INYECCIÓN DE KPIs (Desde el resumen guardado en sesión)
+        res_num = resumen.get('resumen_numerico', {})
+        if 'Total' in res_num and 'Cantidad' in res_num:
+            # Calculamos promedios basados en el resumen de describe()
             try:
-                # Si guardaste el sum() en el upload, úsalo. Si no, lo estimamos del resumen:
-                total_gen = res_num.get('Total', {}).get('mean', 0) * resumen.get('total_filas', 1)
-                cant_gen = res_num.get('Cantidad', {}).get('mean', 1) * resumen.get('total_filas', 1)
-                
-                if cant_gen > 0:
-                    ticket_promedio = total_gen / cant_gen
-                    prompt_sistema += f"\nDATOS REALES CALCULADOS: El ticket promedio global es ${ticket_promedio:,.2f}.\n"
-            except:
-                pass
+                total_est = res_num['Total'].get('mean', 0) * resumen.get('total_filas', 1)
+                cant_est = res_num['Cantidad'].get('mean', 1) * resumen.get('total_filas', 1)
+                if cant_est > 0:
+                    ticket_promedio = total_est / cant_est
+                    prompt_sistema += f"\nDATOS REALES: El ticket promedio global es ${ticket_promedio:,.2f}.\n"
+            except: pass
 
-        # 3. VALIDACIÓN DE CRÉDITOS (PLAN + EXTRAS)
-        res_plan = supabase.table("suscripciones").select("creditos_totales, creditos_usados").eq("email", user_email).single().execute()
-        res_extras = supabase.table("creditos_adicionales").select("cantidad").eq("email", user_email).eq("estado", "activo").execute()
-        
-        total_extras = sum(item['cantidad'] for item in res_extras.data) if res_extras.data else 0
-        
-        if res_plan.data:
-            usados = res_plan.data['creditos_usados'] or 0
-            totales_base = res_plan.data['creditos_totales'] or 0
+        # 3. VALIDACIÓN DE CRÉDITOS USANDO ENGINE (SQLAlchemy)
+        with engine.connect() as conn:
+            # Consultamos el plan base
+            res_plan = conn.execute(text("""
+                SELECT creditos_totales, creditos_usados 
+                FROM suscripciones 
+                WHERE email = :e
+            """), {"e": user_email}).mappings().fetchone()
+            
+            # Consultamos los extras (usando la nueva tabla)
+            res_extras = conn.execute(text("""
+                SELECT SUM(cantidad) as total_extras 
+                FROM creditos_adicionales 
+                WHERE email = :e AND estado = 'activo'
+            """), {"e": user_email}).mappings().fetchone()
+
+        if res_plan:
+            usados = res_plan['creditos_usados'] or 0
+            totales_base = res_plan['creditos_totales'] or 0
+            total_extras = res_extras['total_extras'] or 0 if res_extras else 0
             
             if usados >= (totales_base + total_extras):
-                return jsonify({"response": "⚠️ Has agotado tus créditos. Por favor, recarga para continuar."})
+                return jsonify({"response": "⚠️ Has agotado tus créditos. Por favor, recarga tu plan."})
 
-        # 4. DETERMINAR TIPO DE GRÁFICO PARA EL PDF
+        # 4. DETERMINAR TIPO DE GRÁFICO
         msg_lower = user_msg.lower()
         tipo_grafico = "bar"
         if any(w in msg_lower for w in ["pastel", "pie", "participacion"]): tipo_grafico = "pie"
@@ -275,10 +283,14 @@ def chat():
         )
         full_response = response.choices[0].message.content
 
-        # 6. ACTUALIZAR CONSUMO Y RESPONDER
-        supabase.table("suscripciones").update({"creditos_usados": usados + 1}).eq("email", user_email).execute()
+        # 6. ACTUALIZAR CONSUMO Y GUARDAR SESIÓN
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE suscripciones 
+                SET creditos_usados = COALESCE(creditos_usados, 0) + 1 
+                WHERE email = :e
+            """), {"e": user_email})
 
-        # Guardar en sesión para el PDF
         session['ultima_pregunta'] = user_msg
         session['ultima_respuesta_ia'] = full_response
         session['tipo_grafico'] = tipo_grafico
@@ -292,7 +304,7 @@ def chat():
 
     except Exception as e:
         print(f"Error en chat: {str(e)}")
-        return jsonify({"response": f"Error en el análisis: {str(e)}"})
+        return jsonify({"response": f"Error en el análisis: No se pudo conectar con la base de datos."})
 @app.route('/download_pdf')
 def download_pdf():
     filename = session.get('last_file')
