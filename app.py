@@ -209,96 +209,89 @@ def upload():
 def chat():
     user_msg = request.json.get('message', '')
     filename = session.get('last_file')
-    resumen = session.get('resumen_datos') # <--- Obtenemos el resumen ligero
+    resumen = session.get('resumen_datos')
     
     if not filename or not resumen: 
         return jsonify({"response": "Por favor, sube un archivo primero."})
     
-    try:
-        # 1. VALIDACIÓN PREVENTIVA DE CRÉDITOS
-        with engine.connect() as conn:
-            res = conn.execute(text("""
-                SELECT creditos_usados, creditos_totales 
-                FROM suscripciones 
-                WHERE email = :e
-            """), {"e": session['user']})
-            user_db = res.mappings().fetchone()
-        
-        if user_db:
-            usados = user_db['creditos_usados'] if user_db['creditos_usados'] is not None else 0
-            totales = user_db['creditos_totales'] if user_db['creditos_totales'] is not None else 5
-            
-            if usados >= totales:
-                return jsonify({
-                    "response": f"⚠️ Has agotado tus créditos ({usados}/{totales}). Por favor, contacta al administrador."
-                })
+    user_email = session['user']
 
-        # 2. PROCESAMIENTO USANDO EL RESUMEN (Sin leer el archivo de nuevo)
-        msg_lower = user_msg.lower()
-        
-        # Detectamos el tipo de gráfico para el reporte PDF
-        tipo_grafico = "bar"
-        if any(w in msg_lower for w in ["pastel", "pie", "dona", "participación"]): tipo_grafico = "pie"
-        elif any(w in msg_lower for w in ["linea", "evolucion", "tendencia"]): tipo_grafico = "line"
-        # Calculamos KPIs reales para que la IA no invente números
-        if 'Total' in resumen['columnas'] and 'Cantidad' in resumen['columnas']:
-    # Usamos el resumen numérico que ya extrajimos en el upload
-           total_general = resumen['resumen_numerico']['Total']['sum'] if 'sum' in resumen['resumen_numerico']['Total'] else 0
-           cantidad_general = resumen['resumen_numerico']['Cantidad']['sum'] if 'sum' in resumen['resumen_numerico']['Cantidad'] else 1
-           ticket_promedio_global = total_general / cantidad_general
-    
-    # Añadimos esto al prompt para que la IA tenga la base real
-           prompt_sistema += f"\nKPI REAL: El ticket promedio global es ${ticket_promedio_global:.2f}."
-        # Construimos el prompt usando los datos del resumen
-        # Instrucción mejorada para el análisis de tendencias
+    try:
+        # 1. DEFINICIÓN DEL PROMPT BASE (Evita el UnboundLocalError)
         prompt_sistema = (
-            f"Eres un Director de Consultoría Estratégica. Analizando: {filename}.\n"
-            f"Estructura: {resumen['columnas']}.\n"
-            f"Muestra: {resumen['muestras']}.\n"
-            "INSTRUCCIÓN CRÍTICA DE ANÁLISIS TEMPORAL:\n"
-            "1. No te limites a mencionar caídas; identifica puntos de recuperación o 'rebotes' inmediatos.\n"
-            "2. Si ves un pico después de un valle, descríbelo como una respuesta del mercado o esfuerzo de ventas.\n"
-            "3. Sé preciso con los rangos de fechas."
+            f"Eres un Director de Consultoría Estratégica. Analizando el archivo: {filename}.\n"
+            f"Estructura de columnas: {resumen['columnas']}.\n"
+            f"Muestra de datos: {resumen['muestras']}.\n\n"
+            "INSTRUCCIONES CRÍTICAS:\n"
+            "1. Analiza tendencias: no solo menciones caídas, identifica recuperaciones o 'rebotes'.\n"
+            "2. Usa los KPIs reales que se te proporcionan a continuación.\n"
+            "3. Responde con insights de negocio, PROHIBIDO incluir código o tecnicismos.\n"
         )
 
-        # 3. LLAMADA A LA IA
+        # 2. CÁLCULO E INYECCIÓN DE KPIs REALES (Python ayuda a la IA)
+        if 'Total' in resumen['columnas'] and 'Cantidad' in resumen['columnas']:
+            # Extraemos del resumen numérico generado en el upload
+            res_num = resumen.get('resumen_numerico', {})
+            # Intentamos sacar la suma de la columna 'Total' y 'Cantidad'
+            # Nota: Asegúrate que en el upload usaste df.describe().to_dict() o calculaste las sumas
+            try:
+                # Si guardaste el sum() en el upload, úsalo. Si no, lo estimamos del resumen:
+                total_gen = res_num.get('Total', {}).get('mean', 0) * resumen.get('total_filas', 1)
+                cant_gen = res_num.get('Cantidad', {}).get('mean', 1) * resumen.get('total_filas', 1)
+                
+                if cant_gen > 0:
+                    ticket_promedio = total_gen / cant_gen
+                    prompt_sistema += f"\nDATOS REALES CALCULADOS: El ticket promedio global es ${ticket_promedio:,.2f}.\n"
+            except:
+                pass
+
+        # 3. VALIDACIÓN DE CRÉDITOS (PLAN + EXTRAS)
+        res_plan = supabase.table("suscripciones").select("creditos_totales, creditos_usados").eq("email", user_email).single().execute()
+        res_extras = supabase.table("creditos_adicionales").select("cantidad").eq("email", user_email).eq("estado", "activo").execute()
+        
+        total_extras = sum(item['cantidad'] for item in res_extras.data) if res_extras.data else 0
+        
+        if res_plan.data:
+            usados = res_plan.data['creditos_usados'] or 0
+            totales_base = res_plan.data['creditos_totales'] or 0
+            
+            if usados >= (totales_base + total_extras):
+                return jsonify({"response": "⚠️ Has agotado tus créditos. Por favor, recarga para continuar."})
+
+        # 4. DETERMINAR TIPO DE GRÁFICO PARA EL PDF
+        msg_lower = user_msg.lower()
+        tipo_grafico = "bar"
+        if any(w in msg_lower for w in ["pastel", "pie", "participacion"]): tipo_grafico = "pie"
+        elif any(w in msg_lower for w in ["linea", "evolucion", "tendencia"]): tipo_grafico = "line"
+
+        # 5. LLAMADA A LA IA
         response = client.chat.complete(
             model="mistral-small",
-            messages=[{"role": "system", "content": prompt_sistema}, {"role": "user", "content": user_msg}]
+            messages=[
+                {"role": "system", "content": prompt_sistema},
+                {"role": "user", "content": user_msg}
+            ]
         )
         full_response = response.choices[0].message.content
 
-        # 4. ACTUALIZACIÓN DE CRÉDITOS
-        with engine.begin() as conn:
-            conn.execute(text("""
-                UPDATE suscripciones 
-                SET creditos_usados = COALESCE(creditos_usados, 0) + 1 
-                WHERE email = :e
-            """), {"e": session['user']})
-        
-        # Obtener el nuevo conteo para actualizar el frontend
-        with engine.connect() as conn:
-            res_actualizado = conn.execute(text("SELECT creditos_usados FROM suscripciones WHERE email = :e"), 
-                                           {"e": session['user']})
-            user_info = res_actualizado.mappings().fetchone()
-            nuevo_conteo = user_info['creditos_usados']
+        # 6. ACTUALIZAR CONSUMO Y RESPONDER
+        supabase.table("suscripciones").update({"creditos_usados": usados + 1}).eq("email", user_email).execute()
 
-        # 5. GUARDAR EN SESIÓN PARA EL REPORTE PDF
+        # Guardar en sesión para el PDF
         session['ultima_pregunta'] = user_msg
         session['ultima_respuesta_ia'] = full_response
         session['tipo_grafico'] = tipo_grafico
-        session.modified = True # Asegura que Flask guarde los cambios
+        session.modified = True
 
         return jsonify({
             "response": full_response,
-            "nuevo_conteo": nuevo_conteo
+            "nuevo_conteo": usados + 1,
+            "total_actualizado": totales_base + total_extras
         })
 
     except Exception as e:
-        print(f"Error en chat: {e}")
+        print(f"Error en chat: {str(e)}")
         return jsonify({"response": f"Error en el análisis: {str(e)}"})
-import matplotlib.ticker as mtick # Asegúrate de tener esta importación al inicio
-
 @app.route('/download_pdf')
 def download_pdf():
     filename = session.get('last_file')
