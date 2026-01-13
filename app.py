@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')  # Necesario para entornos de servidor (Koyeb/Heroku)
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_file
 from sqlalchemy import create_engine, text
 from werkzeug.utils import secure_filename
@@ -239,16 +240,25 @@ def chat():
         tipo_grafico = "bar"
         if any(w in msg_lower for w in ["pastel", "pie", "dona", "participación"]): tipo_grafico = "pie"
         elif any(w in msg_lower for w in ["linea", "evolucion", "tendencia"]): tipo_grafico = "line"
-
+        # Calculamos KPIs reales para que la IA no invente números
+        if 'Total' in resumen['columnas'] and 'Cantidad' in resumen['columnas']:
+    # Usamos el resumen numérico que ya extrajimos en el upload
+           total_general = resumen['resumen_numerico']['Total']['sum'] if 'sum' in resumen['resumen_numerico']['Total'] else 0
+           cantidad_general = resumen['resumen_numerico']['Cantidad']['sum'] if 'sum' in resumen['resumen_numerico']['Cantidad'] else 1
+           ticket_promedio_global = total_general / cantidad_general
+    
+    # Añadimos esto al prompt para que la IA tenga la base real
+           prompt_sistema += f"\nKPI REAL: El ticket promedio global es ${ticket_promedio_global:.2f}."
         # Construimos el prompt usando los datos del resumen
+        # Instrucción mejorada para el análisis de tendencias
         prompt_sistema = (
-            f"Eres un Director de Consultoría Estratégica. Analizando el archivo: {filename}.\n"
-            f"Estructura de columnas: {resumen['columnas']}.\n"
-            f"Tipos de datos: {resumen['tipos']}.\n"
-            f"Muestra representativa de los datos: {resumen['muestras']}.\n"
-            f"Total de registros analizados: {resumen['total_filas']}.\n"
-            "REGLA DE ORO: Responde solo con INSIGHTS DE NEGOCIO de alto nivel. "
-            "PROHIBIDO incluir código Python o explicaciones técnicas."
+            f"Eres un Director de Consultoría Estratégica. Analizando: {filename}.\n"
+            f"Estructura: {resumen['columnas']}.\n"
+            f"Muestra: {resumen['muestras']}.\n"
+            "INSTRUCCIÓN CRÍTICA DE ANÁLISIS TEMPORAL:\n"
+            "1. No te limites a mencionar caídas; identifica puntos de recuperación o 'rebotes' inmediatos.\n"
+            "2. Si ves un pico después de un valle, descríbelo como una respuesta del mercado o esfuerzo de ventas.\n"
+            "3. Sé preciso con los rangos de fechas."
         )
 
         # 3. LLAMADA A LA IA
@@ -287,6 +297,8 @@ def chat():
     except Exception as e:
         print(f"Error en chat: {e}")
         return jsonify({"response": f"Error en el análisis: {str(e)}"})
+import matplotlib.ticker as mtick # Asegúrate de tener esta importación al inicio
+
 @app.route('/download_pdf')
 def download_pdf():
     filename = session.get('last_file')
@@ -296,6 +308,7 @@ def download_pdf():
     
     if not filename: return "No hay archivo para generar reporte"
     
+    # Cargar datos
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
 
@@ -304,7 +317,7 @@ def download_pdf():
     fig, ax = plt.subplots(figsize=(8, 4.5))
     colors_pro = ['#1a5276', '#1e8449', '#a04000', '#7d3c98', '#2e4053']
     
-    # 2. PUNTERÍA LÁSER (Selección de columnas)
+    # 2. SELECCIÓN DE COLUMNAS
     p_low = pregunta.lower()
     col_num = next((c for c in df.columns if any(x in c.lower() for x in ['total', 'monto', 'venta'])), df.columns[-1])
     
@@ -322,23 +335,35 @@ def download_pdf():
         ax.plot(datos.index, datos.values, marker='o', color='#1a5276', linewidth=3)
         ax.fill_between(datos.index, datos.values, color='#1a5276', alpha=0.1)
         tit_g, tit_r = f"Evolución de {col_num}", "REPORTE TEMPORAL"
+        
     elif tipo == "pie":
         datos = df.groupby(col_cat)[col_num].sum().sort_values(ascending=False).head(5)
         ax.pie(datos, labels=None, autopct='%1.1f%%', startangle=140, colors=colors_pro, wedgeprops={'edgecolor': 'white', 'linewidth': 2})
         ax.add_artist(plt.Circle((0,0), 0.70, fc='white'))
         ax.legend(datos.index, loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
         tit_g, tit_r = f"Distribución por {col_cat}", "REPORTE DE PARTICIPACIÓN"
-    else:
+        
+    else: # BARRAS
         datos = df.groupby(col_cat)[col_num].sum().sort_values(ascending=False).head(8)
         bars = ax.bar(datos.index, datos.values, color='#2980b9', alpha=0.85)
         for bar in bars:
-            ax.text(bar.get_x()+bar.get_width()/2, bar.get_height(), f'{int(bar.get_height())}', ha='center', va='bottom', fontweight='bold')
+            height = bar.get_height()
+            # Añadimos formato moneda a las etiquetas sobre las barras
+            ax.text(bar.get_x()+bar.get_width()/2, height, f'${int(height):,}', ha='center', va='bottom', fontweight='bold')
         tit_g, tit_r = f"Rendimiento por {col_cat}", "REPORTE EJECUTIVO"
 
+    # --- FORMATEO DE MONEDA EN EJE Y ---
+    if tipo != "pie":
+        fmt = '${x:,.0f}' 
+        tick = mtick.StrMethodFormatter(fmt)
+        ax.yaxis.set_major_formatter(tick)
+
+    # --- CONFIGURACIÓN ESTÉTICA FINAL (Solo una vez) ---
     ax.set_title(tit_g, fontweight='bold', color='#1a5276', pad=20)
     plt.xticks(rotation=30, ha='right')
     plt.tight_layout()
     
+    # Guardar y cerrar
     graph_path = "temp_chart_pro.png"
     plt.savefig(graph_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -349,8 +374,11 @@ def download_pdf():
     pdf.set_font("helvetica", 'B', 16)
     pdf.set_text_color(26, 82, 118)
     pdf.cell(0, 10, tit_r, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    
+    # Imagen centrada
     pdf.image(graph_path, x=35, y=40, w=140)
     
+    # Cuerpo del reporte
     pdf.set_y(140)
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font("helvetica", 'B', 12)
@@ -362,7 +390,10 @@ def download_pdf():
 
     pdf_output = "reporte_analista_pro.pdf"
     pdf.output(pdf_output)
+    
+    # Limpieza de archivo temporal
     if os.path.exists(graph_path): os.remove(graph_path)
+    
     return send_file(pdf_output, as_attachment=True)
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
