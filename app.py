@@ -1,4 +1,5 @@
 import os
+from supabase import create_client, Client
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg')  # Necesario para entornos de servidor (Koyeb/Heroku)
