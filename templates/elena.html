@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elena AI - Premium</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --primary: #00d2ff; --admin: #a18cd1; }
+        body { background: #0f172a; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; transition: 0.5s; overflow: hidden; }
+        .admin-mode-bg { background: #1a1625; }
+        .card-elena { background: rgba(255,255,255,0.05); border-radius: 40px; padding: 2.5rem; width: 400px; text-align: center; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .aura { width: 110px; height: 110px; margin: 0 auto 1.5rem; position: relative; cursor: pointer; }
+        .aura-inner { 
+            inset: 0; position: absolute; border-radius: 50%; 
+            background: linear-gradient(45deg, var(--primary), #3a7bd5); 
+            animation: pulse-aura 2.5s infinite ease-in-out;
+            transition: 0.8s;
+        }
+        .admin-active .aura-inner { background: linear-gradient(45deg, #fbc2eb, var(--admin)); }
+        @keyframes pulse-aura { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 40px var(--primary); } }
+        .res-box { min-height: 100px; margin: 1rem 0; font-size: 1rem; color: #cbd5e1; display: flex; align-items: center; justify-content: center; }
+        .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 15px; color: white; padding: 12px; width: 100%; text-align: center; outline: none; }
+        #tasaInput { background: none; border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 80px; text-align: center; border-radius: 8px; font-weight: bold; }
+        #tasaInput[readonly] { border: none; color: #94a3b8; pointer-events: none; }
+        .logout-btn { position: absolute; top: 20px; right: 20px; color: rgba(255,255,255,0.5); text-decoration: none; font-size: 0.8rem; }
+    </style>
+</head>
+<body id="body">
+    <a href="/logout" class="logout-btn">Cerrar Sesión</a>
+
+<div class="card-elena">
+    <div class="d-flex justify-content-between mb-3 opacity-75 small">
+        <span>TASA BCV: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" onchange="sincronizarTasa()" readonly></span>
+        <span id="labelModo" class="fw-bold">CLIENTE: {{ user.split('@')[0] }}</span>
+    </div>
+    
+    <div class="aura" onclick="escuchar()"><div class="aura-inner" id="auraCirculo"></div></div>
+    
+    <h4 class="fw-bold">ELENA AI</h4>
+    <div class="res-box" id="textoElena">Presiona el círculo para hablar</div>
+    
+    <input type="text" id="userInput" class="input-elena" placeholder="Escriba su consulta..." onkeypress="if(event.key==='Enter') enviar()">
+    
+    <div id="adminTools" style="display: none;" class="mt-4">
+        <input type="file" id="fileIn" hidden onchange="subirExcel()">
+        <button class="btn btn-info btn-sm w-100 mb-2 fw-bold" onclick="document.getElementById('fileIn').click()">ACTUALIZAR INVENTARIO</button>
+        <button class="btn btn-outline-light btn-sm w-100" onclick="window.location.href='/download_pdf'">REPORTE ESTRATÉGICO</button>
+    </div>
+</div>
+
+<script>
+    let modoAdmin = false;
+    const synth = window.speechSynthesis;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    function hablar(msj) {
+        if (!msj) return;
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(msj.replace(/[📊|📈|📉]/g, ''));
+        u.lang = 'es-MX';
+        u.rate = 1.0;
+        synth.speak(u);
+    }
+
+    // Sincroniza la tasa con el servidor para que se guarde en la sesión de Flask
+    async function sincronizarTasa() {
+        const nt = document.getElementById('tasaInput').value;
+        await fetch('/preguntar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nueva_tasa: nt, modo_admin: true, pregunta: "actualizar tasa" })
+        });
+    }
+
+    function escuchar() {
+        if (!SpeechRecognition) {
+            alert("Tu navegador no soporta reconocimiento de voz.");
+            return;
+        }
+        const rec = new SpeechRecognition();
+        rec.lang = 'es-VE';
+        rec.onstart = () => {
+            document.getElementById('textoElena').innerText = "Te escucho...";
+            document.getElementById('auraCirculo').style.animationDuration = "0.5s";
+        };
+        rec.onresult = (e) => {
+            const transcript = e.results[0][0].transcript;
+            document.getElementById('userInput').value = transcript;
+            enviar();
+        };
+        rec.onend = () => {
+            document.getElementById('auraCirculo').style.animationDuration = "2.5s";
+        };
+        rec.start();
+    }
+
+    async function enviar() {
+        const query = document.getElementById('userInput').value;
+        if(!query) return;
+
+        document.getElementById('textoElena').innerText = "Analizando...";
+
+        try {
+            const res = await fetch('/preguntar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    pregunta: query, 
+                    modo_admin: modoAdmin 
+                })
+            });
+
+            const data = await res.json();
+
+            if(data.respuesta === "MODO_ADMIN_ACTIVADO") {
+                activarAdmin();
+            } else if (data.error) {
+                document.getElementById('textoElena').innerText = data.error;
+                hablar(data.error);
+            } else {
+                document.getElementById('textoElena').innerText = data.respuesta;
+                if(data.tasa_sync) document.getElementById('tasaInput').value = data.tasa_sync;
+                hablar(data.respuesta);
+            }
+        } catch (error) {
+            document.getElementById('textoElena').innerText = "Error de conexión.";
+        }
+        
+        document.getElementById('userInput').value = "";
+    }
+
+    function activarAdmin() {
+        modoAdmin = true;
+        document.getElementById('body').classList.add('admin-mode-bg');
+        document.getElementById('labelModo').innerText = "MODO GERENCIA";
+        document.getElementById('labelModo').style.color = "#a18cd1";
+        document.getElementById('tasaInput').readOnly = false;
+        document.getElementById('adminTools').style.display = "block";
+        document.getElementById('auraCirculo').parentElement.classList.add('admin-active');
+        document.getElementById('textoElena').innerText = "Acceso concedido, Gerente.";
+        hablar("Modo administrativo activado. Inventario y costos disponibles.");
+    }
+
+    async function subirExcel() {
+        const fileElement = document.getElementById('fileIn');
+        if (fileElement.files.length === 0) return;
+
+        const fd = new FormData();
+        fd.append('file', fileElement.files[0]);
+        
+        document.getElementById('textoElena').innerText = "Procesando archivo...";
+        
+        try {
+            const res = await fetch('/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+            
+            const mensaje = data.mensaje || (data.success ? "Inventario actualizado" : "Error al cargar");
+            document.getElementById('textoElena').innerText = mensaje;
+            hablar(mensaje);
+        } catch (e) {
+            document.getElementById('textoElena').innerText = "Error al subir Excel.";
+        }
+    }
+</script>
+</body>
+</html>

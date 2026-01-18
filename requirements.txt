@@ -25,3 +25,4 @@ streamlit
 plotly
 streamlit
 supabase
+rapidfuzz
