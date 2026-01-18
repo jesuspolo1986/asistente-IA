@@ -4,48 +4,41 @@
     <meta charset="UTF-8">
     <title>Elena AI | Farmacia</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --primary: #00d2ff; --bg: #0f172a; --warning: #f39c12; }
-        body { background: var(--bg); color: white; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif; }
-        
-        .grace-banner { background: var(--warning); color: black; width: 100%; position: fixed; top: 0; padding: 10px; text-align: center; font-weight: bold; z-index: 9999; }
-        
-        .card-elena, .login-card { background: rgba(255,255,255,0.05); padding: 2rem; border-radius: 30px; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); width: 400px; text-align: center; }
-        
-        .aura { width: 100px; height: 100px; margin: 0 auto 1.5rem; border-radius: 50%; background: linear-gradient(45deg, var(--primary), #3a7bd5); animation: pulse 2s infinite; cursor: pointer; }
-        @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,210,255,0.7); } 70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(0,210,255,0); } 100% { transform: scale(1); } }
-        
-        .res-box { min-height: 80px; margin-bottom: 20px; font-size: 1.1rem; color: #cbd5e1; }
+        body { background: var(--bg); color: white; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; margin: 0; }
+        .grace-banner { background: var(--warning); color: black; width: 100%; position: fixed; top: 0; padding: 10px; text-align: center; font-weight: bold; }
+        .login-card, .card-elena { background: rgba(255,255,255,0.05); padding: 2.5rem; border-radius: 30px; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); width: 380px; text-align: center; }
+        .aura { width: 100px; height: 100px; margin: 0 auto 1.5rem; border-radius: 50%; background: var(--primary); animation: pulse 2s infinite; cursor: pointer; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0,210,255,0.7); } 70% { box-shadow: 0 0 0 20px rgba(0,210,255,0); } 100% { box-shadow: 0 0 0 0 rgba(0,210,255,0); } }
+        .res-box { min-height: 80px; margin-bottom: 20px; color: #cbd5e1; display: flex; align-items: center; justify-content: center; }
         .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 10px; color: white; padding: 12px; width: 100%; text-align: center; }
     </style>
 </head>
 <body>
 
-    {% if dias_restantes == 0 %}
-    <div class="grace-banner">⚠️ Tu suscripción vence hoy. ¡Recuerda renovar!</div>
-    {% elif dias_restantes < 0 %}
-    <div class="grace-banner">🚨 Suscripción vencida ayer. Estás en tu día de gracia.</div>
+    {% if dias_restantes is defined and dias_restantes <= 0 %}
+        <div class="grace-banner">⚠️ Suscripción vencida. Día de gracia activado.</div>
     {% endif %}
 
     {% if not session.get('autenticado') %}
     <div class="login-card">
-        <h3 class="mb-4">Elena AI</h3>
+        <h2 class="mb-4">Elena AI</h2>
+        <p class="small opacity-75">Introduce tu correo autorizado</p>
         <form action="/login" method="POST">
-            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0" placeholder="Correo" required>
-            <input type="password" name="password" class="form-control mb-3 bg-dark text-white border-0" placeholder="Contraseña" required>
-            <button type="submit" class="btn btn-primary w-100 fw-bold">ENTRAR AL SISTEMA</button>
+            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0 py-3" placeholder="ejemplo@farmacia.com" required>
+            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">ACCEDER</button>
         </form>
     </div>
     {% else %}
     <div class="card-elena">
-        <div class="d-flex justify-content-between mb-3 small opacity-75">
-            <span>TASA BCV: <b>{{ tasa }}</b></span>
+        <div class="d-flex justify-content-between mb-3 small opacity-50">
+            <span>TASA: {{ tasa }}</span>
             <a href="/logout" class="text-danger text-decoration-none">Salir</a>
         </div>
         <div class="aura" onclick="escuchar()"></div>
-        <div id="textoElena" class="res-box">Toca el círculo para consultar precio...</div>
-        <input type="text" id="userInput" class="input-elena" placeholder="Nombre del producto..." onkeypress="if(event.key==='Enter') enviar()">
+        <div id="textoElena" class="res-box">¿Qué medicamento buscamos hoy?</div>
+        <input type="text" id="userInput" class="input-elena" placeholder="Escribe el nombre..." onkeypress="if(event.key==='Enter') enviar()">
     </div>
     {% endif %}
 

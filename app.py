@@ -3,41 +3,44 @@ import pandas as pd
 import os
 from pyDolarVenezuela.pages import AlCambio
 from pyDolarVenezuela import Monitor
+from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'elena_farmacia_secret_2026'
+app.secret_key = 'elena_farmacia_2026_key'
 
 # --- CONFIGURACIÓN ---
 EXCEL_FILE = 'inventario.xlsx'
-USUARIO_ADMIN = "farmacia@admin.com"
-PASSWORD_ADMIN = "1234" 
+# Lista de correos autorizados (puedes añadir más aquí)
+CORREOS_AUTORIZADOS = ["farmacia@admin.com", "vendedor1@farmacia.com", "elena@farmacia.com"]
+FECHA_VENCIMIENTO = datetime(2026, 1, 19) 
 
 def obtener_tasa_real():
     try:
-        # Usamos AlCambio para obtener el 341.74 que necesitas
         monitor = Monitor(AlCambio, 'USD')
         monitors_list = monitor.get_all_monitors()
         for m in monitors_list:
             if "BCV" in m.title:
                 return float(m.price)
         return 341.74
-    except Exception as e:
-        print(f"Error tasa: {e}")
+    except:
         return 341.74
 
 @app.route('/')
 def index():
     tasa = obtener_tasa_real()
-    return render_template('index.html', tasa=tasa)
+    hoy = datetime.now()
+    dias_restantes = (FECHA_VENCIMIENTO - hoy).days
+    return render_template('index.html', tasa=tasa, dias_restantes=dias_restantes)
 
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email')
-    password = request.form.get('password')
-    if email == USUARIO_ADMIN and password == PASSWORD_ADMIN:
+    # Solo verificamos si el correo está en nuestra lista de autorizados
+    if email in CORREOS_AUTORIZADOS:
         session['autenticado'] = True
+        session['usuario'] = email
         return redirect(url_for('index'))
-    return "Error: Credenciales no válidas", 401
+    return "Correo no autorizado", 401
 
 @app.route('/logout')
 def logout():
@@ -47,16 +50,15 @@ def logout():
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
     if not session.get('autenticado'):
-        return jsonify({"respuesta": "Por favor, inicia sesión."}), 401
+        return jsonify({"respuesta": "Acceso denegado."}), 401
     
     data = request.get_json()
     pregunta = data.get('pregunta', '').lower()
     tasa = obtener_tasa_real()
     
     try:
-        # Verificamos si existe el Excel en el servidor
         if not os.path.exists(EXCEL_FILE):
-            return jsonify({"respuesta": "El archivo de inventario no está cargado en el servidor."})
+            return jsonify({"respuesta": "Falta el archivo de inventario."})
 
         df = pd.read_excel(EXCEL_FILE)
         match = df[df['Producto'].str.contains(pregunta, case=False, na=False)]
@@ -66,14 +68,13 @@ def preguntar():
             usd = float(match.iloc[0]['Precio_USD'])
             bs = usd * tasa
             return jsonify({
-                "respuesta": f"El {prod} cuesta {usd} dólares. Al cambio de hoy son {bs:.2f} bolívares.",
+                "respuesta": f"El {prod} cuesta {usd} dólares. En bolívares son {bs:.2f}.",
                 "tasa_sync": tasa
             })
-        return jsonify({"respuesta": f"No encontré '{pregunta}' en el inventario."})
-    except Exception as e:
-        return jsonify({"respuesta": f"Hubo un error al leer los datos."}), 500
+        return jsonify({"respuesta": f"No encontré '{pregunta}'."})
+    except:
+        return jsonify({"respuesta": "Error al consultar."}), 500
 
 if __name__ == '__main__':
-    # Koyeb usa la variable de entorno PORT
     port = int(os.environ.get("PORT", 8000))
     app.run(host='0.0.0.0', port=port)
