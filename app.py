@@ -149,63 +149,54 @@ def upload():
     if 'user' not in session:
         return jsonify({"error": "Sesión no iniciada"}), 401
 
-    # 1. VALIDACIÓN DE SALDO EN SUPABASE
+    # 1. VALIDACIÓN DE CRÉDITOS (Supabase)
     user_email = session['user']
     try:
         user_data = supabase.table("usuarios").select("creditos_totales, creditos_usados").eq("email", user_email).single().execute()
-        
-        if user_data.data:
-            if user_data.data['creditos_usados'] >= user_data.data['creditos_totales']:
-                return jsonify({
-                    "error": "Créditos agotados", 
-                    "message": "Has alcanzado el límite de tu plan. Por favor, recarga para continuar."
-                }), 403
+        if user_data.data and user_data.data['creditos_usados'] >= user_data.data['creditos_totales']:
+            return jsonify({"error": "Créditos agotados", "message": "Por favor, recarga tu plan."}), 403
     except Exception as e:
         print(f"Error consultando créditos: {e}")
-        # Si hay error en DB, por seguridad permitimos o bloqueamos según prefieras
 
-    # 2. RECEPCIÓN DEL ARCHIVO
+    # 2. PROCESAMIENTO DEL ARCHIVO
     file = request.files.get('file')
-    if not file: 
-        return jsonify({"error": "No hay archivo"}), 400
+    if not file: return jsonify({"error": "No hay archivo"}), 400
     
     filename = secure_filename(file.filename)
     
-    # 3. PROCESAMIENTO INTELIGENTE (Sin guardar en disco necesariamente)
     try:
-        # Leemos el archivo a memoria (Stream) para no saturar el disco de Koyeb
         stream = io.BytesIO(file.read())
-        if filename.endswith('.csv'):
-            df = pd.read_csv(stream)
-        else:
-            df = pd.read_excel(stream)
+        df = pd.read_csv(stream) if filename.endswith('.csv') else pd.read_excel(stream)
 
-        # Extraemos el resumen estructural (El "ADN" de los datos)
-        resumen = {
-            "columnas": df.columns.tolist(),
-            "tipos": df.dtypes.astype(str).to_dict(),
-            "muestras": df.head(5).to_dict(orient='records'), # 5 filas de ejemplo
-            "total_filas": len(df),
-            "resumen_numerico": df.describe().to_dict() # Conteo, media, max, min de columnas numéricas
+        # --- NIVEL SUPERIOR: CÁLCULOS ESTADÍSTICOS REALES ---
+        # Calculamos todo en Python para que la IA no tenga que adivinar
+        kpis_reales = {
+            "total_facturacion": float(df['Total'].sum()),
+            "total_unidades": int(df['Cantidad'].sum()),
+            "ticket_promedio": float(df['Total'].mean()),
+            "top_vendedores": df.groupby('Vendedor')['Total'].sum().nlargest(5).to_dict(),
+            "top_productos": df.groupby('Producto')['Total'].sum().nlargest(5).to_dict(),
+            "conteo_transacciones": len(df),
+            "vendedor_mas_activo": df['Vendedor'].value_counts().idxmax()
         }
 
-        # Guardamos en sesión el resumen y el nombre
+        resumen = {
+            "columnas": df.columns.tolist(),
+            "kpis": kpis_reales,
+            "muestras": df.head(10).to_dict(orient='records') # Solo para contexto visual
+        }
+
         session['resumen_datos'] = resumen
         session['last_file'] = filename
-        
-        # Opcional: Si aún quieres guardar el archivo físicamente
-        # file.seek(0) # Resetear puntero
-        # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        session.modified = True
 
         return jsonify({
             "success": True, 
-            "filename": filename, 
-            "message": "Archivo analizado y listo para consultas"
+            "message": "Inventario analizado con precisión. Los KPIs han sido calculados con éxito."
         })
 
     except Exception as e:
-        return jsonify({"error": f"No se pudo procesar el archivo: {str(e)}"}), 500
-
+        return jsonify({"error": f"Error al procesar: {str(e)}"}), 500
 @app.route('/chat', methods=['POST'])
 def chat():
     user_msg = request.json.get('message', '')
@@ -216,72 +207,26 @@ def chat():
         return jsonify({"response": "Por favor, sube un archivo primero."})
     
     user_email = session.get('user')
-    if not user_email:
-        return jsonify({"response": "Sesión expirada. Por favor, inicia sesión de nuevo."})
+    kpis = resumen.get('kpis', {})
 
     try:
-        # 1. DEFINICIÓN DEL PROMPT BASE
+        # 1. PROMPT ESTRATÉGICO CON DATOS VERÍDICOS
         prompt_sistema = (
-         f"Eres un Auditor Senior y Director de Estrategia. Estás auditando el archivo: {filename}.\n"
-         f"Estructura de columnas: {resumen['columnas']}.\n"
-         f"Datos completos (KPIs): {resumen['muestras']}.\n\n"
-    
-         "⚠️ REGLAS DE ORO DE AUDITORÍA:\n"
-         "1. PRECISIÓN TOTAL: No resumas por encima. Si un vendedor tiene 10 ventas en el archivo, DEBES contarlas las 10. No asumas que lo que ves en la 'muestra' es todo lo que existe.\n"
-         "2. CÁLCULO REAL: Antes de dar un Insight, suma mentalmente las columnas 'Total' y 'Cantidad' para cada categoría solicitada. Si detectas que un producto como 'Laptop Pro' se repite, suma todas sus apariciones.\n"
-         "3. IDENTIFICACIÓN DE PATRONES: Busca relaciones cruzadas. Si un cliente compra un producto A y un producto B en fechas cercanas, identifícalo como un patrón de consumo.\n"
-         "4. NO ALUCINES: Si no estás seguro de un número exacto porque la muestra es limitada, indícalo, pero usa los KPIs globales proporcionados para dar veracidad.\n"
-         "5. TONO EJECUTIVO: Responde como un consultor de McKinsey: directo, basado en datos y orientado a la rentabilidad (ROI).\n\n"
-    
-         "ESTRUCTURA DE RESPUESTA:\n"
-         "- Hallazgo principal (con números exactos).\n"
-         "- Análisis de tendencias y anomalías.\n"
-         "- Recomendación estratégica accionable."
+            f"Eres un Director de Estrategia auditando el archivo: {filename}.\n"
+            f"AUDITORÍA REAL DEL SISTEMA (USA ESTOS DATOS):\n"
+            f"- Facturación Total: ${kpis['total_facturacion']:,.2f}\n"
+            f"- Ticket Promedio: ${kpis['ticket_promedio']:,.2f}\n"
+            f"- Líderes en Ventas: {kpis['top_vendedores']}\n"
+            f"- Productos más vendidos: {kpis['top_productos']}\n"
+            f"- Total de Transacciones: {kpis['conteo_transacciones']}\n\n"
+            
+            "REGLAS:\n"
+            "1. No inventes datos. Si te preguntan por un vendedor, usa los 'Líderes en Ventas' arriba.\n"
+            "2. Estructura tu respuesta en: Hallazgo, Análisis de Tendencia y Recomendación ROI.\n"
+            "3. Mantén un tono ejecutivo y profesional."
         )
 
-        # 2. INYECCIÓN DE KPIs (Desde el resumen guardado en sesión)
-        res_num = resumen.get('resumen_numerico', {})
-        if 'Total' in res_num and 'Cantidad' in res_num:
-            # Calculamos promedios basados en el resumen de describe()
-            try:
-                total_est = res_num['Total'].get('mean', 0) * resumen.get('total_filas', 1)
-                cant_est = res_num['Cantidad'].get('mean', 1) * resumen.get('total_filas', 1)
-                if cant_est > 0:
-                    ticket_promedio = total_est / cant_est
-                    prompt_sistema += f"\nDATOS REALES: El ticket promedio global es ${ticket_promedio:,.2f}.\n"
-            except: pass
-
-        # 3. VALIDACIÓN DE CRÉDITOS USANDO ENGINE (SQLAlchemy)
-        with engine.connect() as conn:
-            # Consultamos el plan base
-            res_plan = conn.execute(text("""
-                SELECT creditos_totales, creditos_usados 
-                FROM suscripciones 
-                WHERE email = :e
-            """), {"e": user_email}).mappings().fetchone()
-            
-            # Consultamos los extras (usando la nueva tabla)
-            res_extras = conn.execute(text("""
-                SELECT SUM(cantidad) as total_extras 
-                FROM creditos_adicionales 
-                WHERE email = :e AND estado = 'activo'
-            """), {"e": user_email}).mappings().fetchone()
-
-        if res_plan:
-            usados = res_plan['creditos_usados'] or 0
-            totales_base = res_plan['creditos_totales'] or 0
-            total_extras = res_extras['total_extras'] or 0 if res_extras else 0
-            
-            if usados >= (totales_base + total_extras):
-                return jsonify({"response": "⚠️ Has agotado tus créditos. Por favor, recarga tu plan."})
-
-        # 4. DETERMINAR TIPO DE GRÁFICO
-        msg_lower = user_msg.lower()
-        tipo_grafico = "bar"
-        if any(w in msg_lower for w in ["pastel", "pie", "participacion"]): tipo_grafico = "pie"
-        elif any(w in msg_lower for w in ["linea", "evolucion", "tendencia"]): tipo_grafico = "line"
-
-        # 5. LLAMADA A LA IA
+        # 2. LLAMADA A MISTRAL AI
         response = client.chat.complete(
             model="mistral-small",
             messages=[
@@ -291,29 +236,22 @@ def chat():
         )
         full_response = response.choices[0].message.content
 
-        # 6. ACTUALIZAR CONSUMO Y GUARDAR SESIÓN
+        # 3. ACTUALIZACIÓN DE CRÉDITOS (Atomicidad con Engine)
         with engine.begin() as conn:
             conn.execute(text("""
-                UPDATE suscripciones 
+                UPDATE usuarios 
                 SET creditos_usados = COALESCE(creditos_usados, 0) + 1 
                 WHERE email = :e
             """), {"e": user_email})
 
-        session['ultima_pregunta'] = user_msg
-        session['ultima_respuesta_ia'] = full_response
-        session['tipo_grafico'] = tipo_grafico
-        session.modified = True
-
         return jsonify({
             "response": full_response,
-            "nuevo_conteo": usados + 1,
-            "total_actualizado": totales_base + total_extras
+            "status": "success"
         })
 
     except Exception as e:
-        print(f"Error en chat: {str(e)}")
-        return jsonify({"response": f"Error en el análisis: No se pudo conectar con la base de datos."})
-@app.route('/download_pdf')
+        print(f"Error en chat: {e}")
+        return jsonify({"response": "Lo siento, el motor de análisis tuvo un error técnico."})pp.route('/download_pdf')
 def download_pdf():
     filename = session.get('last_file')
     pregunta = session.get('ultima_pregunta', 'Análisis General')
