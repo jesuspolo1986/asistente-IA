@@ -1,5 +1,4 @@
 import os
-
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg')  # Necesario para entornos de servidor (Koyeb/Heroku)
@@ -7,30 +6,107 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_file
 from sqlalchemy import create_engine, text
-from werkzeug.utils import secure_filename
+from werkzeug.utils import secure_filename # Import único
 from mistralai import Mistral
 from fpdf import FPDF
 import io
-from werkzeug.utils import secure_filename
 from fpdf.enums import XPos, YPos
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
+from supabase import create_client
+from rapidfuzz import process, utils # Asegúrate de tenerlo instalado
+
 app = Flask(__name__)
-# SENIOR: Priorizar variables de entorno para seguridad
+
+# --- CONFIGURACIÓN DE SEGURIDAD ---
 app.secret_key = os.environ.get("FLASK_SECRET", "analista_pro_2026_top_secret")
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# --- CONFIGURACIÓN DE SERVICIOS ---
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    DATABASE_URL = "postgresql://postgres:aSxRZ3rVrMu2Oasu@db.kebpamfydhnxeaeegulx.supabase.co:6543/postgres"
-
-# 3. Corrección técnica para SQLAlchemy + Postgres
+# --- CONFIGURACIÓN DE SERVICIOS (BD & IA) ---
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:aSxRZ3rVrMu2Oasu@db.kebpamfydhnxeaeegulx.supabase.co:6543/postgres")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "p2KCokd08zRypMAZQxMbC4ImxkM5DPK1")
 
+# Inicialización de Clientes
 engine = create_engine(DATABASE_URL)
 client = Mistral(api_key=MISTRAL_API_KEY)
+
+# Supabase con validación de seguridad
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+else:
+    print("⚠️ ADVERTENCIA: SUPABASE_URL o KEY no configuradas. El sistema de créditos podría fallar.")
+
+# Memoria global para Elena AI
+inventario_global = {"df": None, "tasa": 36.50}
+# ==========================================================
+# BLOQUE DE INTEGRACIÓN: ELENA AI (COPIAR DESDE AQUÍ)
+# ==========================================================
+from rapidfuzz import process, utils
+
+# Memoria global para Elena
+inventario_global = {"df": None, "tasa": 36.50}
+
+# Mapeo para que Elena encuentre las columnas sin importar el nombre en el Excel
+MAPEO_ELENA = {
+    'Producto': ['producto', 'descripcion', 'nombre', 'articulo', 'item'],
+    'Precio Venta': ['precio venta', 'pvp', 'precio', 'venta', 'precio_unitario'],
+    'Costo': ['costo', 'compra', 'p.costo'],
+    'Stock Actual': ['stock actual', 'stock', 'cantidad', 'existencia']
+}
+
+@app.route('/preguntar', methods=['POST'])
+def preguntar():
+    """Ruta de Elena para búsqueda rápida de precios y stock"""
+    data = request.json
+    pregunta = data.get("pregunta", "").lower().strip()
+    modo_admin = data.get("modo_admin", False)
+    
+    if inventario_global["df"] is None:
+        return jsonify({"respuesta": "Elena: Aún no he recibido el reporte de inventario."})
+
+    df = inventario_global["df"]
+    
+    # Limpiamos la pregunta para mejorar la búsqueda
+    termino = pregunta.replace("precio", "").replace("cuanto cuesta", "").replace("tienes", "").strip()
+    
+    # Búsqueda difusa (Elena busca aunque el usuario escriba con errores)
+    match = process.extractOne(termino, df['Producto'].astype(str).tolist(), processor=utils.default_process)
+
+    if match and match[1] > 65:
+        fila = df[df['Producto'] == match[0]].iloc[0]
+        p_usd = float(fila['Precio Venta'])
+        p_bs = p_usd * inventario_global["tasa"]
+        
+        if modo_admin:
+            # Info detallada para el dueño
+            costo = float(fila.get('Costo', 0))
+            margen = ((p_usd - costo) / p_usd) * 100 if p_usd > 0 else 0
+            res = f"📊 {match[0]} | Stock: {int(fila.get('Stock Actual', 0))} | PVP: ${p_usd:.2f} | Margen: {margen:.1f}%"
+        else:
+            # Info sencilla para el cliente (con conversión a bolívares)
+            res = f"El {match[0]} tiene un costo de {p_bs:,.2f} Bs (son {p_usd:,.2f} dólares)."
+        
+        return jsonify({"respuesta": res, "tasa_sync": inventario_global["tasa"]})
+
+    return jsonify({"respuesta": "No logré encontrar ese producto. ¿Podrías ser más específico?"})
+
+# MODIFICACIÓN NECESARIA EN TU FUNCIÓN UPLOAD EXISTENTE:
+# Dentro de tu ruta @app.route('/upload'), DESPUÉS de crear el 'df', 
+# debes añadir estas líneas para que Elena sepa leerlo:
+def sincronizar_con_elena(df_subido):
+    for estandar, sinonimos in MAPEO_ELENA.items():
+        for col in df_subido.columns:
+            if str(col).lower().strip() in sinonimos:
+                df_subido.rename(columns={col: estandar}, inplace=True)
+    inventario_global["df"] = df_subido
+# ==========================================================
+# FIN DEL BLOQUE DE ELENA
+# ==========================================================
 # --- CONFIGURACIÓN DE SEGURIDAD ADMIN ---
 ADMIN_PASSWORD = "18364982" # Cambia esto por uno real
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -152,6 +228,7 @@ def upload():
     # 1. VALIDACIÓN DE SALDO EN SUPABASE
     user_email = session['user']
     try:
+        # Nota: Asegúrate de tener 'supabase' inicializado en tu código
         user_data = supabase.table("usuarios").select("creditos_totales, creditos_usados").eq("email", user_email).single().execute()
         
         if user_data.data:
@@ -162,7 +239,6 @@ def upload():
                 }), 403
     except Exception as e:
         print(f"Error consultando créditos: {e}")
-        # Si hay error en DB, por seguridad permitimos o bloqueamos según prefieras
 
     # 2. RECEPCIÓN DEL ARCHIVO
     file = request.files.get('file')
@@ -171,41 +247,58 @@ def upload():
     
     filename = secure_filename(file.filename)
     
-    # 3. PROCESAMIENTO INTELIGENTE (Sin guardar en disco necesariamente)
+    # 3. PROCESAMIENTO E INTEGRACIÓN CON ELENA
     try:
-        # Leemos el archivo a memoria (Stream) para no saturar el disco de Koyeb
         stream = io.BytesIO(file.read())
         if filename.endswith('.csv'):
             df = pd.read_csv(stream)
         else:
             df = pd.read_excel(stream)
 
-        # Extraemos el resumen estructural (El "ADN" de los datos)
+        # --- INICIO INTEGRACIÓN ELENA ---
+        # Definimos los nombres de columnas que Elena necesita entender
+        MAPEO_ELENA = {
+            'Producto': ['producto', 'descripcion', 'nombre', 'articulo', 'item'],
+            'Precio Venta': ['precio venta', 'pvp', 'precio', 'venta', 'precio_unitario'],
+            'Costo': ['costo', 'compra', 'p.costo'],
+            'Stock Actual': ['stock actual', 'stock', 'cantidad', 'existencia']
+        }
+
+        # Renombramos las columnas del DF para que coincidan con lo que busca Elena
+        for estandar, sinonimos in MAPEO_ELENA.items():
+            for col in df.columns:
+                if str(col).lower().strip() in sinonimos:
+                    df.rename(columns={col: estandar}, inplace=True)
+        
+        # Guardamos en la memoria global para que Elena pueda responder preguntas de voz/chat
+        # Asegúrate de tener definido 'inventario_global = {"df": None, "tasa": 36.50}' al inicio del app.py
+        inventario_global["df"] = df.copy() 
+        # --- FIN INTEGRACIÓN ELENA ---
+
+        # 4. RESUMEN ESTRUCTURAL PARA AI PRO ANALYST
         resumen = {
             "columnas": df.columns.tolist(),
             "tipos": df.dtypes.astype(str).to_dict(),
-            "muestras": df.head(5).to_dict(orient='records'), # 5 filas de ejemplo
+            "muestras": df.head(5).to_dict(orient='records'),
             "total_filas": len(df),
-            "resumen_numerico": df.describe().to_dict() # Conteo, media, max, min de columnas numéricas
+            "resumen_numerico": df.describe().to_dict()
         }
 
-        # Guardamos en sesión el resumen y el nombre
         session['resumen_datos'] = resumen
         session['last_file'] = filename
         
-        # Opcional: Si aún quieres guardar el archivo físicamente
-        # file.seek(0) # Resetear puntero
-        # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        # Si necesitas guardar físicamente para el generador de PDF
+        file.seek(0)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
         return jsonify({
             "success": True, 
             "filename": filename, 
-            "message": "Archivo analizado y listo para consultas"
+            "message": "¡Inventario sincronizado con Elena y listo para análisis!"
         })
 
     except Exception as e:
         return jsonify({"error": f"No se pudo procesar el archivo: {str(e)}"}), 500
-
 @app.route('/chat', methods=['POST'])
 def chat():
     user_msg = request.json.get('message', '')
