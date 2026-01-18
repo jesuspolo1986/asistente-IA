@@ -3,128 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elena AI | Business Intelligence</title>
+    <title>Elena AI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --primary: #00d2ff; --admin: #a18cd1; --bg: #0f172a; }
-        body { background: var(--bg); color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: 0.5s; overflow: hidden; }
-        
-        /* --- ESTILO LOGIN (AI PRO) --- */
-        .login-card { background: rgba(255,255,255,0.05); padding: 2.5rem; border-radius: 30px; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); width: 100%; max-width: 400px; text-align: center; }
-        .form-control { background: rgba(255,255,255,0.1); border: none; color: white; border-radius: 12px; padding: 12px; }
-        .form-control:focus { background: rgba(255,255,255,0.15); color: white; box-shadow: 0 0 15px var(--primary); }
-        
-        /* --- ESTILO ELENA --- */
-        .admin-mode-bg { background: #1a1625; }
-        .card-elena { background: rgba(255,255,255,0.03); border-radius: 40px; padding: 2rem; width: 420px; text-align: center; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.3); position: relative;}
-        .aura { width: 120px; height: 120px; margin: 0 auto 1.5rem; position: relative; cursor: pointer; }
+        body { background: var(--bg); color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; transition: 0.5s; overflow: hidden; }
+        .admin-mode-bg { background: #16121e; }
+        .login-card, .card-elena { background: rgba(255,255,255,0.05); padding: 2.5rem; border-radius: 40px; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); width: 420px; text-align: center; }
+        .aura { width: 110px; height: 110px; margin: 0 auto 1.5rem; position: relative; cursor: pointer; }
         .aura-inner { inset: 0; position: absolute; border-radius: 50%; background: linear-gradient(45deg, var(--primary), #3a7bd5); animation: pulse-aura 2.5s infinite ease-in-out; transition: 0.8s; }
         .admin-active .aura-inner { background: linear-gradient(45deg, #fbc2eb, var(--admin)); }
-        @keyframes pulse-aura { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 45px var(--primary); } }
-        
-        .res-box { min-height: 110px; margin: 1rem 0; font-size: 1.05rem; color: #cbd5e1; display: flex; align-items: center; justify-content: center; line-height: 1.4; }
-        .input-elena { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; color: white; padding: 14px; width: 100%; text-align: center; outline: none; transition: 0.3s; }
-        .input-elena:focus { border-color: var(--primary); background: rgba(255,255,255,0.12); }
-        
-        .credits-tag { font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; color: #00d2ff; }
-        #tasaInput { background: none; border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 70px; text-align: center; border-radius: 8px; font-weight: bold; }
-        .logout-btn { position: absolute; top: -40px; right: 0; color: rgba(255,255,255,0.4); text-decoration: none; font-size: 0.8rem; }
+        @keyframes pulse-aura { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 40px var(--primary); } }
+        .res-box { min-height: 100px; margin: 1rem 0; color: #cbd5e1; display: flex; align-items: center; justify-content: center; }
+        .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 15px; color: white; padding: 12px; width: 100%; text-align: center; outline: none; }
+        #tasaInput { background: none; border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 75px; text-align: center; border-radius: 8px; font-weight: bold; }
+        .btn-exit-admin { display: none; background: rgba(255,255,255,0.1); border: none; color: #ff8686; padding: 5px 15px; border-radius: 20px; font-size: 0.7rem; cursor: pointer; margin-bottom: 10px; }
     </style>
 </head>
 <body id="body">
 
     {% if login_mode %}
     <div class="login-card">
-        <div class="aura" style="width: 80px; height: 80px;"><div class="aura-inner"></div></div>
-        <h2 class="fw-bold mb-2">Elena AI</h2>
-        <p class="text-white-50 small mb-4">Ingresa para conectar con tu inventario</p>
+        <h2 class="fw-bold mb-4">AI Pro Analyst</h2>
         <form action="/login" method="POST">
-            <input type="email" name="email" class="form-control mb-3" placeholder="Tu correo electrónico" required>
-            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold" style="background: linear-gradient(45deg, #00d2ff, #3a7bd5); border: none; border-radius: 12px;">INICIAR SESIÓN</button>
+            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0" placeholder="Email" required>
+            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">ENTRAR</button>
         </form>
-        {% if error %}<div class="alert alert-danger mt-3 py-2 small" style="background: rgba(220,53,69,0.2); border: none; color: #ff8686;">{{ error }}</div>{% endif %}
     </div>
-
     {% else %}
     <div class="card-elena">
-        <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Salir</a>
+        <button id="btnExit" class="btn-exit-admin" onclick="desactivarAdmin()">
+            <i class="fas fa-eye-slash"></i> SALIR DE GERENCIA
+        </button>
         
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <span class="credits-tag"><i class="fas fa-bolt"></i> {{ creditos_usados }} / {{ creditos_totales }}</span>
-            <span id="labelModo" class="small fw-bold text-white-50">VENDEDOR</span>
-            <div class="small">
-                <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly>
-            </div>
+        <div class="d-flex justify-content-between mb-3 small opacity-75">
+            <span>TASA: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly></span>
+            <span id="labelModo">VENDEDOR</span>
         </div>
 
         <div class="aura" onclick="escuchar()"><div class="aura-inner" id="auraCirculo"></div></div>
-        
-        <h4 class="fw-bold mb-0">ELENA AI</h4>
-        <small class="text-primary opacity-75">{{ user }}</small>
-        
-        <div class="res-box" id="textoElena">¿En qué puedo ayudarte hoy?</div>
-        
-        <input type="text" id="userInput" class="input-elena" placeholder="Escribe o pulsa el círculo..." onkeypress="if(event.key==='Enter') enviar()">
+        <div class="res-box" id="textoElena">Consultar producto...</div>
+        <input type="text" id="userInput" class="input-elena" placeholder="Escriba aquí..." onkeypress="if(event.key==='Enter') enviar()">
 
-        <div id="adminTools" style="display: none;" class="mt-4 animate__animated animate__fadeIn">
+        <div id="adminTools" style="display: none;" class="mt-4">
             <input type="file" id="fileIn" hidden onchange="subirExcel()">
-            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold py-2" style="border-radius: 10px;" onclick="document.getElementById('fileIn').click()">
-                <i class="fas fa-upload me-2"></i> CARGAR INVENTARIO
-            </button>
-            <button class="btn btn-outline-light btn-sm w-100 py-2" style="border-radius: 10px; border-color: rgba(255,255,255,0.2);" onclick="window.location.href='/download_pdf'">
-                <i class="fas fa-file-pdf me-2"></i> REPORTE GERENCIAL
-            </button>
+            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold" onclick="document.getElementById('fileIn').click()">SUBIR EXCEL</button>
+            <button class="btn btn-outline-light btn-sm w-100" onclick="window.location.href='/download_pdf'">REPORTE PDF</button>
         </div>
     </div>
     {% endif %}
 
 <script>
-    // --- LÓGICA DE ELENA CONECTADA AL BACKEND UNIFICADO ---
     let modoAdmin = false;
     const synth = window.speechSynthesis;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     function hablar(msj) {
-        if (!msj) return;
         synth.cancel();
-        const u = new SpeechSynthesisUtterance(msj.replace(/[📊|📈|📉|*]/g, ''));
+        const u = new SpeechSynthesisUtterance(msj.replace(/[📊]/g, ''));
         u.lang = 'es-MX';
         synth.speak(u);
     }
 
     function escuchar() {
-        if (!SpeechRecognition) return alert("Navegador no compatible");
         const rec = new SpeechRecognition();
         rec.lang = 'es-VE';
-        rec.onstart = () => {
-            document.getElementById('textoElena').innerText = "Escuchando...";
-            document.getElementById('auraCirculo').style.animationDuration = "0.5s";
-        };
-        rec.onresult = (e) => {
-            document.getElementById('userInput').value = e.results[0][0].transcript;
-            enviar();
-        };
-        rec.onend = () => document.getElementById('auraCirculo').style.animationDuration = "2.5s";
+        rec.onstart = () => document.getElementById('textoElena').innerText = "Escuchando...";
+        rec.onresult = (e) => { document.getElementById('userInput').value = e.results[0][0].transcript; enviar(); };
         rec.start();
     }
 
     async function enviar() {
         const query = document.getElementById('userInput').value;
         if(!query) return;
-
-        document.getElementById('textoElena').innerText = "...";
-
         const res = await fetch('/preguntar', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ pregunta: query, modo_admin: modoAdmin })
         });
         const data = await res.json();
-
-        if(data.respuesta === "MODO_ADMIN_ACTIVADO") {
-            activarAdmin();
-        } else {
+        
+        if(data.respuesta === "MODO_ADMIN_ACTIVADO") activarAdmin();
+        else if(data.respuesta === "MODO_VENDEDOR_ACTIVADO") desactivarAdmin();
+        else {
             document.getElementById('textoElena').innerText = data.respuesta;
             hablar(data.respuesta);
         }
@@ -134,12 +96,21 @@
     function activarAdmin() {
         modoAdmin = true;
         document.getElementById('body').classList.add('admin-mode-bg');
-        document.getElementById('labelModo').innerText = "GERENTE";
-        document.getElementById('labelModo').classList.replace('text-white-50', 'text-info');
-        document.getElementById('tasaInput').readOnly = false;
+        document.getElementById('labelModo').innerText = "GERENCIA";
         document.getElementById('adminTools').style.display = "block";
-        document.getElementById('auraCirculo').style.boxShadow = "0 0 45px #a18cd1";
-        hablar("Modo gerencia activo. Ya puede cargar archivos y ver costos.");
+        document.getElementById('btnExit').style.display = "inline-block";
+        document.getElementById('tasaInput').readOnly = false;
+        hablar("Modo gerencia activado.");
+    }
+
+    function desactivarAdmin() {
+        modoAdmin = false;
+        document.getElementById('body').classList.remove('admin-mode-bg');
+        document.getElementById('labelModo').innerText = "VENDEDOR";
+        document.getElementById('adminTools').style.display = "none";
+        document.getElementById('btnExit').style.display = "none";
+        document.getElementById('tasaInput').readOnly = true;
+        hablar("Modo vendedor activado.");
     }
 
     async function subirExcel() {
