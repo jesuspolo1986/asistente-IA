@@ -251,7 +251,7 @@ def chat():
 
     except Exception as e:
         print(f"Error en chat: {e}")
-        return jsonify({"response": "Lo siento, el motor de análisis tuvo un error técnico."})pp.route('/download_pdf')
+        return jsonify({"response": "Lo siento, el motor de análisis tuvo un error técnico."})
 def download_pdf():
     filename = session.get('last_file')
     pregunta = session.get('ultima_pregunta', 'Análisis General')
