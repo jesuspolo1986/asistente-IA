@@ -1,8 +1,6 @@
 import os
 import io
-import requests
 import pandas as pd
-from bs4 import BeautifulSoup
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from sqlalchemy import create_engine, text
 from mistralai import Mistral
@@ -11,7 +9,7 @@ from rapidfuzz import process, utils
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "elena_pro_secret_2026")
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN DE DB Y SERVICIOS ---
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:aSxRZ3rVrMu2Oasu@db.kebpamfydhnxeaeegulx.supabase.co:6543/postgres")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -26,24 +24,6 @@ MAPEO_COLUMNAS = {
     'Stock Actual': ['stock actual', 'stock', 'cantidad', 'existencia']
 }
 
-# --- FUNCIÓN DE BÚSQUEDA REAL EN INTERNET ---
-def obtener_tasa_internet():
-    try:
-        url = "https://www.bcv.org.ve/"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        # verify=False para evitar problemas de certificados en algunos servidores
-        response = requests.get(url, headers=headers, verify=False, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Extracción específica del valor del dólar en el BCV
-        tasa_box = soup.find('div', id='dolar')
-        tasa_valor = tasa_box.find('strong').text.strip()
-        
-        return float(tasa_valor.replace(',', '.'))
-    except Exception as e:
-        print(f"Error en internet: {e}")
-        return None
-
 @app.route('/')
 def index():
     if 'user' not in session:
@@ -54,14 +34,14 @@ def index():
         user_data = conn.execute(query, {"e": session['user']}).mappings().fetchone()
     
     if user_data and user_data['activo'] == 1:
-        if 'tasa_actual' not in session:
-            session['tasa_actual'] = 36.50
+        tasa = session.get('tasa_actual', 36.50)
         return render_template('index.html', 
                                login_mode=False, 
                                user=session['user'], 
-                               tasa=session['tasa_actual'],
+                               tasa=tasa,
                                creditos_usados=user_data['creditos_usados'] or 0,
                                creditos_totales=500)
+    
     session.clear()
     return render_template('index.html', login_mode=True, error="Suscripción inactiva.")
 
@@ -72,38 +52,29 @@ def preguntar():
     data = request.json
     pregunta = data.get("pregunta", "").lower().strip()
     modo_admin = data.get("modo_admin", False)
-
-    # COMANDO: ACTUALIZAR DESDE INTERNET
-    if "actualiza la tasa" in pregunta or "busca la tasa" in pregunta:
-        nueva = obtener_tasa_internet()
-        if nueva:
-            v_anterior = session.get('tasa_actual', 0)
-            session['tasa_actual'] = nueva
-            tendencia = "subió" if nueva > v_anterior else "bajó" if nueva < v_anterior else "se mantiene"
-            return jsonify({
-                "respuesta": f"He consultado el monitor. La tasa {tendencia} a {nueva} Bolívares.",
-                "tasa_sync": nueva
-            })
-        return jsonify({"respuesta": "No pude conectar con el servidor de la tasa."})
-
-    if pregunta == "activar modo gerencia": return jsonify({"respuesta": "MODO_ADMIN_ACTIVADO"})
-    if pregunta in ["activar modo vendedor", "salir de gerencia"]: return jsonify({"respuesta": "MODO_VENDEDOR_ACTIVADO"})
+    
+    # CONTROL DE MODOS
+    if pregunta == "activar modo gerencia":
+        return jsonify({"respuesta": "MODO_ADMIN_ACTIVADO"})
+    if pregunta in ["activar modo vendedor", "salir de gerencia", "modo vendedor"]:
+        return jsonify({"respuesta": "MODO_VENDEDOR_ACTIVADO"})
 
     resumen = session.get('resumen_datos')
-    if not resumen: return jsonify({"respuesta": "Elena: Carga un archivo para comenzar."})
+    if not resumen:
+        return jsonify({"respuesta": "Elena: Por favor, carga el inventario en herramientas."})
 
     df = pd.DataFrame(resumen['datos_completos'])
     match = process.extractOne(pregunta.replace("precio", "").strip(), df['Producto'].astype(str).tolist(), processor=utils.default_process)
     
     if match and match[1] > 65:
         f = df[df['Producto'] == match[0]].iloc[0]
-        tasa = float(session.get('tasa_actual', 36.50))
-        p_usd = float(str(f['Precio Venta']).replace('$', '').replace(',', ''))
+        tasa = session.get('tasa_actual', 36.50)
+        p_usd = float(f['Precio Venta'])
         
         if modo_admin:
-            costo = float(str(f.get('Costo', 0)).replace('$', '').replace(',', ''))
+            costo = float(f.get('Costo', 0))
             m = ((p_usd - costo) / p_usd) * 100 if p_usd > 0 else 0
-            res = f"📊 {match[0]} | Costo: ${costo:,.2f} | Venta: ${p_usd:,.2f} | Margen: {m:.1f}% | Stock: {int(f.get('Stock Actual', 0))}"
+            res = f"📊 {match[0]} | Costo: ${costo:.2f} | Venta: ${p_usd:.2f} | Margen: {m:.1f}% | Stock: {int(f.get('Stock Actual', 0))}"
         else:
             res = f"El {match[0]} cuesta {p_usd * tasa:,.2f} Bs ({p_usd:,.2f} USD)."
         
@@ -125,12 +96,13 @@ def upload():
         df.rename(columns=nuevas, inplace=True)
         session['resumen_datos'] = {"columnas": df.columns.tolist(), "datos_completos": df.to_dict(orient='records')}
         session.modified = True
-        return jsonify({"success": True, "mensaje": "Inventario leído."})
+        return jsonify({"success": True, "mensaje": "Inventario cargado."})
     except Exception as e: return jsonify({"success": False, "error": str(e)})
 
 @app.route('/login', methods=['POST'])
 def login():
-    session['user'] = request.form.get('email', '').strip().lower()
+    email = request.form.get('email', '').strip().lower()
+    session['user'] = email
     return redirect(url_for('index'))
 
 @app.route('/logout')
