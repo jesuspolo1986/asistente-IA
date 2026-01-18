@@ -32,24 +32,29 @@ MAPEO_COLUMNAS = {
 }
 
 def obtener_tasa_real():
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    # Intento 1: BCV Oficial
+    # Añadimos un número aleatorio al final de la URL para forzar al BCV a darnos la tasa nueva
+    import time
+    url = f"https://www.bcv.org.ve/?t={int(time.time())}" 
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+    }
+    
     try:
-        res = requests.get("https://www.bcv.org.ve/", headers=headers, verify=False, timeout=8)
+        res = requests.get(url, headers=headers, verify=False, timeout=10)
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, 'html.parser')
-            valor = soup.find('div', id='dolar').find('strong').text.strip()
-            return float(valor.replace(',', '.'))
-    except:
-        pass
-    
-    # Intento 2: API de Respaldo (Si el BCV bloquea el servidor)
-    try:
-        res = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=5)
-        return float(res.json()['rates']['VES'])
-    except:
+            # Buscamos específicamente el fuerte del dólar
+            # El BCV a veces tiene espacios invisibles, los eliminamos todos
+            valor_sucio = soup.find('div', id='dolar').find('strong').text.strip()
+            # Reemplazamos coma por punto y quitamos cualquier carácter raro
+            valor_limpio = "".join(c for c in valor_sucio if c.isdigit() or c in ',.')
+            return float(valor_limpio.replace(',', '.'))
+    except Exception as e:
+        print(f"Error crítico de sincronización: {e}")
         return None
-
 @app.route('/')
 def index():
     if 'user' not in session:

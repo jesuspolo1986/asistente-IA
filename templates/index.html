@@ -26,9 +26,10 @@
     {% if login_mode %}
     <div class="login-card">
         <h2 class="fw-bold mb-4">Elena AI</h2>
+        <p class="text-info small">Acceso al Sistema de Farmacia</p>
         <form action="/login" method="POST">
-            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0 py-3" placeholder="Email" required>
-            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">ENTRAR</button>
+            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0 py-3" placeholder="Correo Electrónico" required>
+            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">ENTRAR AL DASHBOARD</button>
         </form>
     </div>
     {% else %}
@@ -38,17 +39,19 @@
         </button>
         
         <div class="d-flex justify-content-between mb-3 small">
-            <span>TASA: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly></span>
+            <span>TASA BCV: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly></span>
             <span id="labelModo" class="opacity-75">MODO VENDEDOR</span>
         </div>
 
         <div class="aura" onclick="escuchar()"><div class="aura-inner" id="auraCirculo"></div></div>
-        <div class="res-box" id="textoElena">Presiona para hablar...</div>
-        <input type="text" id="userInput" class="input-elena" placeholder="Escribe aquí..." onkeypress="if(event.key==='Enter') enviar()">
+        <div class="res-box" id="textoElena">Presiona el círculo para hablar...</div>
+        <input type="text" id="userInput" class="input-elena" placeholder="Escribe o habla..." onkeypress="if(event.key==='Enter') enviar()">
 
         <div id="adminTools" style="display: none;" class="mt-4">
             <input type="file" id="fileIn" hidden onchange="subirExcel()">
-            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold" onclick="document.getElementById('fileIn').click()">ACTUALIZAR INVENTARIO</button>
+            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold" onclick="document.getElementById('fileIn').click()">
+                <i class="fas fa-file-excel"></i> ACTUALIZAR INVENTARIO
+            </button>
         </div>
     </div>
     {% endif %}
@@ -66,10 +69,17 @@
     }
 
     function escuchar() {
+        if (!SpeechRecognition) {
+            alert("Tu navegador no soporta reconocimiento de voz.");
+            return;
+        }
         const rec = new SpeechRecognition();
         rec.lang = 'es-VE';
         rec.onstart = () => document.getElementById('textoElena').innerText = "Escuchando...";
-        rec.onresult = (e) => { document.getElementById('userInput').value = e.results[0][0].transcript; enviar(); };
+        rec.onresult = (e) => { 
+            document.getElementById('userInput').value = e.results[0][0].transcript; 
+            enviar(); 
+        };
         rec.start();
     }
 
@@ -77,20 +87,24 @@
         const query = document.getElementById('userInput').value;
         if(!query) return;
 
-        const res = await fetch('/preguntar', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ pregunta: query, modo_admin: modoAdmin })
-        });
-        const data = await res.json();
-        
-        if(data.tasa_sync) document.getElementById('tasaInput').value = parseFloat(data.tasa_sync).toFixed(2);
+        try {
+            const res = await fetch('/preguntar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ pregunta: query, modo_admin: modoAdmin })
+            });
+            const data = await res.json();
+            
+            if(data.tasa_sync) document.getElementById('tasaInput').value = parseFloat(data.tasa_sync).toFixed(2);
 
-        if(data.respuesta === "MODO_ADMIN_ACTIVADO") activarAdmin();
-        else if(data.respuesta === "MODO_VENDEDOR_ACTIVADO") desactivarAdmin();
-        else {
-            document.getElementById('textoElena').innerText = data.respuesta;
-            hablar(data.respuesta);
+            if(data.respuesta === "MODO_ADMIN_ACTIVADO") activarAdmin();
+            else if(data.respuesta === "MODO_VENDEDOR_ACTIVADO") desactivarAdmin();
+            else {
+                document.getElementById('textoElena').innerText = data.respuesta;
+                hablar(data.respuesta);
+            }
+        } catch (error) {
+            console.error("Error al enviar:", error);
         }
         document.getElementById('userInput').value = "";
     }
@@ -98,25 +112,40 @@
     // --- LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA (9:05 y 1:05) ---
     function verificarReloj() {
         const ahora = new Date();
+        const diaSemana = ahora.getDay(); // 5 es viernes
         const h = ahora.getHours();
         const m = ahora.getMinutes();
+
+        // Actualización normal 9:05 AM y 1:05 PM (13:05)
         if ((h === 9 && m === 5) || (h === 13 && m === 5)) {
-            console.log("Actualizando tasa por horario programado...");
+            console.log("Activando actualización programada...");
+            ejecutarActualizacionSilenciosa();
+        }
+
+        // Refuerzo Viernes 1:15 PM
+        if (diaSemana === 5 && h === 13 && m === 15) {
+            console.log("Activando refuerzo de viernes...");
             ejecutarActualizacionSilenciosa();
         }
     }
-    setInterval(verificarReloj, 60000); // Revisa cada minuto
+
+    // IMPORTANTE: Iniciar el intervalo de revisión cada 60 segundos
+    setInterval(verificarReloj, 60000);
 
     async function ejecutarActualizacionSilenciosa() {
-        const res = await fetch('/preguntar', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ pregunta: "actualiza la tasa" })
-        });
-        const data = await res.json();
-        if(data.tasa_sync) {
-            document.getElementById('tasaInput').value = parseFloat(data.tasa_sync).toFixed(2);
-            hablar("La tasa de cambio ha sido actualizada automáticamente.");
+        try {
+            const res = await fetch('/preguntar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ pregunta: "actualiza la tasa" })
+            });
+            const data = await res.json();
+            if(data.tasa_sync) {
+                document.getElementById('tasaInput').value = parseFloat(data.tasa_sync).toFixed(2);
+                hablar("Atención: He actualizado la tasa de cambio automáticamente.");
+            }
+        } catch (e) {
+            console.error("Error en auto-actualización:", e);
         }
     }
 
@@ -139,12 +168,22 @@
     }
 
     async function subirExcel() {
+        const fileInput = document.getElementById('fileIn');
+        if (fileInput.files.length === 0) return;
+
         const fd = new FormData();
-        fd.append('file', document.getElementById('fileIn').files[0]);
-        const res = await fetch('/upload', { method: 'POST', body: fd });
-        const data = await res.json();
-        document.getElementById('textoElena').innerText = data.mensaje;
-        hablar(data.mensaje);
+        fd.append('file', fileInput.files[0]);
+        
+        document.getElementById('textoElena').innerText = "Leyendo inventario...";
+        
+        try {
+            const res = await fetch('/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+            document.getElementById('textoElena').innerText = data.mensaje;
+            hablar(data.mensaje);
+        } catch (e) {
+            document.getElementById('textoElena').innerText = "Error al subir archivo.";
+        }
     }
 </script>
 </body>
