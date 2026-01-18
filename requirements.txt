@@ -24,3 +24,5 @@ fpdf2
 streamlit
 plotly
 streamlit
+supabase
+#
