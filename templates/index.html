@@ -2,189 +2,86 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elena AI | Farmacia</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --primary: #00d2ff; --admin: #a18cd1; --bg: #0f172a; }
-        body { background: var(--bg); color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', sans-serif; transition: 0.5s; overflow: hidden; }
-        .admin-mode-bg { background: #16121e; }
-        .card-elena, .login-card { background: rgba(255,255,255,0.05); padding: 2.5rem; border-radius: 40px; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); width: 420px; text-align: center; position: relative; }
-        .aura { width: 110px; height: 110px; margin: 0 auto 1.5rem; position: relative; cursor: pointer; }
-        .aura-inner { inset: 0; position: absolute; border-radius: 50%; background: linear-gradient(45deg, var(--primary), #3a7bd5); animation: pulse-aura 2.5s infinite ease-in-out; transition: 0.8s; }
-        .admin-active .aura-inner { background: linear-gradient(45deg, #fbc2eb, var(--admin)); }
-        @keyframes pulse-aura { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 40px var(--primary); } }
-        .res-box { min-height: 100px; margin: 1rem 0; color: #cbd5e1; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; line-height: 1.4; }
-        .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 15px; color: white; padding: 14px; width: 100%; text-align: center; outline: none; }
-        #tasaInput { background: none; border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 85px; text-align: center; border-radius: 8px; font-weight: bold; }
-        .btn-exit-admin { display: none; background: rgba(220, 53, 69, 0.2); border: none; color: #ff8686; padding: 5px 15px; border-radius: 20px; font-size: 0.75rem; margin-bottom: 10px; cursor: pointer; }
+        :root { --primary: #00d2ff; --bg: #0f172a; --warning: #f39c12; }
+        body { background: var(--bg); color: white; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif; }
+        
+        .grace-banner { background: var(--warning); color: black; width: 100%; position: fixed; top: 0; padding: 10px; text-align: center; font-weight: bold; z-index: 9999; }
+        
+        .card-elena, .login-card { background: rgba(255,255,255,0.05); padding: 2rem; border-radius: 30px; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); width: 400px; text-align: center; }
+        
+        .aura { width: 100px; height: 100px; margin: 0 auto 1.5rem; border-radius: 50%; background: linear-gradient(45deg, var(--primary), #3a7bd5); animation: pulse 2s infinite; cursor: pointer; }
+        @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,210,255,0.7); } 70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(0,210,255,0); } 100% { transform: scale(1); } }
+        
+        .res-box { min-height: 80px; margin-bottom: 20px; font-size: 1.1rem; color: #cbd5e1; }
+        .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 10px; color: white; padding: 12px; width: 100%; text-align: center; }
     </style>
 </head>
-<body id="body">
+<body>
 
-    {% if login_mode %}
+    {% if dias_restantes == 0 %}
+    <div class="grace-banner">⚠️ Tu suscripción vence hoy. ¡Recuerda renovar!</div>
+    {% elif dias_restantes < 0 %}
+    <div class="grace-banner">🚨 Suscripción vencida ayer. Estás en tu día de gracia.</div>
+    {% endif %}
+
+    {% if not session.get('autenticado') %}
     <div class="login-card">
-        <h2 class="fw-bold mb-4">Elena AI</h2>
-        <p class="text-info small">Acceso al Sistema de Farmacia</p>
+        <h3 class="mb-4">Elena AI</h3>
         <form action="/login" method="POST">
-            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0 py-3" placeholder="Correo Electrónico" required>
-            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">ENTRAR AL DASHBOARD</button>
+            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0" placeholder="Correo" required>
+            <input type="password" name="password" class="form-control mb-3 bg-dark text-white border-0" placeholder="Contraseña" required>
+            <button type="submit" class="btn btn-primary w-100 fw-bold">ENTRAR AL SISTEMA</button>
         </form>
     </div>
     {% else %}
     <div class="card-elena">
-        <button id="btnExit" class="btn-exit-admin" onclick="desactivarAdmin()">
-            <i class="fas fa-sign-out-alt"></i> SALIR DE GERENCIA
-        </button>
-        
-        <div class="d-flex justify-content-between mb-3 small">
-            <span>TASA BCV: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly></span>
-            <span id="labelModo" class="opacity-75">MODO VENDEDOR</span>
+        <div class="d-flex justify-content-between mb-3 small opacity-75">
+            <span>TASA BCV: <b>{{ tasa }}</b></span>
+            <a href="/logout" class="text-danger text-decoration-none">Salir</a>
         </div>
-
-        <div class="aura" onclick="escuchar()"><div class="aura-inner" id="auraCirculo"></div></div>
-        <div class="res-box" id="textoElena">Presiona el círculo para hablar...</div>
-        <input type="text" id="userInput" class="input-elena" placeholder="Escribe o habla..." onkeypress="if(event.key==='Enter') enviar()">
-
-        <div id="adminTools" style="display: none;" class="mt-4">
-            <input type="file" id="fileIn" hidden onchange="subirExcel()">
-            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold" onclick="document.getElementById('fileIn').click()">
-                <i class="fas fa-file-excel"></i> ACTUALIZAR INVENTARIO
-            </button>
-        </div>
+        <div class="aura" onclick="escuchar()"></div>
+        <div id="textoElena" class="res-box">Toca el círculo para consultar precio...</div>
+        <input type="text" id="userInput" class="input-elena" placeholder="Nombre del producto..." onkeypress="if(event.key==='Enter') enviar()">
     </div>
     {% endif %}
 
-<script>
-    let modoAdmin = false;
-    const synth = window.speechSynthesis;
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    <script>
+        const synth = window.speechSynthesis;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    function hablar(msj) {
-        synth.cancel();
-        const u = new SpeechSynthesisUtterance(msj.replace(/[📊]/g, ''));
-        u.lang = 'es-MX';
-        synth.speak(u);
-    }
-
-    function escuchar() {
-        if (!SpeechRecognition) {
-            alert("Tu navegador no soporta reconocimiento de voz.");
-            return;
+        function hablar(t) {
+            synth.cancel();
+            const u = new SpeechSynthesisUtterance(t);
+            u.lang = 'es-MX';
+            synth.speak(u);
         }
-        const rec = new SpeechRecognition();
-        rec.lang = 'es-VE';
-        rec.onstart = () => document.getElementById('textoElena').innerText = "Escuchando...";
-        rec.onresult = (e) => { 
-            document.getElementById('userInput').value = e.results[0][0].transcript; 
-            enviar(); 
-        };
-        rec.start();
-    }
 
-    async function enviar() {
-        const query = document.getElementById('userInput').value;
-        if(!query) return;
+        function escuchar() {
+            const rec = new SpeechRecognition();
+            rec.lang = 'es-VE';
+            rec.onresult = (e) => {
+                document.getElementById('userInput').value = e.results[0][0].transcript;
+                enviar();
+            };
+            rec.start();
+        }
 
-        try {
+        async function enviar() {
+            const q = document.getElementById('userInput').value;
             const res = await fetch('/preguntar', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ pregunta: query, modo_admin: modoAdmin })
+                body: JSON.stringify({ pregunta: q })
             });
             const data = await res.json();
-            
-            if(data.tasa_sync) document.getElementById('tasaInput').value = parseFloat(data.tasa_sync).toFixed(2);
-
-            if(data.respuesta === "MODO_ADMIN_ACTIVADO") activarAdmin();
-            else if(data.respuesta === "MODO_VENDEDOR_ACTIVADO") desactivarAdmin();
-            else {
-                document.getElementById('textoElena').innerText = data.respuesta;
-                hablar(data.respuesta);
-            }
-        } catch (error) {
-            console.error("Error al enviar:", error);
+            document.getElementById('textoElena').innerText = data.respuesta;
+            hablar(data.respuesta);
+            document.getElementById('userInput').value = "";
         }
-        document.getElementById('userInput').value = "";
-    }
-
-    // --- LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA (9:05 y 1:05) ---
-    function verificarReloj() {
-        const ahora = new Date();
-        const diaSemana = ahora.getDay(); // 5 es viernes
-        const h = ahora.getHours();
-        const m = ahora.getMinutes();
-
-        // Actualización normal 9:05 AM y 1:05 PM (13:05)
-        if ((h === 9 && m === 5) || (h === 13 && m === 5)) {
-            console.log("Activando actualización programada...");
-            ejecutarActualizacionSilenciosa();
-        }
-
-        // Refuerzo Viernes 1:15 PM
-        if (diaSemana === 5 && h === 13 && m === 15) {
-            console.log("Activando refuerzo de viernes...");
-            ejecutarActualizacionSilenciosa();
-        }
-    }
-
-    // IMPORTANTE: Iniciar el intervalo de revisión cada 60 segundos
-    setInterval(verificarReloj, 60000);
-
-    async function ejecutarActualizacionSilenciosa() {
-        try {
-            const res = await fetch('/preguntar', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ pregunta: "actualiza la tasa" })
-            });
-            const data = await res.json();
-            if(data.tasa_sync) {
-                document.getElementById('tasaInput').value = parseFloat(data.tasa_sync).toFixed(2);
-                hablar("Atención: He actualizado la tasa de cambio automáticamente.");
-            }
-        } catch (e) {
-            console.error("Error en auto-actualización:", e);
-        }
-    }
-
-    function activarAdmin() {
-        modoAdmin = true;
-        document.getElementById('body').classList.add('admin-mode-bg');
-        document.getElementById('labelModo').innerText = "MODO GERENCIA";
-        document.getElementById('adminTools').style.display = "block";
-        document.getElementById('btnExit').style.display = "inline-block";
-        hablar("Modo gerencia activado.");
-    }
-
-    function desactivarAdmin() {
-        modoAdmin = false;
-        document.getElementById('body').classList.remove('admin-mode-bg');
-        document.getElementById('labelModo').innerText = "MODO VENDEDOR";
-        document.getElementById('adminTools').style.display = "none";
-        document.getElementById('btnExit').style.display = "none";
-        hablar("Modo vendedor activado.");
-    }
-
-    async function subirExcel() {
-        const fileInput = document.getElementById('fileIn');
-        if (fileInput.files.length === 0) return;
-
-        const fd = new FormData();
-        fd.append('file', fileInput.files[0]);
-        
-        document.getElementById('textoElena').innerText = "Leyendo inventario...";
-        
-        try {
-            const res = await fetch('/upload', { method: 'POST', body: fd });
-            const data = await res.json();
-            document.getElementById('textoElena').innerText = data.mensaje;
-            hablar(data.mensaje);
-        } catch (e) {
-            document.getElementById('textoElena').innerText = "Error al subir archivo.";
-        }
-    }
-</script>
+    </script>
 </body>
 </html>

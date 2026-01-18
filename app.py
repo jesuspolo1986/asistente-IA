@@ -1,151 +1,81 @@
-import os
-import io
-import requests
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import pandas as pd
-from bs4 import BeautifulSoup
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for
-from sqlalchemy import create_engine, text
-from mistralai import Mistral
-from rapidfuzz import process, utils
-import urllib3
-
-# Desactivar advertencias de certificados para el BCV
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import os
+from pyDolarVenezuela.pages import AlCambio
+from pyDolarVenezuela import Monitor
+from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET", "elena_pro_secure_2026")
+app.secret_key = 'elena_farmacia_secret_2026'
 
-# --- CONFIGURACIÓN DE BASE DE DATOS ---
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:aSxRZ3rVrMu2Oasu@db.kebpamfydhnxeaeegulx.supabase.co:6543/postgres")
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-engine = create_engine(DATABASE_URL)
-client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY", "p2KCokd08zRypMAZQxMbC4ImxkM5DPK1"))
-
-# Mapeo inteligente de columnas para el Excel
-MAPEO_COLUMNAS = {
-    'Producto': ['producto', 'descripcion', 'nombre', 'articulo', 'item'],
-    'Precio Venta': ['precio venta', 'pvp', 'precio', 'venta', 'precio_unitario'],
-    'Costo': ['costo', 'compra', 'p.costo'],
-    'Stock Actual': ['stock actual', 'stock', 'cantidad', 'existencia']
-}
+# --- CONFIGURACIÓN ---
+EXCEL_FILE = 'inventario.xlsx'
+USUARIO_ADMIN = "farmacia@admin.com"
+PASSWORD_ADMIN = "1234" # Cambia esto por tu clave real
+FECHA_VENCIMIENTO = datetime(2026, 1, 17) # Ejemplo: venció ayer
 
 def obtener_tasa_real():
-    # Añadimos un número aleatorio al final de la URL para forzar al BCV a darnos la tasa nueva
-    import time
-    url = f"https://www.bcv.org.ve/?t={int(time.time())}" 
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-    }
-    
     try:
-        res = requests.get(url, headers=headers, verify=False, timeout=10)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, 'html.parser')
-            # Buscamos específicamente el fuerte del dólar
-            # El BCV a veces tiene espacios invisibles, los eliminamos todos
-            valor_sucio = soup.find('div', id='dolar').find('strong').text.strip()
-            # Reemplazamos coma por punto y quitamos cualquier carácter raro
-            valor_limpio = "".join(c for c in valor_sucio if c.isdigit() or c in ',.')
-            return float(valor_limpio.replace(',', '.'))
-    except Exception as e:
-        print(f"Error crítico de sincronización: {e}")
-        return None
+        monitor = Monitor(AlCambio, 'USD')
+        monitores = monitor.get_all_monitors()
+        for m in monitores:
+            if "BCV" in m.title:
+                return float(m.price)
+        return 341.74
+    except:
+        return 341.74
+
+def calcular_gracia():
+    hoy = datetime.now()
+    dias_diff = (FECHA_VENCIMIENTO - hoy).days
+    return dias_diff # Si es -1, está en periodo de gracia
+
 @app.route('/')
 def index():
-    if 'user' not in session:
-        return render_template('index.html', login_mode=True)
-    
-    # Actualización automática al entrar a la app
-    tasa_fresca = obtener_tasa_real()
-    if tasa_fresca:
-        session['tasa_actual'] = tasa_fresca
-    elif 'tasa_actual' not in session:
-        session['tasa_actual'] = 344.51 # Valor base de seguridad
-
-    return render_template('index.html', 
-                           login_mode=False, 
-                           user=session['user'], 
-                           tasa=session.get('tasa_actual'))
-
-@app.route('/preguntar', methods=['POST'])
-def preguntar():
-    if 'user' not in session: return jsonify({"error": "No autorizado"}), 401
-    
-    data = request.json
-    pregunta = data.get("pregunta", "").lower().strip()
-    modo_admin = data.get("modo_admin", False)
-
-    # COMANDO DE TASA (Manual o por voz)
-    if "actualiza la tasa" in pregunta or "busca la tasa" in pregunta:
-        v_anterior = session.get('tasa_actual', 0)
-        nueva = obtener_tasa_real()
-        if nueva:
-            session['tasa_actual'] = nueva
-            tendencia = "subió" if nueva > v_anterior else "bajó" if nueva < v_anterior else "se mantiene"
-            return jsonify({
-                "respuesta": f"He verificado el monitor. La tasa {tendencia} a {nueva:,.2f} Bolívares.",
-                "tasa_sync": nueva
-            })
-        return jsonify({"respuesta": "No pude conectar con el servidor de la tasa."})
-
-    # CONTROL DE MODOS
-    if pregunta == "activar modo gerencia": return jsonify({"respuesta": "MODO_ADMIN_ACTIVADO"})
-    if pregunta in ["activar modo vendedor", "salir de gerencia"]: return jsonify({"respuesta": "MODO_VENDEDOR_ACTIVADO"})
-
-    resumen = session.get('resumen_datos')
-    if not resumen: return jsonify({"respuesta": "Elena: Por favor, carga el inventario en herramientas."})
-
-    # BÚSQUEDA DE PRODUCTOS
-    df = pd.DataFrame(resumen['datos_completos'])
-    match = process.extractOne(pregunta.replace("precio", "").strip(), df['Producto'].astype(str).tolist(), processor=utils.default_process)
-    
-    if match and match[1] > 65:
-        f = df[df['Producto'] == match[0]].iloc[0]
-        tasa = float(session.get('tasa_actual', 344.51))
-        p_usd = float(str(f['Precio Venta']).replace('$', '').replace(',', ''))
-        
-        if modo_admin:
-            costo = float(str(f.get('Costo', 0)).replace('$', '').replace(',', ''))
-            m = ((p_usd - costo) / p_usd) * 100 if p_usd > 0 else 0
-            res = f"📊 {match[0]} | Costo: ${costo:,.2f} | Venta: ${p_usd:,.2f} | Margen: {m:.1f}% | Stock: {int(f.get('Stock Actual', 0))}"
-        else:
-            res = f"El {match[0]} cuesta {p_usd * tasa:,.2f} Bs ({p_usd:,.2f} USD)."
-        
-        return jsonify({"respuesta": res, "tasa_sync": tasa})
-
-    return responder_con_ia(pregunta, resumen)
-
-def responder_con_ia(pregunta, resumen):
-    prompt = f"Eres Elena, asistente de farmacia. Datos: {resumen['columnas']}. Responde breve."
-    response = client.chat.complete(model="mistral-small", messages=[{"role": "system", "content": prompt}, {"role": "user", "content": pregunta}])
-    return jsonify({"respuesta": response.choices[0].message.content})
-
-@app.route('/upload', methods=['POST'])
-def upload():
-    file = request.files.get('file')
-    try:
-        df = pd.read_excel(io.BytesIO(file.read())) if file.filename.endswith(('.xlsx', '.xls')) else pd.read_csv(io.BytesIO(file.read()))
-        nuevas = {c: est for est, sin in MAPEO_COLUMNAS.items() for c in df.columns if str(c).lower().strip() in sin}
-        df.rename(columns=nuevas, inplace=True)
-        session['resumen_datos'] = {"columnas": df.columns.tolist(), "datos_completos": df.to_dict(orient='records')}
-        session.modified = True
-        return jsonify({"success": True, "mensaje": "Inventario cargado exitosamente."})
-    except Exception as e: return jsonify({"success": False, "error": str(e)})
+    tasa = obtener_tasa_real()
+    dias = calcular_gracia()
+    return render_template('index.html', tasa=tasa, dias_restantes=dias)
 
 @app.route('/login', methods=['POST'])
 def login():
-    session['user'] = request.form.get('email', '').strip().lower()
-    return redirect(url_for('index'))
+    email = request.form.get('email')
+    password = request.form.get('password')
+    
+    if email == USUARIO_ADMIN and password == PASSWORD_ADMIN:
+        session['autenticado'] = True
+        return redirect(url_for('index'))
+    return "Credenciales incorrectas", 401
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('index'))
 
+@app.route('/preguntar', methods=['POST'])
+def preguntar():
+    if not session.get('autenticado'):
+        return jsonify({"respuesta": "Inicia sesión primero."}), 401
+    
+    data = request.get_json()
+    pregunta = data.get('pregunta', '').lower()
+    tasa = obtener_tasa_real()
+    
+    try:
+        df = pd.read_excel(EXCEL_FILE)
+        # Búsqueda de producto
+        match = df[df['Producto'].str.contains(pregunta, case=False, na=False)]
+        
+        if not match.empty:
+            prod = match.iloc[0]['Producto']
+            usd = float(match.iloc[0]['Precio_USD'])
+            bs = usd * tasa
+            return jsonify({
+                "respuesta": f"El {prod} cuesta {usd} dólares. Al cambio son {bs:.2f} bolívares.",
+                "tasa_sync": tasa
+            })
+        return jsonify({"respuesta": "No encontré ese producto."})
+    except Exception as e:
+        return jsonify({"respuesta": f"Error: {str(e)}"}), 500
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    app.run(debug=True, port=5000)
