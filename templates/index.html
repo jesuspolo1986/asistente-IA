@@ -2,43 +2,166 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Elena AI | Farmacia</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elena AI | Asistente de Farmacia</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --primary: #00d2ff; --bg: #0f172a; --warning: #f39c12; }
-        body { background: var(--bg); color: white; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; margin: 0; }
-        .grace-banner { background: var(--warning); color: black; width: 100%; position: fixed; top: 0; padding: 10px; text-align: center; font-weight: bold; }
-        .login-card, .card-elena { background: rgba(255,255,255,0.05); padding: 2.5rem; border-radius: 30px; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); width: 380px; text-align: center; }
-        .aura { width: 100px; height: 100px; margin: 0 auto 1.5rem; border-radius: 50%; background: var(--primary); animation: pulse 2s infinite; cursor: pointer; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0,210,255,0.7); } 70% { box-shadow: 0 0 0 20px rgba(0,210,255,0); } 100% { box-shadow: 0 0 0 0 rgba(0,210,255,0); } }
-        .res-box { min-height: 80px; margin-bottom: 20px; color: #cbd5e1; display: flex; align-items: center; justify-content: center; }
-        .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 10px; color: white; padding: 12px; width: 100%; text-align: center; }
+        :root {
+            --primary-glow: #00d2ff;
+            --secondary-glow: #3a7bd5;
+            --bg-dark: #0f172a;
+            --grace-warning: #f39c12;
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* Banner de Suscripción (Regla de Negocio: Periodo de Gracia) */
+        .grace-banner {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: var(--grace-warning);
+            color: #000;
+            text-align: center;
+            padding: 12px;
+            font-weight: bold;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .login-card, .elena-container {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2.5rem;
+            border-radius: 30px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        /* Aura de Elena (Animación) */
+        .elena-aura {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(45deg, var(--primary-glow), var(--secondary-glow));
+            border-radius: 50%;
+            margin: 0 auto 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.3s;
+        }
+
+        .elena-aura:hover { transform: scale(1.05); }
+
+        .elena-aura.listening {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0.7); }
+            70% { box-shadow: 0 0 0 25px rgba(0, 210, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0); }
+        }
+
+        .response-box {
+            min-height: 100px;
+            margin-bottom: 1.5rem;
+            font-size: 1.2rem;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.4;
+        }
+
+        .input-group-elena {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 5px;
+            display: flex;
+        }
+
+        .input-group-elena input {
+            background: transparent;
+            border: none;
+            color: white;
+            padding: 12px;
+            flex-grow: 1;
+            outline: none;
+        }
+
+        .tasa-badge {
+            background: rgba(0, 210, 255, 0.2);
+            color: var(--primary-glow);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            border: 1px solid var(--primary-glow);
+        }
     </style>
 </head>
 <body>
 
-    {% if dias_restantes is defined and dias_restantes <= 0 %}
-        <div class="grace-banner">⚠️ Suscripción vencida. Día de gracia activado.</div>
+    {% if dias_restantes is defined %}
+        {% if dias_restantes == 0 %}
+            <div class="grace-banner">
+                <i class="fas fa-exclamation-triangle me-2"></i> Tu suscripción expira hoy. ¡Recuerda renovar!
+            </div>
+        {% elif dias_restantes < 0 %}
+            <div class="grace-banner">
+                <i class="fas fa-clock me-2"></i> Suscripción vencida ayer. Elena está en periodo de gracia.
+            </div>
+        {% endif %}
     {% endif %}
 
     {% if not session.get('autenticado') %}
     <div class="login-card">
-        <h2 class="mb-4">Elena AI</h2>
-        <p class="small opacity-75">Introduce tu correo autorizado</p>
+        <h2 class="fw-bold mb-2">Elena AI</h2>
+        <p class="text-muted small mb-4">Ingresa tu correo autorizado</p>
         <form action="/login" method="POST">
-            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0 py-3" placeholder="ejemplo@farmacia.com" required>
-            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">ACCEDER</button>
+            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0 py-3" placeholder="correo@farmacia.com" required>
+            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold shadow">ACCEDER AL SISTEMA</button>
         </form>
     </div>
     {% else %}
-    <div class="card-elena">
-        <div class="d-flex justify-content-between mb-3 small opacity-50">
-            <span>TASA: {{ tasa }}</span>
-            <a href="/logout" class="text-danger text-decoration-none">Salir</a>
+    <div class="elena-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="tasa-badge">BCV: {{ tasa }}</div>
+            <a href="/logout" class="text-danger text-decoration-none small"><i class="fas fa-sign-out-alt"></i> Salir</a>
         </div>
-        <div class="aura" onclick="escuchar()"></div>
-        <div id="textoElena" class="res-box">¿Qué medicamento buscamos hoy?</div>
-        <input type="text" id="userInput" class="input-elena" placeholder="Escribe el nombre..." onkeypress="if(event.key==='Enter') enviar()">
+
+        <div id="auraElena" class="elena-aura" onclick="iniciarEscucha()">
+            <i class="fas fa-microphone fa-2xl text-white"></i>
+        </div>
+
+        <div id="textoElena" class="response-box">
+            Presiona el círculo para hablar o escribe el nombre del producto abajo.
+        </div>
+
+        <div class="input-group-elena mb-2">
+            <input type="text" id="userInput" placeholder="¿Qué medicamento buscas?" onkeypress="if(event.key==='Enter') enviarConsulta()">
+            <button class="btn btn-primary rounded-3" onclick="enviarConsulta()">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+        <p class="text-muted" style="font-size: 0.7rem;">Elena utiliza Edge-TTS para las respuestas de voz.</p>
     </div>
     {% endif %}
 
@@ -46,34 +169,76 @@
         const synth = window.speechSynthesis;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-        function hablar(t) {
+        function hablar(texto) {
+            if (!synth) return;
+            // Detener cualquier voz previa
             synth.cancel();
-            const u = new SpeechSynthesisUtterance(t);
-            u.lang = 'es-MX';
-            synth.speak(u);
+            const utterance = new SpeechSynthesisUtterance(texto);
+            utterance.lang = 'es-MX'; // Voz en español
+            utterance.rate = 1.0;
+            utterance.pitch = 1.1; // Un poco más aguda para que suene como "Elena"
+            synth.speak(utterance);
         }
 
-        function escuchar() {
-            const rec = new SpeechRecognition();
-            rec.lang = 'es-VE';
-            rec.onresult = (e) => {
-                document.getElementById('userInput').value = e.results[0][0].transcript;
-                enviar();
+        function iniciarEscucha() {
+            if (!SpeechRecognition) {
+                alert("Tu navegador no soporta el reconocimiento de voz.");
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            const aura = document.getElementById('auraElena');
+            const box = document.getElementById('textoElena');
+
+            recognition.lang = 'es-VE';
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                aura.classList.add('listening');
+                box.innerText = "Elena te escucha...";
             };
-            rec.start();
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('userInput').value = transcript;
+                enviarConsulta();
+            };
+
+            recognition.onerror = () => {
+                aura.classList.remove('listening');
+                box.innerText = "No pude escucharte bien. Intenta de nuevo.";
+            };
+
+            recognition.onend = () => {
+                aura.classList.remove('listening');
+            };
+
+            recognition.start();
         }
 
-        async function enviar() {
-            const q = document.getElementById('userInput').value;
-            const res = await fetch('/preguntar', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ pregunta: q })
-            });
-            const data = await res.json();
-            document.getElementById('textoElena').innerText = data.respuesta;
-            hablar(data.respuesta);
-            document.getElementById('userInput').value = "";
+        async function enviarConsulta() {
+            const input = document.getElementById('userInput');
+            const box = document.getElementById('textoElena');
+            const query = input.value.trim();
+
+            if (!query) return;
+
+            box.innerText = "Buscando en inventario...";
+            input.value = "";
+
+            try {
+                const response = await fetch('/preguntar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pregunta: query })
+                });
+
+                const data = await response.json();
+                box.innerText = data.respuesta;
+                hablar(data.respuesta);
+            } catch (error) {
+                box.innerText = "Error de conexión con el servidor.";
+            }
         }
     </script>
 </body>
