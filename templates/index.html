@@ -3,232 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Pro Analyst | Dashboard</title>
+    <title>Elena AI | Business Intelligence</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        /* --- ESTRUCTURA DE PANTALLA FIJA --- */
-        html, body {
-            height: 100%;
-            margin: 0;
-            overflow: hidden; 
-        }
-
-        .app-container {
-            display: flex;
-            height: 100vh;
-            width: 100vw;
-        }
-
-        .sidebar {
-            width: 260px;
-            padding: 1.5rem 1rem;
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            background: #1a1a2e; /* Color oscuro profesional */
-            color: white;
-        }
-
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        /* --- CHAT ÁREA CON SCROLL --- */
-        .chat-area {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .chat-box {
-            flex: 1;
-            overflow-y: auto;
-            padding: 30px 40px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            background: #f8f9fa;
-        }
-
-        /* --- BARRA DE PREGUNTAS FIJA --- */
-        .input-container {
-            background: white;
-            border-top: 1px solid #eee;
-            flex-shrink: 0;
-            padding: 20px 40px;
-        }
-
-        /* --- ESTILO DE BOTONES UNIFICADO --- */
-        .btn-upload, .btn-download, .btn-outline-light {
-            padding: 10px 12px !important;
-            font-size: 0.85rem !important;
-            border-radius: 8px !important;
-            margin-bottom: 10px !important;
-            font-weight: 500 !important;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-decoration: none !important;
-            transition: all 0.3s ease;
-        }
-
-        /* Botón Recargar (Azul Marca) */
-        .btn-recarga {
-            background: #1a5276 !important;
-            color: white !important;
-            border: none !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
+        :root { --primary: #00d2ff; --admin: #a18cd1; --bg: #0f172a; }
+        body { background: var(--bg); color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: 0.5s; overflow: hidden; }
         
-        /* Botón Reporte (Naranja/Verde según tu CSS original) */
-        .btn-download {
-            background: #27ae60 !important; /* Verde profesional */
-            color: white !important;
-            border: none !important;
-        }
-
-        .btn-upload { background: #34495e; color: white; border: none; }
-
-        /* Burbujas de chat */
-        .message.ai .bubble {
-            max-width: 90%;
-            padding: 20px 25px;
-            line-height: 1.7;
-            font-size: 1rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-            border-radius: 2px 20px 20px 20px;
-            background: white;
-            color: #333;
-        }
-
-        .credits-counter {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
-            padding: 12px 5px;
-            margin-bottom: 20px;
-        }
-        .credits-label { font-size: 0.65rem; color: #bdc3c7; text-transform: uppercase; display: block; }
-        .credits-value { font-size: 1.1rem; font-weight: 700; color: #ffffff; }
-
-        /* Scrollbar estética */
-        .chat-box::-webkit-scrollbar { width: 6px; }
-        .chat-box::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
-
-        /* Login */
-        .login-overlay { height: 100vh; display: flex; align-items: center; justify-content: center; background: #f4f7f6; width: 100%; }
-        .login-card { background: white; padding: 2.5rem; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 400px; width: 90%; text-align: center; }
+        /* --- ESTILO LOGIN (AI PRO) --- */
+        .login-card { background: rgba(255,255,255,0.05); padding: 2.5rem; border-radius: 30px; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); width: 100%; max-width: 400px; text-align: center; }
+        .form-control { background: rgba(255,255,255,0.1); border: none; color: white; border-radius: 12px; padding: 12px; }
+        .form-control:focus { background: rgba(255,255,255,0.15); color: white; box-shadow: 0 0 15px var(--primary); }
+        
+        /* --- ESTILO ELENA --- */
+        .admin-mode-bg { background: #1a1625; }
+        .card-elena { background: rgba(255,255,255,0.03); border-radius: 40px; padding: 2rem; width: 420px; text-align: center; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.3); position: relative;}
+        .aura { width: 120px; height: 120px; margin: 0 auto 1.5rem; position: relative; cursor: pointer; }
+        .aura-inner { inset: 0; position: absolute; border-radius: 50%; background: linear-gradient(45deg, var(--primary), #3a7bd5); animation: pulse-aura 2.5s infinite ease-in-out; transition: 0.8s; }
+        .admin-active .aura-inner { background: linear-gradient(45deg, #fbc2eb, var(--admin)); }
+        @keyframes pulse-aura { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 45px var(--primary); } }
+        
+        .res-box { min-height: 110px; margin: 1rem 0; font-size: 1.05rem; color: #cbd5e1; display: flex; align-items: center; justify-content: center; line-height: 1.4; }
+        .input-elena { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; color: white; padding: 14px; width: 100%; text-align: center; outline: none; transition: 0.3s; }
+        .input-elena:focus { border-color: var(--primary); background: rgba(255,255,255,0.12); }
+        
+        .credits-tag { font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; color: #00d2ff; }
+        #tasaInput { background: none; border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 70px; text-align: center; border-radius: 8px; font-weight: bold; }
+        .logout-btn { position: absolute; top: -40px; right: 0; color: rgba(255,255,255,0.4); text-decoration: none; font-size: 0.8rem; }
     </style>
 </head>
-<body>
+<body id="body">
 
     {% if login_mode %}
-    <div class="login-overlay">
-        <div class="login-card">
-            <i class="fas fa-chart-pie fa-3x mb-3" style="color: #1a5276;"></i>
-            <h2>AI Pro Analyst</h2>
-            <p class="text-muted">Ingresa tu email para continuar</p>
-            <form action="/login" method="POST">
-                <input type="email" name="email" class="form-control mb-3" placeholder="correo@ejemplo.com" required>
-                <button type="submit" class="btn btn-primary w-100 py-2" style="background: #1a5276; border: none;">Entrar al Panel</button>
-            </form>
-            {% if error %}<div class="alert alert-danger mt-3 small">{{ error }}</div>{% endif %}
-        </div>
+    <div class="login-card">
+        <div class="aura" style="width: 80px; height: 80px;"><div class="aura-inner"></div></div>
+        <h2 class="fw-bold mb-2">Elena AI</h2>
+        <p class="text-white-50 small mb-4">Ingresa para conectar con tu inventario</p>
+        <form action="/login" method="POST">
+            <input type="email" name="email" class="form-control mb-3" placeholder="Tu correo electrónico" required>
+            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold" style="background: linear-gradient(45deg, #00d2ff, #3a7bd5); border: none; border-radius: 12px;">INICIAR SESIÓN</button>
+        </form>
+        {% if error %}<div class="alert alert-danger mt-3 py-2 small" style="background: rgba(220,53,69,0.2); border: none; color: #ff8686;">{{ error }}</div>{% endif %}
     </div>
+
     {% else %}
-    <div class="app-container">
-        <nav class="sidebar">
-            <div class="brand mb-4">
-                <i class="fas fa-chart-pie me-2"></i>
-                <span>AI Pro Analyst</span>
+    <div class="card-elena">
+        <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Salir</a>
+        
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="credits-tag"><i class="fas fa-bolt"></i> {{ creditos_usados }} / {{ creditos_totales }}</span>
+            <span id="labelModo" class="small fw-bold text-white-50">VENDEDOR</span>
+            <div class="small">
+                <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly>
             </div>
+        </div>
 
-            <div class="credits-counter text-center">
-                <span class="credits-label">Créditos de Consulta</span>
-                <span class="credits-value">
-                    <i class="fas fa-bolt text-warning me-1"></i> 
-                    {{ creditos_usados }} / {{ creditos_totales }}
-                </span>
-            </div>
+        <div class="aura" onclick="escuchar()"><div class="aura-inner" id="auraCirculo"></div></div>
+        
+        <h4 class="fw-bold mb-0">ELENA AI</h4>
+        <small class="text-primary opacity-75">{{ user }}</small>
+        
+        <div class="res-box" id="textoElena">¿En qué puedo ayudarte hoy?</div>
+        
+        <input type="text" id="userInput" class="input-elena" placeholder="Escribe o pulsa el círculo..." onkeypress="if(event.key==='Enter') enviar()">
 
-            <div class="upload-section">
-                <p class="small text-white-50 mb-2">HERRAMIENTAS</p>
-                <input type="file" id="fileInput" hidden onchange="uploadFile()">
-                <button class="btn-upload w-100" onclick="document.getElementById('fileInput').click()">
-                    <i class="fas fa-file-upload me-2"></i> Cargar Datos
-                </button>
-                <div id="fileStatus" class="file-status small opacity-75 text-center mt-1">Sin archivo activo</div>
-            </div>
-
-            <div class="mt-auto pt-4">
-                <p class="small text-white-50 mb-2">SOPORTE Y PAGOS</p>
-                
-                <a href="https://wa.me/584128598727?text=Hola,%20quiero%20recargar%20créditos" 
-                   target="_blank" class="btn-upload btn-recarga w-100">
-                    <i class="fab fa-whatsapp me-2"></i> Recargar Plan
-                </a>
-                
-                <a href="/download_pdf" class="btn-download w-100">
-                    <i class="fas fa-file-pdf me-2"></i> Reporte PDF
-                </a>
-
-                <hr class="text-white-50">
-                <div class="user-info mb-2 small text-truncate text-white-50">
-                    <i class="fas fa-user-circle me-1"></i> {{ user }}
-                </div>
-                <a href="/logout" class="btn btn-sm btn-outline-light w-100 opacity-75">Cerrar Sesión</a>
-            </div>
-        </nav>
-
-        <div class="main-content">
-            {% if dias_restantes is defined %}
-                {% if dias_restantes == 0 %}
-                <div class="alert alert-warning m-3 py-2 small shadow-sm">
-                    <strong>⚠️ Atención:</strong> Tu suscripción vence hoy. Mañana inicia tu día de gracia.
-                </div>
-                {% elif dias_restantes < 0 %}
-                <div class="alert alert-danger m-3 py-2 small shadow-sm">
-                    <strong>⚡ Día de Gracia:</strong> Suscripción vencida. Último día de acceso permitido.
-                </div>
-                {% endif %}
-            {% endif %}
-
-            <main class="chat-area">
-                <header class="chat-header px-4 py-3 border-bottom bg-white">
-                    <div>
-                        <h4 class="mb-0">Panel de Inteligencia</h4>
-                        <small class="text-success"><i class="fas fa-circle fa-xs"></i> Sistema Activo</small>
-                    </div>
-                </header>
-
-                <div id="chatBox" class="chat-box">
-                    <div class="message ai">
-                        <div class="bubble">
-                            Bienvenido al panel estratégico. Por favor, carga un archivo <strong>Excel</strong> o <strong>CSV</strong> para iniciar el análisis profundo de tus datos.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="input-container">
-                    <div class="input-group shadow-sm" style="border-radius: 15px; overflow: hidden; background: #f1f3f4;">
-                        <input type="text" id="userInput" class="form-control border-0 py-3 px-4" placeholder="¿Qué insights deseas obtener hoy?" style="background: transparent;">
-                        <button class="btn btn-primary px-4" onclick="sendMessage()">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </div>
-            </main>
+        <div id="adminTools" style="display: none;" class="mt-4 animate__animated animate__fadeIn">
+            <input type="file" id="fileIn" hidden onchange="subirExcel()">
+            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold py-2" style="border-radius: 10px;" onclick="document.getElementById('fileIn').click()">
+                <i class="fas fa-upload me-2"></i> CARGAR INVENTARIO
+            </button>
+            <button class="btn btn-outline-light btn-sm w-100 py-2" style="border-radius: 10px; border-color: rgba(255,255,255,0.2);" onclick="window.location.href='/download_pdf'">
+                <i class="fas fa-file-pdf me-2"></i> REPORTE GERENCIAL
+            </button>
         </div>
     </div>
     {% endif %}
 
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+    // --- LÓGICA DE ELENA CONECTADA AL BACKEND UNIFICADO ---
+    let modoAdmin = false;
+    const synth = window.speechSynthesis;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    function hablar(msj) {
+        if (!msj) return;
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(msj.replace(/[📊|📈|📉|*]/g, ''));
+        u.lang = 'es-MX';
+        synth.speak(u);
+    }
+
+    function escuchar() {
+        if (!SpeechRecognition) return alert("Navegador no compatible");
+        const rec = new SpeechRecognition();
+        rec.lang = 'es-VE';
+        rec.onstart = () => {
+            document.getElementById('textoElena').innerText = "Escuchando...";
+            document.getElementById('auraCirculo').style.animationDuration = "0.5s";
+        };
+        rec.onresult = (e) => {
+            document.getElementById('userInput').value = e.results[0][0].transcript;
+            enviar();
+        };
+        rec.onend = () => document.getElementById('auraCirculo').style.animationDuration = "2.5s";
+        rec.start();
+    }
+
+    async function enviar() {
+        const query = document.getElementById('userInput').value;
+        if(!query) return;
+
+        document.getElementById('textoElena').innerText = "...";
+
+        const res = await fetch('/preguntar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ pregunta: query, modo_admin: modoAdmin })
+        });
+        const data = await res.json();
+
+        if(data.respuesta === "MODO_ADMIN_ACTIVADO") {
+            activarAdmin();
+        } else {
+            document.getElementById('textoElena').innerText = data.respuesta;
+            hablar(data.respuesta);
+        }
+        document.getElementById('userInput').value = "";
+    }
+
+    function activarAdmin() {
+        modoAdmin = true;
+        document.getElementById('body').classList.add('admin-mode-bg');
+        document.getElementById('labelModo').innerText = "GERENTE";
+        document.getElementById('labelModo').classList.replace('text-white-50', 'text-info');
+        document.getElementById('tasaInput').readOnly = false;
+        document.getElementById('adminTools').style.display = "block";
+        document.getElementById('auraCirculo').style.boxShadow = "0 0 45px #a18cd1";
+        hablar("Modo gerencia activo. Ya puede cargar archivos y ver costos.");
+    }
+
+    async function subirExcel() {
+        const fd = new FormData();
+        fd.append('file', document.getElementById('fileIn').files[0]);
+        const res = await fetch('/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        document.getElementById('textoElena').innerText = data.mensaje;
+        hablar(data.mensaje);
+    }
+</script>
 </body>
 </html>
