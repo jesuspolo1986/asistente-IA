@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elena AI | Dashboard</title>
+    <title>Elena AI | Farmacia</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -13,11 +13,12 @@
         .card-elena, .login-card { background: rgba(255,255,255,0.05); padding: 2.5rem; border-radius: 40px; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); width: 420px; text-align: center; position: relative; }
         .aura { width: 110px; height: 110px; margin: 0 auto 1.5rem; position: relative; cursor: pointer; }
         .aura-inner { inset: 0; position: absolute; border-radius: 50%; background: linear-gradient(45deg, var(--primary), #3a7bd5); animation: pulse-aura 2.5s infinite ease-in-out; transition: 0.8s; }
+        .admin-active .aura-inner { background: linear-gradient(45deg, #fbc2eb, var(--admin)); }
         @keyframes pulse-aura { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 40px var(--primary); } }
-        .res-box { min-height: 100px; margin: 1rem 0; color: #cbd5e1; display: flex; align-items: center; justify-content: center; line-height: 1.4; }
-        .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 15px; color: white; padding: 14px; width: 100%; text-align: center; outline: none; transition: 0.3s; }
-        #tasaInput { background: none; border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 80px; text-align: center; border-radius: 8px; font-weight: bold; }
-        .btn-exit-admin { display: none; background: rgba(220, 53, 69, 0.2); border: none; color: #ff8686; padding: 5px 15px; border-radius: 20px; font-size: 0.7rem; margin-bottom: 10px; cursor: pointer; }
+        .res-box { min-height: 100px; margin: 1rem 0; color: #cbd5e1; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; line-height: 1.4; }
+        .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 15px; color: white; padding: 14px; width: 100%; text-align: center; outline: none; }
+        #tasaInput { background: none; border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 85px; text-align: center; border-radius: 8px; font-weight: bold; }
+        .btn-exit-admin { display: none; background: rgba(220, 53, 69, 0.2); border: none; color: #ff8686; padding: 5px 15px; border-radius: 20px; font-size: 0.75rem; margin-bottom: 10px; cursor: pointer; }
     </style>
 </head>
 <body id="body">
@@ -26,24 +27,28 @@
     <div class="login-card">
         <h2 class="fw-bold mb-4">Elena AI</h2>
         <form action="/login" method="POST">
-            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0 py-3" placeholder="Correo Electrónico" required>
-            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">ENTRAR AL SISTEMA</button>
+            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0 py-3" placeholder="Email" required>
+            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold">ENTRAR</button>
         </form>
     </div>
     {% else %}
     <div class="card-elena">
-        <button id="btnExit" class="btn-exit-admin" onclick="desactivarAdmin()">SALIR MODO GERENCIA</button>
-        <div class="d-flex justify-content-between mb-3 small">
-            <span>TASA: <input type="number" id="tasaInput" value="{{ tasa }}" readonly></span>
-            <span id="labelModo" class="opacity-75">VENDEDOR</span>
-        </div>
-        <div class="aura" onclick="escuchar()"><div class="aura-inner" id="auraCirculo"></div></div>
-        <div class="res-box" id="textoElena">¿En qué puedo ayudarte?</div>
-        <input type="text" id="userInput" class="input-elena" placeholder="Habla o escribe aquí..." onkeypress="if(event.key==='Enter') enviar()">
+        <button id="btnExit" class="btn-exit-admin" onclick="desactivarAdmin()">
+            <i class="fas fa-sign-out-alt"></i> SALIR DE GERENCIA
+        </button>
         
+        <div class="d-flex justify-content-between mb-3 small">
+            <span>TASA: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly></span>
+            <span id="labelModo" class="opacity-75">MODO VENDEDOR</span>
+        </div>
+
+        <div class="aura" onclick="escuchar()"><div class="aura-inner" id="auraCirculo"></div></div>
+        <div class="res-box" id="textoElena">Presiona para hablar...</div>
+        <input type="text" id="userInput" class="input-elena" placeholder="Escribe aquí..." onkeypress="if(event.key==='Enter') enviar()">
+
         <div id="adminTools" style="display: none;" class="mt-4">
             <input type="file" id="fileIn" hidden onchange="subirExcel()">
-            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold" onclick="document.getElementById('fileIn').click()">CARGAR EXCEL</button>
+            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold" onclick="document.getElementById('fileIn').click()">ACTUALIZAR INVENTARIO</button>
         </div>
     </div>
     {% endif %}
@@ -63,7 +68,7 @@
     function escuchar() {
         const rec = new SpeechRecognition();
         rec.lang = 'es-VE';
-        rec.onstart = () => { document.getElementById('textoElena').innerText = "Escuchando..."; };
+        rec.onstart = () => document.getElementById('textoElena').innerText = "Escuchando...";
         rec.onresult = (e) => { document.getElementById('userInput').value = e.results[0][0].transcript; enviar(); };
         rec.start();
     }
@@ -79,7 +84,7 @@
         });
         const data = await res.json();
         
-        if(data.tasa_sync) document.getElementById('tasaInput').value = data.tasa_sync;
+        if(data.tasa_sync) document.getElementById('tasaInput').value = parseFloat(data.tasa_sync).toFixed(2);
 
         if(data.respuesta === "MODO_ADMIN_ACTIVADO") activarAdmin();
         else if(data.respuesta === "MODO_VENDEDOR_ACTIVADO") desactivarAdmin();
@@ -90,22 +95,47 @@
         document.getElementById('userInput').value = "";
     }
 
+    // --- LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA (9:05 y 1:05) ---
+    function verificarReloj() {
+        const ahora = new Date();
+        const h = ahora.getHours();
+        const m = ahora.getMinutes();
+        if ((h === 9 && m === 5) || (h === 13 && m === 5)) {
+            console.log("Actualizando tasa por horario programado...");
+            ejecutarActualizacionSilenciosa();
+        }
+    }
+    setInterval(verificarReloj, 60000); // Revisa cada minuto
+
+    async function ejecutarActualizacionSilenciosa() {
+        const res = await fetch('/preguntar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ pregunta: "actualiza la tasa" })
+        });
+        const data = await res.json();
+        if(data.tasa_sync) {
+            document.getElementById('tasaInput').value = parseFloat(data.tasa_sync).toFixed(2);
+            hablar("La tasa de cambio ha sido actualizada automáticamente.");
+        }
+    }
+
     function activarAdmin() {
         modoAdmin = true;
         document.getElementById('body').classList.add('admin-mode-bg');
-        document.getElementById('labelModo').innerText = "GERENCIA";
+        document.getElementById('labelModo').innerText = "MODO GERENCIA";
         document.getElementById('adminTools').style.display = "block";
         document.getElementById('btnExit').style.display = "inline-block";
-        hablar("Modo gerencia activo.");
+        hablar("Modo gerencia activado.");
     }
 
     function desactivarAdmin() {
         modoAdmin = false;
         document.getElementById('body').classList.remove('admin-mode-bg');
-        document.getElementById('labelModo').innerText = "VENDEDOR";
+        document.getElementById('labelModo').innerText = "MODO VENDEDOR";
         document.getElementById('adminTools').style.display = "none";
         document.getElementById('btnExit').style.display = "none";
-        hablar("Modo vendedor activo.");
+        hablar("Modo vendedor activado.");
     }
 
     async function subirExcel() {
