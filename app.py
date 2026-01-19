@@ -50,8 +50,8 @@ def login():
             session['usuario'] = email
             session['fecha_vencimiento'] = str(res.data[0].get('fecha_vencimiento'))
             return redirect(url_for('index'))
-        return "Usuario no autorizado", 401
-    except: return "Error de base de datos", 500
+        return "Usuario no autorizado o inactivo", 401
+    except: return "Error de conexión con la base de datos", 500
 
 @app.route('/logout')
 def logout():
@@ -60,13 +60,28 @@ def logout():
 
 @app.route('/subir_excel', methods=['POST'])
 def subir_excel():
-    file = request.files.get('archivo')
+    # Verificamos si el archivo viene en la petición
+    if 'archivo' not in request.files:
+        flash("Error: No se detectó el archivo en el formulario.", "danger")
+        return redirect(url_for('index'))
+    
+    file = request.files['archivo']
+    
+    if file.filename == '':
+        flash("Error: No seleccionaste ningún archivo.", "danger")
+        return redirect(url_for('index'))
+
     if file and file.filename.endswith('.xlsx'):
-        file.save(EXCEL_FILE)
-        # Usamos flash para la confirmación visual
+        # Ruta absoluta para asegurar que se guarde en la raíz del proyecto en Koyeb
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        destination = os.path.join(base_path, EXCEL_FILE)
+        
+        file.save(destination)
         flash("¡Inventario actualizado con éxito!", "success")
         return redirect(url_for('index'))
-    return "Error en archivo", 400
+    
+    flash("Error: El archivo debe ser formato .xlsx (Excel)", "danger")
+    return redirect(url_for('index'))
 
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
@@ -80,14 +95,23 @@ def preguntar():
     tasa = obtener_tasa_real()
     try:
         if not os.path.exists(EXCEL_FILE):
-            return jsonify({"respuesta": "Elena no tiene el inventario. Súbelo en modo gerencia."})
+            return jsonify({"respuesta": "Elena no tiene el inventario cargado. Por favor, sube el archivo .xlsx en el panel de gerencia."})
+        
+        # Leemos el Excel
         df = pd.read_excel(EXCEL_FILE)
+        # Buscamos el producto
         match = df[df['Producto'].str.contains(pregunta, case=False, na=False)]
+        
         if not match.empty:
-            p, u = match.iloc[0]['Producto'], float(match.iloc[0]['Precio_USD'])
-            return jsonify({"respuesta": f"El {p} cuesta {u}$. Son {u*tasa:.2f} Bs."})
-        return jsonify({"respuesta": f"No encontré {pregunta}."})
-    except: return jsonify({"respuesta": "Error al leer inventario."})
+            p = match.iloc[0]['Producto']
+            u = float(match.iloc[0]['Precio_USD'])
+            precio_bs = u * tasa
+            return jsonify({"respuesta": f"El {p} cuesta {u}$. Al cambio son {precio_bs:.2f} bolívares."})
+        
+        return jsonify({"respuesta": f"Lo siento, no encontré el producto '{pregunta}' en el inventario."})
+    except Exception as e: 
+        return jsonify({"respuesta": f"Error al procesar el Excel: {str(e)}"})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host='0.0.0.0', port=port)
