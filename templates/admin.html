@@ -2,77 +2,54 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Admin - Centro de Control</title>
+    <title>Admin - Control de Rentas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: #f1f5f9; }
-        .card-stat { border: none; border-radius: 12px; transition: 0.3s; }
-        .vencido-row { background-color: #fff1f2 !important; }
+        body { background: #f8fafc; }
+        .vencido { background-color: #fff1f2 !important; }
+        .card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
     </style>
 </head>
-<body class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold"><i class="fas fa-shield-alt text-primary me-2"></i>Panel Administrativo</h2>
-        <a href="/" class="btn btn-outline-dark">Regresar a Elena</a>
+<body class="container py-5">
+    <div class="d-flex justify-content-between mb-4">
+        <h2>🚀 Panel de Control Elena</h2>
+        <a href="/" class="btn btn-dark">Volver</a>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-md-8">
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <div class="card card-stat p-3 shadow-sm bg-white">
-                        <small class="text-muted fw-bold">TOTAL CLIENTES</small>
-                        <h3 class="fw-bold">{{ stats.total }}</h3>
-                    </div>
-                </div>
-                <div class="col-md-4 mb-3">
-                    <div class="card card-stat p-3 shadow-sm bg-success text-white">
-                        <small class="fw-bold">ACTIVOS</small>
-                        <h3 class="fw-bold">{{ stats.activos }}</h3>
-                    </div>
-                </div>
-                <div class="col-md-4 mb-3">
-                    <div class="card card-stat p-3 shadow-sm bg-danger text-white">
-                        <small class="fw-bold">VENCIDOS</small>
-                        <h3 class="fw-bold">{{ stats.vencidos }}</h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card p-2 shadow-sm bg-white text-center">
-                <canvas id="myChart" style="max-height: 120px;"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <div class="card shadow-sm p-4">
+    <div class="card p-4">
+        <h5 class="fw-bold mb-3">Gestión de Clientes</h5>
         <table class="table align-middle">
-            <thead>
+            <thead class="table-light">
                 <tr>
-                    <th>Email del Cliente</th>
-                    <th>Vencimiento</th>
-                    <th>Acción</th>
+                    <th>Email</th>
+                    <th>Vence el</th>
+                    <th>Estado</th>
+                    <th>Acciones de Renta</th>
                 </tr>
             </thead>
             <tbody>
                 {% for u in usuarios %}
-                <tr class="{% if u.vencido %}vencido-row{% endif %}">
+                <tr class="{% if u.vencido %}vencido{% endif %}">
                     <td>
-                        <div class="fw-bold">{{ u.email }}</div>
-                        {% if u.vencido %}<span class="text-danger small">Cobro Pendiente</span>{% endif %}
+                        {{ u.email }}
+                        {% if u.vencido %}<span class="badge bg-danger ms-2">VENCIDO</span>{% endif %}
                     </td>
-                    <td><span class="text-muted">{{ u.fecha_vencimiento }}</span></td>
+                    <td>{{ u.fecha_vencimiento }}</td>
                     <td>
-                        <div class="d-flex gap-2">
+                        {% if u.activo == 1 %}
+                        <span class="badge bg-success">Activo</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group">
                             <form action="/admin/renovar/{{ u.id }}?auth_key={{ admin_pass }}" method="POST">
-                                <button type="submit" class="btn btn-sm btn-primary">Renovar +30d</button>
+                                <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> 30 días</button>
                             </form>
-                            <a href="/admin/toggle/{{ u.id }}?auth_key={{ admin_pass }}" 
-                               class="btn btn-sm {% if u.activo == 1 %}btn-outline-danger{% else %}btn-success{% endif %}">
-                                <i class="fas {% if u.activo == 1 %}fa-pause{% else %}fa-play{% endif %}"></i>
+                            <a href="/admin/toggle/{{ u.id }}?auth_key={{ admin_pass }}" class="btn btn-sm {% if u.activo == 1 %}btn-danger{% else %}btn-success{% endif %}">
+                                <i class="fas {% if u.activo == 1 %}fa-user-slash{% else %}fa-user-check{% endif %}"></i>
                             </a>
                         </div>
                     </td>
@@ -81,21 +58,5 @@
             </tbody>
         </table>
     </div>
-
-    <script>
-        const ctx = document.getElementById('myChart');
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Activos', 'Vencidos'],
-                datasets: [{
-                    data: [{{ stats.activos }}, {{ stats.vencidos }}],
-                    backgroundColor: ['#10b981', '#ef4444'],
-                    borderWidth: 0
-                }]
-            },
-            options: { plugins: { legend: { display: false } } }
-        });
-    </script>
 </body>
 </html>
