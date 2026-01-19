@@ -19,26 +19,17 @@ EXCEL_FILE = 'inventario.xlsx'
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def obtener_tasa_real():
-    """Mejora 1: Corrección de Tasa para obtener BCV real"""
+    """Obtiene la tasa oficial del BCV o la más cercana disponible"""
     try:
-        # Instanciamos el monitor con AlCambio
         monitor = Monitor(AlCambio, 'USD')
-        # Obtenemos todos los monitores disponibles
         monitors_list = monitor.get_all_monitors()
-        
-        # Buscamos específicamente el que dice BCV
         for m in monitors_list:
-            # Filtramos por título o clave según la versión de la librería
             nombre = str(getattr(m, 'title', m)).upper()
             if "BCV" in nombre:
                 return float(m.price)
-        
-        # Si no encuentra BCV por nombre, intentamos el primer valor disponible (que suele ser el oficial)
         return float(monitors_list[0].price)
-    except Exception as e:
-        print(f"Error obteniendo tasa: {e}")
-        # Si todo falla, devuelve el respaldo
-        return 341.74
+    except:
+        return 341.74 # Respaldo si falla la conexión
 
 # --- RUTAS DE USUARIO ---
 
@@ -49,7 +40,6 @@ def index():
     if session.get('autenticado') and session.get('fecha_vencimiento'):
         try:
             vence = datetime.strptime(session['fecha_vencimiento'], '%Y-%m-%d')
-            # Cálculo de días (incluyendo negativos para periodo de gracia)
             dias_restantes = (vence.date() - datetime.now().date()).days
         except: pass
     return render_template('index.html', tasa=tasa, dias_restantes=dias_restantes)
@@ -66,11 +56,10 @@ def login():
             return redirect(url_for('index'))
         return "Usuario inactivo o no encontrado", 401
     except:
-        return "Error al conectar con la base de datos", 500
+        return "Error de conexión con la base de datos", 500
 
 @app.route('/logout')
 def logout():
-    """Mejora 2: Ruta para que el botón 'Salir' funcione"""
     session.clear()
     return redirect(url_for('index'))
 
@@ -78,10 +67,9 @@ def logout():
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    """Mejora 3: Acceso administrativo y carga de datos"""
     auth = request.args.get('auth_key')
     if auth != ADMIN_PASS:
-        return "Acceso Denegado: Debes usar la llave correcta en la URL", 403
+        return "Acceso Denegado", 403
 
     if request.method == 'POST':
         email = request.form.get('email')
@@ -89,9 +77,7 @@ def admin():
         fecha_v = (datetime.now() + timedelta(days=dias)).strftime('%Y-%m-%d')
         try:
             supabase.table("suscripciones").insert({
-                "email": email, 
-                "fecha_vencimiento": fecha_v, 
-                "activo": 1
+                "email": email, "fecha_vencimiento": fecha_v, "activo": 1
             }).execute()
         except: pass
 
@@ -99,40 +85,48 @@ def admin():
         usuarios = supabase.table("suscripciones").select("*").execute().data
     except:
         usuarios = []
-        
     return render_template('admin.html', usuarios=usuarios, admin_pass=ADMIN_PASS)
 
 @app.route('/subir_excel', methods=['POST'])
 def subir_excel():
     auth = request.args.get('auth_key')
     if auth != ADMIN_PASS: return "No autorizado", 403
-    
     file = request.files.get('archivo')
     if file and file.filename.endswith('.xlsx'):
         file.save(EXCEL_FILE)
         return redirect(url_for('admin', auth_key=ADMIN_PASS))
-    return "Archivo no válido", 400
+    return "Archivo inválido", 400
 
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
     if not session.get('autenticado'): return jsonify({"respuesta": "Inicia sesión."}), 401
-    pregunta = request.get_json().get('pregunta', '').lower()
+    
+    data = request.get_json()
+    pregunta = data.get('pregunta', '').lower().strip()
+    
+    # MEJORA: Acceso "Modo Gerencia"
+    if "activar modo gerencia" in pregunta:
+        return jsonify({
+            "respuesta": "Acceso administrativo detectado. Entrando al panel...",
+            "redirect": url_for('admin', auth_key=ADMIN_PASS)
+        })
+
     tasa = obtener_tasa_real()
     try:
         if not os.path.exists(EXCEL_FILE):
-            return jsonify({"respuesta": "Por favor, sube el inventario.xlsx en el panel de administrador."})
+            return jsonify({"respuesta": "Elena no tiene el inventario.xlsx. Súbelo en el panel admin."})
             
         df = pd.read_excel(EXCEL_FILE)
         match = df[df['Producto'].str.contains(pregunta, case=False, na=False)]
         if not match.empty:
             p, u = match.iloc[0]['Producto'], float(match.iloc[0]['Precio_USD'])
             return jsonify({
-                "respuesta": f"El {p} cuesta {u}$. Al cambio de hoy son {u*tasa:.2f} bolívares.",
+                "respuesta": f"El {p} cuesta {u}$. Al cambio son {u*tasa:.2f} bolívares.",
                 "tasa_sync": tasa
             })
-        return jsonify({"respuesta": f"Lo siento, no encontré el producto '{pregunta}'."})
-    except Exception as e:
-        return jsonify({"respuesta": f"Error al leer el inventario: {str(e)}"})
+        return jsonify({"respuesta": f"No encontré '{pregunta}'."})
+    except:
+        return jsonify({"respuesta": "Error al leer el inventario."})
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))

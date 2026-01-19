@@ -26,7 +26,7 @@
             overflow: hidden;
         }
 
-        /* Banner de Suscripción (Regla de Negocio: Periodo de Gracia) */
+        /* Banner de Suscripción (Periodo de Gracia) */
         .grace-banner {
             position: fixed;
             top: 0;
@@ -52,7 +52,7 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
 
-        /* Aura de Elena (Animación) */
+        /* Aura de Elena */
         .elena-aura {
             width: 120px;
             height: 120px;
@@ -66,8 +66,6 @@
             position: relative;
             transition: transform 0.3s;
         }
-
-        .elena-aura:hover { transform: scale(1.05); }
 
         .elena-aura.listening {
             animation: pulse 1.5s infinite;
@@ -152,7 +150,7 @@
         </div>
 
         <div id="textoElena" class="response-box">
-            Presiona el círculo para hablar o escribe el nombre del producto abajo.
+            Presiona el círculo para hablar o escribe abajo.
         </div>
 
         <div class="input-group-elena mb-2">
@@ -161,7 +159,6 @@
                 <i class="fas fa-paper-plane"></i>
             </button>
         </div>
-        <p class="text-muted" style="font-size: 0.7rem;">Elena utiliza Edge-TTS para las respuestas de voz.</p>
     </div>
     {% endif %}
 
@@ -171,48 +168,26 @@
 
         function hablar(texto) {
             if (!synth) return;
-            // Detener cualquier voz previa
             synth.cancel();
             const utterance = new SpeechSynthesisUtterance(texto);
-            utterance.lang = 'es-MX'; // Voz en español
+            utterance.lang = 'es-MX';
             utterance.rate = 1.0;
-            utterance.pitch = 1.1; // Un poco más aguda para que suene como "Elena"
             synth.speak(utterance);
         }
 
         function iniciarEscucha() {
-            if (!SpeechRecognition) {
-                alert("Tu navegador no soporta el reconocimiento de voz.");
-                return;
-            }
-
+            if (!SpeechRecognition) return alert("Navegador no soportado");
             const recognition = new SpeechRecognition();
             const aura = document.getElementById('auraElena');
             const box = document.getElementById('textoElena');
 
             recognition.lang = 'es-VE';
-            recognition.interimResults = false;
-
-            recognition.onstart = () => {
-                aura.classList.add('listening');
-                box.innerText = "Elena te escucha...";
-            };
-
-            recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                document.getElementById('userInput').value = transcript;
+            recognition.onstart = () => aura.classList.add('listening');
+            recognition.onresult = (e) => {
+                document.getElementById('userInput').value = e.results[0][0].transcript;
                 enviarConsulta();
             };
-
-            recognition.onerror = () => {
-                aura.classList.remove('listening');
-                box.innerText = "No pude escucharte bien. Intenta de nuevo.";
-            };
-
-            recognition.onend = () => {
-                aura.classList.remove('listening');
-            };
-
+            recognition.onend = () => aura.classList.remove('listening');
             recognition.start();
         }
 
@@ -222,8 +197,7 @@
             const query = input.value.trim();
 
             if (!query) return;
-
-            box.innerText = "Buscando en inventario...";
+            box.innerText = "Elena está pensando...";
             input.value = "";
 
             try {
@@ -234,10 +208,20 @@
                 });
 
                 const data = await response.json();
+
+                // MEJORA: Redirección automática si es Modo Gerencia
+                if (data.redirect) {
+                    box.innerText = data.respuesta;
+                    setTimeout(() => {
+                        window.location.href = data.redirect;
+                    }, 1500);
+                    return;
+                }
+
                 box.innerText = data.respuesta;
                 hablar(data.respuesta);
             } catch (error) {
-                box.innerText = "Error de conexión con el servidor.";
+                box.innerText = "Error de conexión.";
             }
         }
     </script>
