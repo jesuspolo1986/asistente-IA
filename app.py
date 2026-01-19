@@ -16,8 +16,15 @@ SUPABASE_KEY = "sb_secret_lSrahuG5Nv32T1ZaV7lfRw_WFXuiP4H"
 ADMIN_PASS = "1234"
 EXCEL_FILE = 'inventario.xlsx'
 
-# Diccionario para mantener los datos en RAM (como en tu proyecto de prueba)
+# Memoria global
 inventario_memoria = {"df": None, "tasa": 54.20}
+
+# IMPORTANTE: Mapeo de columnas para que reconozca tu Excel
+MAPEO_COLUMNAS = {
+    'Producto': ['producto', 'descripcion', 'nombre', 'articulo', 'item'],
+    'Precio_USD': ['precio venta', 'pvp', 'precio', 'venta', 'precio_unitario', 'precio_usd', 'costo_usd'],
+    'Stock Actual': ['stock actual', 'stock', 'cantidad', 'existencia']
+}
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -30,8 +37,7 @@ def obtener_tasa_real():
                 val = float(m.price)
                 if 10 < val < 100: return val
         return 54.20
-    except:
-        return 54.20
+    except: return 54.20
 
 @app.route('/')
 def index():
@@ -45,36 +51,38 @@ def index():
         except: pass
     return render_template('index.html', tasa=tasa, dias_restantes=dias_restantes)
 
-# --- CARGA DE EXCEL (LOGICA MEJORADA) ---
-@app.route('/subir_excel', methods=['POST'])
-def subir_excel():
-    # Buscamos el nombre 'archivo' que es el que tiene tu HTML
-    file = request.files.get('archivo')
-    if not file:
-        flash("No se seleccionó ningún archivo", "danger")
-        return redirect(url_for('index'))
+# --- RUTA DE CARGA UNIFICADA (UPLOAD) ---
+@app.route('/upload', methods=['POST'])
+def upload():
+    file = request.files.get('archivo') # Nombre 'archivo' coincide con tu JS
+    if not file: 
+        return jsonify({"success": False, "mensaje": "Sin archivo"})
     
     try:
-        # LEER EN MEMORIA (Igual que el proyecto que te funciona)
         stream = io.BytesIO(file.read())
-        df = pd.read_excel(stream, engine='openpyxl')
+        if file.filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(stream, engine='openpyxl')
+        else:
+            df = pd.read_csv(stream)
+
+        # Normalizar columnas
+        nuevas = {c: est for est, sin in MAPEO_COLUMNAS.items() for c in df.columns if str(c).lower().strip() in sin}
+        df.rename(columns=nuevas, inplace=True)
         
-        # Limpiar nombres de columnas por si acaso
+        # Limpiar espacios
         df.columns = [str(c).strip() for c in df.columns]
         
-        # Guardar en RAM para respuesta inmediata
+        # GUARDAR EN RAM (Usando el nombre correcto)
         inventario_memoria["df"] = df
         
-        # Guardar en DISCO para persistencia
+        # Guardar copia en disco
         stream.seek(0)
         with open(EXCEL_FILE, "wb") as f:
             f.write(stream.getbuffer())
             
-        flash("¡Inventario cargado exitosamente en memoria!", "success")
+        return jsonify({"success": True, "mensaje": "Inventario cargado exitosamente."})
     except Exception as e:
-        flash(f"Error al procesar Excel: {str(e)}", "danger")
-    
-    return redirect(url_for('index'))
+        return jsonify({"success": False, "error": str(e)})
 
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
@@ -87,10 +95,7 @@ def preguntar():
     tasa = inventario_memoria["tasa"]
     
     try:
-        # 1. Intentar usar la RAM
         df = inventario_memoria["df"]
-        
-        # 2. Si la RAM está vacía, intentar leer el archivo guardado
         if df is None:
             if os.path.exists(EXCEL_FILE):
                 df = pd.read_excel(EXCEL_FILE, engine='openpyxl')
@@ -98,7 +103,7 @@ def preguntar():
             else:
                 return jsonify({"respuesta": "Elena no tiene datos. Sube el Excel primero."})
 
-        # Búsqueda (ajustada a tus columnas: Producto y Precio_USD)
+        # Búsqueda
         match = df[df['Producto'].str.contains(pregunta, case=False, na=False)]
         
         if not match.empty:
@@ -110,7 +115,6 @@ def preguntar():
     except Exception as e:
         return jsonify({"respuesta": f"Error en la consulta: {str(e)}"})
 
-# --- RUTAS DE LOGIN / LOGOUT / ADMIN ---
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email', '').lower().strip()
@@ -143,4 +147,4 @@ def admin_panel():
     return render_template('admin.html', usuarios=usuarios, stats=stats, admin_pass=ADMIN_PASS)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
