@@ -3,161 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elena AI | Asistente de Farmacia</title>
+    <title>Elena AI | Farmacia</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root {
-            --primary-glow: #00d2ff;
-            --secondary-glow: #3a7bd5;
-            --bg-dark: #0f172a;
-            --grace-warning: #f39c12;
-        }
-
-        body {
-            background: var(--bg-dark);
-            color: white;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            overflow: hidden;
-        }
-
-        /* Banner de Suscripción (Periodo de Gracia) */
-        .grace-banner {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            background: var(--grace-warning);
-            color: #000;
-            text-align: center;
-            padding: 12px;
-            font-weight: bold;
-            z-index: 1000;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-
-        .login-card, .elena-container {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 2.5rem;
-            border-radius: 30px;
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            width: 100%;
-            max-width: 420px;
-            text-align: center;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-        }
-
-        /* Aura de Elena */
-        .elena-aura {
-            width: 120px;
-            height: 120px;
-            background: linear-gradient(45deg, var(--primary-glow), var(--secondary-glow));
-            border-radius: 50%;
-            margin: 0 auto 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            position: relative;
-            transition: transform 0.3s;
-        }
-
-        .elena-aura.listening {
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0.7); }
-            70% { box-shadow: 0 0 0 25px rgba(0, 210, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0); }
-        }
-
-        .response-box {
-            min-height: 100px;
-            margin-bottom: 1.5rem;
-            font-size: 1.2rem;
-            color: #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1.4;
-        }
-
-        .input-group-elena {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 5px;
-            display: flex;
-        }
-
-        .input-group-elena input {
-            background: transparent;
-            border: none;
-            color: white;
-            padding: 12px;
-            flex-grow: 1;
-            outline: none;
-        }
-
-        .tasa-badge {
-            background: rgba(0, 210, 255, 0.2);
-            color: var(--primary-glow);
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: bold;
-            border: 1px solid var(--primary-glow);
-        }
+        :root { --primary: #00d2ff; --bg: #0f172a; --grace: #f39c12; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .grace-banner { position: fixed; top: 0; width: 100%; background: var(--grace); color: #000; text-align: center; padding: 10px; font-weight: bold; z-index: 1000; }
+        .elena-container { background: rgba(255,255,255,0.05); padding: 2rem; border-radius: 30px; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); width: 100%; max-width: 400px; text-align: center; }
+        .elena-aura { width: 100px; height: 100px; background: linear-gradient(45deg, var(--primary), #3a7bd5); border-radius: 50%; margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .elena-aura.listening { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0,210,255,0.7); } 70% { box-shadow: 0 0 0 20px rgba(0,210,255,0); } 100% { box-shadow: 0 0 0 0 rgba(0,210,255,0); } }
+        .response-box { min-height: 80px; margin-bottom: 1rem; font-size: 1.1rem; color: #e2e8f0; }
+        .input-group-elena { background: rgba(255,255,255,0.1); border-radius: 15px; padding: 5px; display: flex; }
+        .input-group-elena input { background: transparent; border: none; color: white; padding: 10px; flex-grow: 1; outline: none; }
+        .tasa-badge { background: rgba(0,210,255,0.2); color: var(--primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; border: 1px solid var(--primary); }
+        .alert-confirm { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; border-radius: 50px; padding: 10px 25px; }
     </style>
 </head>
 <body>
 
-    {% if dias_restantes is defined %}
-        {% if dias_restantes == 0 %}
-            <div class="grace-banner">
-                <i class="fas fa-exclamation-triangle me-2"></i> Tu suscripción expira hoy. ¡Recuerda renovar!
-            </div>
-        {% elif dias_restantes < 0 %}
-            <div class="grace-banner">
-                <i class="fas fa-clock me-2"></i> Suscripción vencida ayer. Elena está en periodo de gracia.
-            </div>
-        {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-success alert-confirm shadow-lg border-0 anim-fade">
+            <i class="fas fa-check-circle me-2"></i> {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% if dias_restantes is defined and dias_restantes <= 0 %}
+        <div class="grace-banner">
+            <i class="fas fa-clock me-2"></i> Suscripción vencida. Periodo de gracia activo.
+        </div>
     {% endif %}
 
     {% if not session.get('autenticado') %}
-    <div class="login-card">
-        <h2 class="fw-bold mb-2">Elena AI</h2>
-        <p class="text-muted small mb-4">Ingresa tu correo autorizado</p>
+    <div class="login-card p-5 bg-dark rounded-5 text-center shadow-lg" style="width: 350px;">
+        <h3 class="fw-bold mb-4">Elena AI</h3>
         <form action="/login" method="POST">
-            <input type="email" name="email" class="form-control mb-3 bg-dark text-white border-0 py-3" placeholder="correo@farmacia.com" required>
-            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold shadow">ACCEDER AL SISTEMA</button>
+            <input type="email" name="email" class="form-control mb-3 bg-secondary text-white border-0" placeholder="Correo" required>
+            <button type="submit" class="btn btn-primary w-100 fw-bold">ENTRAR</button>
         </form>
     </div>
     {% else %}
     <div class="elena-container">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div class="tasa-badge">BCV: {{ tasa }}</div>
-            <a href="/logout" class="text-danger text-decoration-none small"><i class="fas fa-sign-out-alt"></i> Salir</a>
+            <a href="/logout" class="text-danger text-decoration-none small">Salir</a>
+        </div>
+
+        <div id="panelGerencia" style="display: none; background: rgba(0,210,255,0.1);" class="mb-4 p-3 border border-info rounded-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-info small fw-bold">MODO GERENCIA</span>
+                <button onclick="salirGerencia()" class="btn btn-sm btn-outline-danger border-0" style="font-size: 0.6rem;">SALIR</button>
+            </div>
+            <form action="/subir_excel" method="POST" enctype="multipart/form-data" class="d-flex gap-2">
+                <input type="file" name="archivo" class="form-control form-control-sm bg-transparent text-white" accept=".xlsx" required>
+                <button type="submit" class="btn btn-info btn-sm text-white">Subir</button>
+            </form>
         </div>
 
         <div id="auraElena" class="elena-aura" onclick="iniciarEscucha()">
             <i class="fas fa-microphone fa-2xl text-white"></i>
         </div>
 
-        <div id="textoElena" class="response-box">
-            Presiona el círculo para hablar o escribe abajo.
-        </div>
+        <div id="textoElena" class="response-box">Presiona para hablar</div>
 
-        <div class="input-group-elena mb-2">
-            <input type="text" id="userInput" placeholder="¿Qué medicamento buscas?" onkeypress="if(event.key==='Enter') enviarConsulta()">
-            <button class="btn btn-primary rounded-3" onclick="enviarConsulta()">
-                <i class="fas fa-paper-plane"></i>
-            </button>
+        <div class="input-group-elena">
+            <input type="text" id="userInput" placeholder="Buscar producto..." onkeypress="if(event.key==='Enter') enviarConsulta()">
+            <button class="btn btn-primary rounded-3" onclick="enviarConsulta()"><i class="fas fa-paper-plane"></i></button>
         </div>
     </div>
     {% endif %}
@@ -166,64 +82,58 @@
         const synth = window.speechSynthesis;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-        function hablar(texto) {
-            if (!synth) return;
-            synth.cancel();
-            const utterance = new SpeechSynthesisUtterance(texto);
-            utterance.lang = 'es-MX';
-            utterance.rate = 1.0;
-            synth.speak(utterance);
+        function hablar(t) { 
+            if(!synth) return; 
+            synth.cancel(); 
+            const u = new SpeechSynthesisUtterance(t); 
+            u.lang = 'es-MX'; 
+            u.rate = 1.1; 
+            synth.speak(u); 
+        }
+
+        function salirGerencia() {
+            document.getElementById('panelGerencia').style.display = 'none';
+            document.getElementById('textoElena').innerText = "Vuelto al modo vendedor.";
+            hablar("Modo vendedor.");
         }
 
         function iniciarEscucha() {
-            if (!SpeechRecognition) return alert("Navegador no soportado");
-            const recognition = new SpeechRecognition();
+            const rec = new SpeechRecognition();
             const aura = document.getElementById('auraElena');
-            const box = document.getElementById('textoElena');
-
-            recognition.lang = 'es-VE';
-            recognition.onstart = () => aura.classList.add('listening');
-            recognition.onresult = (e) => {
-                document.getElementById('userInput').value = e.results[0][0].transcript;
-                enviarConsulta();
-            };
-            recognition.onend = () => aura.classList.remove('listening');
-            recognition.start();
+            rec.lang = 'es-VE';
+            rec.onstart = () => aura.classList.add('listening');
+            rec.onresult = (e) => { document.getElementById('userInput').value = e.results[0][0].transcript; enviarConsulta(); };
+            rec.onend = () => aura.classList.remove('listening');
+            rec.start();
         }
 
         async function enviarConsulta() {
             const input = document.getElementById('userInput');
             const box = document.getElementById('textoElena');
             const query = input.value.trim();
-
-            if (!query) return;
-            box.innerText = "Elena está pensando...";
+            if(!query) return;
+            box.innerText = "Elena pensando...";
             input.value = "";
 
-            try {
-                const response = await fetch('/preguntar', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pregunta: query })
-                });
+            const res = await fetch('/preguntar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pregunta: query })
+            });
+            const data = await res.json();
 
-                const data = await response.json();
-
-                // MEJORA: Redirección automática si es Modo Gerencia
-                if (data.redirect) {
-                    box.innerText = data.respuesta;
-                    setTimeout(() => {
-                        window.location.href = data.redirect;
-                    }, 1500);
-                    return;
-                }
-
-                box.innerText = data.respuesta;
-                hablar(data.respuesta);
-            } catch (error) {
-                box.innerText = "Error de conexión.";
+            if(data.modo_admin) {
+                document.getElementById('panelGerencia').style.display = 'block';
             }
+            box.innerText = data.respuesta;
+            hablar(data.respuesta);
         }
+
+        // Auto-ocultar alerta de confirmación
+        setTimeout(() => {
+            const alert = document.querySelector('.alert-confirm');
+            if(alert) alert.style.display = 'none';
+        }, 4000);
     </script>
 </body>
 </html>
