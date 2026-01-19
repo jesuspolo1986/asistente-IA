@@ -10,33 +10,17 @@
         :root { --primary: #00d2ff; --admin: #a18cd1; }
         body { background: #0f172a; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; transition: 0.5s; overflow: hidden; }
         .admin-mode-bg { background: #1a1625 !important; }
-        
         .grace-banner { position: fixed; top: 0; width: 100%; background: #f39c12; color: #000; text-align: center; padding: 5px; font-weight: bold; z-index: 1000; font-size: 0.8rem; }
-        
         .card-elena { background: rgba(255,255,255,0.05); border-radius: 40px; padding: 2rem; width: 380px; text-align: center; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
-        
         .aura { width: 110px; height: 110px; margin: 0 auto 1.5rem; position: relative; cursor: pointer; }
-        .aura-inner { 
-            inset: 0; position: absolute; border-radius: 50%; 
-            background: linear-gradient(45deg, var(--primary), #3a7bd5); 
-            animation: pulse-aura 2.5s infinite ease-in-out;
-            transition: 0.8s;
-            display: flex; align-items: center; justify-content: center;
-        }
+        .aura-inner { inset: 0; position: absolute; border-radius: 50%; background: linear-gradient(45deg, var(--primary), #3a7bd5); animation: pulse-aura 2.5s infinite ease-in-out; transition: 0.8s; display: flex; align-items: center; justify-content: center; }
         .admin-active .aura-inner { background: linear-gradient(45deg, #fbc2eb, var(--admin)); }
-        
         @keyframes pulse-aura { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 40px var(--primary); } }
-        
         .res-box { min-height: 80px; margin: 1rem 0; font-size: 1rem; color: #cbd5e1; display: flex; align-items: center; justify-content: center; line-height: 1.4; }
         .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 15px; color: white; padding: 12px; width: 100%; text-align: center; outline: none; }
-        
-        #tasaInput { background: rgba(255,255,255,0.05); border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 85px; text-align: center; border-radius: 8px; font-weight: bold; outline: none; }
-        #tasaInput:focus { border-color: var(--admin); box-shadow: 0 0 10px var(--admin); }
-        #tasaInput[readonly] { border: none; color: #94a3b8; pointer-events: none; background: none; }
-        
-        #labelModo { cursor: pointer; transition: 0.3s; }
-        #labelModo:hover { opacity: 0.7; }
-        
+        #tasaInput { background: none; border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 80px; text-align: center; border-radius: 8px; font-weight: bold; }
+        #tasaInput[readonly] { border: none; color: #94a3b8; pointer-events: none; }
+        #labelModo { cursor: pointer; }
         .logout-link { position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.3); text-decoration: none; font-size: 0.8rem; }
     </style>
 </head>
@@ -57,30 +41,23 @@
     {% else %}
     <div class="card-elena" id="mainCard">
         <div class="d-flex justify-content-between mb-3 opacity-75 small align-items-center">
-            <span>TASA: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly onchange="sincronizarTasaManual()"></span>
-            <span id="labelModo" class="fw-bold text-info" onclick="desactivarAdmin()" title="Click para volver a Vendedor">VENDEDOR</span>
+            <span>TASA: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly onchange="sincronizarTasa()"></span>
+            <span id="labelModo" class="fw-bold text-info" onclick="desactivarAdmin()">VENDEDOR</span>
         </div>
-
         <div class="aura" onclick="escuchar()">
-            <div class="aura-inner" id="auraCircle">
-                <i class="fas fa-microphone fa-2x"></i>
-            </div>
+            <div class="aura-inner" id="auraCircle"><i class="fas fa-microphone fa-2x"></i></div>
         </div>
-
         <h4 class="fw-bold">ELENA AI</h4>
-        <div class="res-box" id="textoElena">Consultar producto o precio</div>
-        
+        <div class="res-box" id="textoElena">Toca el micrófono para preguntar</div>
         <input type="text" id="userInput" class="input-elena" placeholder="¿Qué buscas?" onkeypress="if(event.key==='Enter') enviar()">
-
-        <div id="adminTools" style="display: none;" class="mt-4 anim-fade-in">
+        
+        <div id="adminTools" style="display: none;" class="mt-4">
             <hr class="opacity-25">
             <input type="file" id="fileIn" hidden onchange="subirExcel()">
-            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold text-white shadow-sm" onclick="document.getElementById('fileIn').click()">
+            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold text-white" onclick="document.getElementById('fileIn').click()">
                 <i class="fas fa-file-excel me-2"></i>ACTUALIZAR INVENTARIO
             </button>
-            <p class="small text-muted mt-2">Puedes editar la tasa arriba ↑</p>
         </div>
-
         <a href="/logout" class="logout-link">Cerrar sesión</a>
     </div>
     {% endif %}
@@ -119,7 +96,6 @@
         const query = document.getElementById('userInput').value.toLowerCase().trim();
         if(!query) return;
 
-        // Comandos de voz/texto para cambiar de modo
         if (query === "activar modo vendedor" || query === "salir de gerencia") {
             desactivarAdmin();
             document.getElementById('userInput').value = "";
@@ -131,12 +107,11 @@
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ pregunta: query, modo_admin: modoAdmin })
         });
-        
         const data = await res.json();
         
         if(data.modo_admin) {
             activarAdmin();
-            document.getElementById('textoElena').innerText = "Modo administrativo activado.";
+            document.getElementById('textoElena').innerText = "Modo gerencia activo.";
             hablar("Modo administrativo activado.");
         } else {
             document.getElementById('textoElena').innerText = data.respuesta;
@@ -152,7 +127,7 @@
         document.getElementById('labelModo').innerText = "GERENCIA";
         document.getElementById('labelModo').className = "fw-bold text-warning";
         document.getElementById('adminTools').style.display = "block";
-        document.getElementById('tasaInput').readOnly = false; // DESBLOQUEAR TASA
+        document.getElementById('tasaInput').readOnly = false;
     }
 
     function desactivarAdmin() {
@@ -163,33 +138,29 @@
         document.getElementById('labelModo').innerText = "VENDEDOR";
         document.getElementById('labelModo').className = "fw-bold text-info";
         document.getElementById('adminTools').style.display = "none";
-        document.getElementById('tasaInput').readOnly = true; // BLOQUEAR TASA
+        document.getElementById('tasaInput').readOnly = true;
         document.getElementById('textoElena').innerText = "Modo vendedor activo.";
         hablar("Modo vendedor activado.");
     }
 
-    // Nueva función para enviar la tasa manual al servidor
-    async function sincronizarTasaManual() {
-        if(!modoAdmin) return;
-        const nuevaTasa = document.getElementById('tasaInput').value;
+    async function sincronizarTasa() {
+        const nt = document.getElementById('tasaInput').value;
         await fetch('/preguntar', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ nueva_tasa: nuevaTasa, modo_admin: true })
+            body: JSON.stringify({ nueva_tasa: nt })
         });
-        document.getElementById('textoElena').innerText = "Tasa actualizada a " + nuevaTasa + " Bs.";
     }
 
     async function subirExcel() {
         const fileIn = document.getElementById('fileIn');
-        if(!fileIn.files[0]) return;
-        document.getElementById('textoElena').innerText = "Procesando...";
         const fd = new FormData();
         fd.append('archivo', fileIn.files[0]);
+        document.getElementById('textoElena').innerText = "Cargando...";
         const res = await fetch('/upload', { method: 'POST', body: fd });
         const data = await res.json();
         if(data.success) {
-            document.getElementById('textoElena').innerText = "Inventario listo.";
+            document.getElementById('textoElena').innerText = "Inventario actualizado.";
             hablar("Inventario actualizado.");
         }
     }

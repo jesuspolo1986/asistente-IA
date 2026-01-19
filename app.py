@@ -20,8 +20,7 @@ inventario_memoria = {"df": None, "tasa": 54.20}
 
 MAPEO_COLUMNAS = {
     'Producto': ['producto', 'descripcion', 'nombre', 'articulo', 'item'],
-    'Precio_USD': ['precio venta', 'pvp', 'precio', 'venta', 'precio_unitario', 'precio_usd', 'costo_usd'],
-    'Stock Actual': ['stock actual', 'stock', 'cantidad', 'existencia']
+    'Precio_USD': ['precio venta', 'pvp', 'precio', 'venta', 'precio_unitario', 'precio_usd', 'costo_usd']
 }
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -39,7 +38,6 @@ def obtener_tasa_real():
 
 @app.route('/')
 def index():
-    # Solo actualizamos la tasa automáticamente si no ha sido cambiada manualmente en esta sesión
     if "tasa_manual" not in inventario_memoria:
         inventario_memoria["tasa"] = obtener_tasa_real()
     
@@ -72,22 +70,17 @@ def upload():
 def preguntar():
     data = request.get_json()
     
-    # 1. Lógica para actualización de TASA MANUAL desde Gerencia
     if data.get('nueva_tasa'):
         try:
-            nueva_tasa = float(data.get('nueva_tasa'))
-            inventario_memoria["tasa"] = nueva_tasa
-            inventario_memoria["tasa_manual"] = True # Marcamos que es manual para que no la sobrescriba el BCV
-            return jsonify({"respuesta": "Tasa actualizada", "tasa": nueva_tasa})
+            inventario_memoria["tasa"] = float(data.get('nueva_tasa'))
+            inventario_memoria["tasa_manual"] = True
+            return jsonify({"respuesta": "Tasa actualizada", "tasa": inventario_memoria["tasa"]})
         except: return jsonify({"respuesta": "Error en tasa"})
 
     raw_pregunta = data.get('pregunta', '').lower().strip()
-    
     if "activar modo gerencia" in raw_pregunta:
         return jsonify({"respuesta": "Modo gerencia activo.", "modo_admin": True})
 
-    # 2. LIMPIEZA DE LENGUAJE NATURAL
-    # Eliminamos palabras comunes para quedarnos solo con el nombre del producto
     palabras_sobrantes = ["cuanto", "cuesta", "vale", "precio", "de", "del", "el", "la", "tiene", "cual", "es"]
     query_limpio = raw_pregunta
     for palabra in palabras_sobrantes:
@@ -101,21 +94,32 @@ def preguntar():
             if os.path.exists(EXCEL_FILE):
                 df = pd.read_excel(EXCEL_FILE, engine='openpyxl')
                 inventario_memoria["df"] = df
-            else: return jsonify({"respuesta": "No tengo el inventario cargado aún."})
+            else: return jsonify({"respuesta": "Sube el inventario primero."})
 
-        # Búsqueda sobre el query limpio
-        match = df[df['Producto'].str.contains(query_limpio, case=False, na=False)]
+        # Búsqueda de múltiples coincidencias
+        matches = df[df['Producto'].str.contains(query_limpio, case=False, na=False)]
         
-        if not match.empty:
-            p = match.iloc[0]['Producto']
-            u = float(match.iloc[0]['Precio_USD'])
+        if matches.empty:
+            return jsonify({"respuesta": f"No encontré {query_limpio}."})
+
+        if len(matches) == 1:
+            p = matches.iloc[0]['Producto']
+            u = float(matches.iloc[0]['Precio_USD'])
             total_bs = round(u * tasa, 2)
-            
-            # Respuesta mucho más natural y profesional
-            respuesta_voz = f"El {p} tiene un precio de {u} dólares. En bolívares sería un total de {total_bs}."
-            return jsonify({"respuesta": respuesta_voz})
+            return jsonify({"respuesta": f"El {p} tiene un precio de {u} dólares, que son {total_bs} bolívares."})
         
-        return jsonify({"respuesta": f"Lo siento, no encontré el producto {query_limpio}."})
+        else:
+            # Si hay varios, enumerar los primeros 3 para no cansar al usuario
+            opciones = []
+            for i, row in matches.head(3).iterrows():
+                nom = row['Producto']
+                pre = row['Precio_USD']
+                bs = round(float(pre) * tasa, 2)
+                opciones.append(f"{nom} en {pre}$ ({bs} Bs)")
+            
+            texto_opciones = " . también tengo . ".join(opciones)
+            return jsonify({"respuesta": f"Encontré varias opciones: {texto_opciones}. ¿Cuál necesitas?"})
+
     except Exception as e:
         return jsonify({"respuesta": f"Error: {str(e)}"})
 
