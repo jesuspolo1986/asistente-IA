@@ -2,61 +2,104 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Admin - Control de Rentas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerencia | Elena AI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background: #f8fafc; }
-        .vencido { background-color: #fff1f2 !important; }
-        .card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        body { background: #0f172a; color: white; font-family: sans-serif; min-height: 100vh; padding: 2rem 1rem; }
+        .admin-container { max-width: 900px; margin: auto; }
+        .card-stats { background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); padding: 1.5rem; backdrop-filter: blur(10px); }
+        .table-elena { background: rgba(255,255,255,0.03); border-radius: 15px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
+        .table-elena th { background: rgba(0,210,255,0.1); color: #00d2ff; border: none; }
+        .table-elena td { border-color: rgba(255,255,255,0.05); vertical-align: middle; }
+        .input-admin { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 10px; padding: 8px 15px; width: 100%; outline: none; }
+        .badge-active { background: #2ecc71; color: #fff; }
+        .badge-expired { background: #e74c3c; color: #fff; }
+        .btn-add { background: #a18cd1; border: none; font-weight: bold; border-radius: 10px; transition: 0.3s; }
+        .btn-add:hover { background: #8e7cc3; transform: translateY(-2px); }
     </style>
 </head>
-<body class="container py-5">
-    <div class="d-flex justify-content-between mb-4">
-        <h2>🚀 Panel de Control Elena</h2>
-        <a href="/" class="btn btn-dark">Volver</a>
+<body>
+
+<div class="admin-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-user-shield me-2 text-info"></i> PANEL ELENA 2026</h2>
+        <a href="/" class="btn btn-outline-light btn-sm"><i class="fas fa-arrow-left"></i> Volver</a>
     </div>
 
-    <div class="card p-4">
-        <h5 class="fw-bold mb-3">Gestión de Clientes</h5>
-        <table class="table align-middle">
-            <thead class="table-light">
+    <div class="row g-3 mb-4 text-center">
+        <div class="col-md-4">
+            <div class="card-stats">
+                <h3 class="text-info">{{ stats.total }}</h3>
+                <span class="small opacity-50 text-uppercase">Total Clientes</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-stats">
+                <h3 class="text-success">{{ stats.activos }}</h3>
+                <span class="small opacity-50 text-uppercase">Activos</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-stats">
+                <h3 class="text-danger">{{ stats.vencidos }}</h3>
+                <span class="small opacity-50 text-uppercase">Vencidos</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-stats mb-4">
+        <h5 class="mb-3">Registrar Nuevo Cliente</h5>
+        <form action="/admin/crear" method="POST" class="row g-2">
+            <input type="hidden" name="auth_key" value="{{ admin_pass }}">
+            <div class="col-md-5">
+                <input type="email" name="email" class="input-admin" placeholder="Correo del Cliente" required>
+            </div>
+            <div class="col-md-4">
+                <input type="date" name="vence" class="input-admin" required>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-add w-100 text-white">GUARDAR</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-responsive table-elena">
+        <table class="table table-dark mb-0">
+            <thead>
                 <tr>
-                    <th>Email</th>
-                    <th>Vence el</th>
-                    <th>Estado</th>
-                    <th>Acciones de Renta</th>
+                    <th>CLIENTE</th>
+                    <th>VENCE</th>
+                    <th class="text-center">ESTADO</th>
+                    <th class="text-end">ACCIÓN</th>
                 </tr>
             </thead>
             <tbody>
                 {% for u in usuarios %}
-                <tr class="{% if u.vencido %}vencido{% endif %}">
-                    <td>
-                        {{ u.email }}
-                        {% if u.vencido %}<span class="badge bg-danger ms-2">VENCIDO</span>{% endif %}
-                    </td>
+                <tr>
+                    <td>{{ u.email }}</td>
                     <td>{{ u.fecha_vencimiento }}</td>
-                    <td>
-                        {% if u.activo == 1 %}
-                        <span class="badge bg-success">Activo</span>
+                    <td class="text-center">
+                        {% if u.vencido %}
+                        <span class="badge badge-expired">VENCIDO</span>
                         {% else %}
-                        <span class="badge bg-secondary">Inactivo</span>
+                        <span class="badge badge-active">ACTIVO</span>
                         {% endif %}
                     </td>
-                    <td>
-                        <div class="btn-group">
-                            <form action="/admin/renovar/{{ u.id }}?auth_key={{ admin_pass }}" method="POST">
-                                <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> 30 días</button>
-                            </form>
-                            <a href="/admin/toggle/{{ u.id }}?auth_key={{ admin_pass }}" class="btn btn-sm {% if u.activo == 1 %}btn-danger{% else %}btn-success{% endif %}">
-                                <i class="fas {% if u.activo == 1 %}fa-user-slash{% else %}fa-user-check{% endif %}"></i>
-                            </a>
-                        </div>
+                    <td class="text-end">
+                        <form action="/admin/eliminar" method="POST" onsubmit="return confirm('¿Eliminar cliente?');">
+                            <input type="hidden" name="auth_key" value="{{ admin_pass }}">
+                            <input type="hidden" name="email" value="{{ u.email }}">
+                            <button type="submit" class="btn btn-link text-danger p-0"><i class="fas fa-trash-alt"></i></button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+</div>
+
 </body>
 </html>

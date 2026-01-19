@@ -16,11 +16,11 @@
         .aura-inner { inset: 0; position: absolute; border-radius: 50%; background: linear-gradient(45deg, var(--primary), #3a7bd5); animation: pulse-aura 2.5s infinite ease-in-out; transition: 0.8s; display: flex; align-items: center; justify-content: center; }
         .admin-active .aura-inner { background: linear-gradient(45deg, #fbc2eb, var(--admin)); }
         @keyframes pulse-aura { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 40px var(--primary); } }
-        .res-box { min-height: 80px; margin: 1rem 0; font-size: 1rem; color: #cbd5e1; display: flex; align-items: center; justify-content: center; line-height: 1.4; }
+        .res-box { min-height: 100px; margin: 1rem 0; font-size: 0.95rem; color: #cbd5e1; display: flex; align-items: center; justify-content: center; line-height: 1.4; padding: 0 10px; }
         .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 15px; color: white; padding: 12px; width: 100%; text-align: center; outline: none; }
         #tasaInput { background: none; border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 80px; text-align: center; border-radius: 8px; font-weight: bold; }
         #tasaInput[readonly] { border: none; color: #94a3b8; pointer-events: none; }
-        #labelModo { cursor: pointer; }
+        #labelModo { cursor: pointer; text-decoration: underline; text-decoration-style: dotted; }
         .logout-link { position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.3); text-decoration: none; font-size: 0.8rem; }
     </style>
 </head>
@@ -32,7 +32,7 @@
 
     {% if not session.get('autenticado') %}
     <div class="card-elena">
-        <h4 class="fw-bold mb-4">Acceso Elena AI</h4>
+        <h4 class="fw-bold mb-4">Elena AI | Acceso</h4>
         <form action="/login" method="POST">
             <input type="email" name="email" class="input-elena mb-3" placeholder="Correo electrónico" required>
             <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">ENTRAR</button>
@@ -48,13 +48,13 @@
             <div class="aura-inner" id="auraCircle"><i class="fas fa-microphone fa-2x"></i></div>
         </div>
         <h4 class="fw-bold">ELENA AI</h4>
-        <div class="res-box" id="textoElena">Toca el micrófono para preguntar</div>
+        <div class="res-box" id="textoElena">Pregunta por un producto o activa modo gerencia</div>
         <input type="text" id="userInput" class="input-elena" placeholder="¿Qué buscas?" onkeypress="if(event.key==='Enter') enviar()">
         
         <div id="adminTools" style="display: none;" class="mt-4">
             <hr class="opacity-25">
             <input type="file" id="fileIn" hidden onchange="subirExcel()">
-            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold text-white" onclick="document.getElementById('fileIn').click()">
+            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold text-white shadow-sm" onclick="document.getElementById('fileIn').click()">
                 <i class="fas fa-file-excel me-2"></i>ACTUALIZAR INVENTARIO
             </button>
         </div>
@@ -77,7 +77,7 @@
     }
 
     function escuchar() {
-        if (!SpeechRecognition) return;
+        if (!SpeechRecognition) { alert("Navegador no compatible"); return; }
         const rec = new SpeechRecognition();
         rec.lang = 'es-VE';
         rec.onstart = () => {
@@ -111,7 +111,7 @@
         
         if(data.modo_admin) {
             activarAdmin();
-            document.getElementById('textoElena').innerText = "Modo gerencia activo.";
+            document.getElementById('textoElena').innerText = "Modo gerencia activo. Ya puedes editar la tasa o subir el inventario.";
             hablar("Modo administrativo activado.");
         } else {
             document.getElementById('textoElena').innerText = data.respuesta;
@@ -150,18 +150,21 @@
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ nueva_tasa: nt })
         });
+        document.getElementById('textoElena').innerText = "Tasa fijada en " + nt + " bolívares.";
     }
 
     async function subirExcel() {
         const fileIn = document.getElementById('fileIn');
         const fd = new FormData();
         fd.append('archivo', fileIn.files[0]);
-        document.getElementById('textoElena').innerText = "Cargando...";
+        document.getElementById('textoElena').innerText = "Procesando inventario...";
         const res = await fetch('/upload', { method: 'POST', body: fd });
         const data = await res.json();
         if(data.success) {
-            document.getElementById('textoElena').innerText = "Inventario actualizado.";
+            document.getElementById('textoElena').innerText = "Inventario actualizado correctamente.";
             hablar("Inventario actualizado.");
+        } else {
+            document.getElementById('textoElena').innerText = "Error al cargar archivo.";
         }
     }
 </script>
