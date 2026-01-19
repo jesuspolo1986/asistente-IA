@@ -16,10 +16,8 @@ SUPABASE_KEY = "sb_secret_lSrahuG5Nv32T1ZaV7lfRw_WFXuiP4H"
 ADMIN_PASS = "1234"
 EXCEL_FILE = 'inventario.xlsx'
 
-# Memoria global
 inventario_memoria = {"df": None, "tasa": 54.20}
 
-# IMPORTANTE: Mapeo de columnas para que reconozca tu Excel
 MAPEO_COLUMNAS = {
     'Producto': ['producto', 'descripcion', 'nombre', 'articulo', 'item'],
     'Precio_USD': ['precio venta', 'pvp', 'precio', 'venta', 'precio_unitario', 'precio_usd', 'costo_usd'],
@@ -41,8 +39,11 @@ def obtener_tasa_real():
 
 @app.route('/')
 def index():
-    tasa = obtener_tasa_real()
-    inventario_memoria["tasa"] = tasa
+    # Solo actualizamos la tasa automáticamente si no ha sido cambiada manualmente en esta sesión
+    if "tasa_manual" not in inventario_memoria:
+        inventario_memoria["tasa"] = obtener_tasa_real()
+    
+    tasa = inventario_memoria["tasa"]
     dias_restantes = 1
     if session.get('autenticado') and session.get('fecha_vencimiento'):
         try:
@@ -51,46 +52,46 @@ def index():
         except: pass
     return render_template('index.html', tasa=tasa, dias_restantes=dias_restantes)
 
-# --- RUTA DE CARGA UNIFICADA (UPLOAD) ---
 @app.route('/upload', methods=['POST'])
 def upload():
-    file = request.files.get('archivo') # Nombre 'archivo' coincide con tu JS
-    if not file: 
-        return jsonify({"success": False, "mensaje": "Sin archivo"})
-    
+    file = request.files.get('archivo')
+    if not file: return jsonify({"success": False, "mensaje": "Sin archivo"})
     try:
         stream = io.BytesIO(file.read())
-        if file.filename.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(stream, engine='openpyxl')
-        else:
-            df = pd.read_csv(stream)
-
-        # Normalizar columnas
+        df = pd.read_excel(stream, engine='openpyxl') if file.filename.endswith(('.xlsx', '.xls')) else pd.read_csv(stream)
         nuevas = {c: est for est, sin in MAPEO_COLUMNAS.items() for c in df.columns if str(c).lower().strip() in sin}
         df.rename(columns=nuevas, inplace=True)
-        
-        # Limpiar espacios
         df.columns = [str(c).strip() for c in df.columns]
-        
-        # GUARDAR EN RAM (Usando el nombre correcto)
         inventario_memoria["df"] = df
-        
-        # Guardar copia en disco
         stream.seek(0)
-        with open(EXCEL_FILE, "wb") as f:
-            f.write(stream.getbuffer())
-            
-        return jsonify({"success": True, "mensaje": "Inventario cargado exitosamente."})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        with open(EXCEL_FILE, "wb") as f: f.write(stream.getbuffer())
+        return jsonify({"success": True, "mensaje": "Inventario cargado"})
+    except Exception as e: return jsonify({"success": False, "error": str(e)})
 
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
     data = request.get_json()
-    pregunta = data.get('pregunta', '').lower().strip()
     
-    if "activar modo gerencia" in pregunta:
+    # 1. Lógica para actualización de TASA MANUAL desde Gerencia
+    if data.get('nueva_tasa'):
+        try:
+            nueva_tasa = float(data.get('nueva_tasa'))
+            inventario_memoria["tasa"] = nueva_tasa
+            inventario_memoria["tasa_manual"] = True # Marcamos que es manual para que no la sobrescriba el BCV
+            return jsonify({"respuesta": "Tasa actualizada", "tasa": nueva_tasa})
+        except: return jsonify({"respuesta": "Error en tasa"})
+
+    raw_pregunta = data.get('pregunta', '').lower().strip()
+    
+    if "activar modo gerencia" in raw_pregunta:
         return jsonify({"respuesta": "Modo gerencia activo.", "modo_admin": True})
+
+    # 2. LIMPIEZA DE LENGUAJE NATURAL
+    # Eliminamos palabras comunes para quedarnos solo con el nombre del producto
+    palabras_sobrantes = ["cuanto", "cuesta", "vale", "precio", "de", "del", "el", "la", "tiene", "cual", "es"]
+    query_limpio = raw_pregunta
+    for palabra in palabras_sobrantes:
+        query_limpio = query_limpio.replace(f" {palabra} ", " ").replace(f"{palabra} ", "")
 
     tasa = inventario_memoria["tasa"]
     
@@ -100,20 +101,23 @@ def preguntar():
             if os.path.exists(EXCEL_FILE):
                 df = pd.read_excel(EXCEL_FILE, engine='openpyxl')
                 inventario_memoria["df"] = df
-            else:
-                return jsonify({"respuesta": "Elena no tiene datos. Sube el Excel primero."})
+            else: return jsonify({"respuesta": "No tengo el inventario cargado aún."})
 
-        # Búsqueda
-        match = df[df['Producto'].str.contains(pregunta, case=False, na=False)]
+        # Búsqueda sobre el query limpio
+        match = df[df['Producto'].str.contains(query_limpio, case=False, na=False)]
         
         if not match.empty:
             p = match.iloc[0]['Producto']
             u = float(match.iloc[0]['Precio_USD'])
-            return jsonify({"respuesta": f"{p}: {u}$. Total: {u*tasa:.2f} Bs."})
+            total_bs = round(u * tasa, 2)
+            
+            # Respuesta mucho más natural y profesional
+            respuesta_voz = f"El {p} tiene un precio de {u} dólares. En bolívares sería un total de {total_bs}."
+            return jsonify({"respuesta": respuesta_voz})
         
-        return jsonify({"respuesta": f"No encontré '{pregunta}'."})
+        return jsonify({"respuesta": f"Lo siento, no encontré el producto {query_limpio}."})
     except Exception as e:
-        return jsonify({"respuesta": f"Error en la consulta: {str(e)}"})
+        return jsonify({"respuesta": f"Error: {str(e)}"})
 
 @app.route('/login', methods=['POST'])
 def login():
