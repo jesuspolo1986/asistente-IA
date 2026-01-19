@@ -7,135 +7,169 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --primary: #00d2ff; --bg: #0f172a; --grace: #f39c12; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .grace-banner { position: fixed; top: 0; width: 100%; background: var(--grace); color: #000; text-align: center; padding: 10px; font-weight: bold; z-index: 1000; }
-        .elena-container { background: rgba(255,255,255,0.05); padding: 2rem; border-radius: 30px; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); width: 100%; max-width: 400px; text-align: center; }
-        .elena-aura { width: 100px; height: 100px; background: linear-gradient(45deg, var(--primary), #3a7bd5); border-radius: 50%; margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .elena-aura.listening { animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0,210,255,0.7); } 70% { box-shadow: 0 0 0 20px rgba(0,210,255,0); } 100% { box-shadow: 0 0 0 0 rgba(0,210,255,0); } }
-        .response-box { min-height: 80px; margin-bottom: 1rem; font-size: 1.1rem; color: #e2e8f0; }
-        .input-group-elena { background: rgba(255,255,255,0.1); border-radius: 15px; padding: 5px; display: flex; }
-        .input-group-elena input { background: transparent; border: none; color: white; padding: 10px; flex-grow: 1; outline: none; }
-        .tasa-badge { background: rgba(0,210,255,0.2); color: var(--primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; border: 1px solid var(--primary); }
-        .alert-confirm { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; border-radius: 50px; padding: 10px 25px; }
+        :root { --primary: #00d2ff; --admin: #a18cd1; }
+        body { background: #0f172a; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; transition: 0.5s; overflow: hidden; }
+        .admin-mode-bg { background: #1a1625 !important; }
+        
+        /* Banner de Suscripción */
+        .grace-banner { position: fixed; top: 0; width: 100%; background: #f39c12; color: #000; text-align: center; padding: 5px; font-weight: bold; z-index: 1000; font-size: 0.8rem; }
+        
+        .card-elena { background: rgba(255,255,255,0.05); border-radius: 40px; padding: 2rem; width: 380px; text-align: center; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
+        
+        .aura { width: 110px; height: 110px; margin: 0 auto 1.5rem; position: relative; cursor: pointer; }
+        .aura-inner { 
+            inset: 0; position: absolute; border-radius: 50%; 
+            background: linear-gradient(45deg, var(--primary), #3a7bd5); 
+            animation: pulse-aura 2.5s infinite ease-in-out;
+            transition: 0.8s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .admin-active .aura-inner { background: linear-gradient(45deg, #fbc2eb, var(--admin)); }
+        
+        @keyframes pulse-aura { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 40px var(--primary); } }
+        
+        .res-box { min-height: 80px; margin: 1rem 0; font-size: 1rem; color: #cbd5e1; display: flex; align-items: center; justify-content: center; line-height: 1.4; }
+        .input-elena { background: rgba(255,255,255,0.1); border: none; border-radius: 15px; color: white; padding: 12px; width: 100%; text-align: center; outline: none; }
+        
+        #tasaInput { background: none; border: 1px solid rgba(0,210,255,0.3); color: #00d2ff; width: 70px; text-align: center; border-radius: 8px; font-weight: bold; }
+        #tasaInput[readonly] { border: none; color: #94a3b8; pointer-events: none; }
+        
+        .logout-link { position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.3); text-decoration: none; font-size: 0.8rem; }
     </style>
 </head>
-<body>
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-success alert-confirm shadow-lg border-0 anim-fade">
-            <i class="fas fa-check-circle me-2"></i> {{ message }}
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+<body id="body">
 
     {% if dias_restantes is defined and dias_restantes <= 0 %}
-        <div class="grace-banner">
-            <i class="fas fa-clock me-2"></i> Suscripción vencida. Periodo de gracia activo.
-        </div>
+    <div class="grace-banner">⚠️ Suscripción vencida. Periodo de gracia activo.</div>
     {% endif %}
 
     {% if not session.get('autenticado') %}
-    <div class="login-card p-5 bg-dark rounded-5 text-center shadow-lg" style="width: 350px;">
-        <h3 class="fw-bold mb-4">Elena AI</h3>
+    <div class="card-elena">
+        <h4 class="fw-bold mb-4">Acceso Elena AI</h4>
         <form action="/login" method="POST">
-            <input type="email" name="email" class="form-control mb-3 bg-secondary text-white border-0" placeholder="Correo" required>
-            <button type="submit" class="btn btn-primary w-100 fw-bold">ENTRAR</button>
+            <input type="email" name="email" class="input-elena mb-3" placeholder="Correo electrónico" required>
+            <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">ENTRAR</button>
         </form>
     </div>
     {% else %}
-    <div class="elena-container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div class="tasa-badge">BCV: {{ tasa }}</div>
-            <a href="/logout" class="text-danger text-decoration-none small">Salir</a>
+    <div class="card-elena" id="mainCard">
+        <div class="d-flex justify-content-between mb-3 opacity-75 small align-items-center">
+            <span>TASA: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly></span>
+            <span id="labelModo" class="fw-bold text-info">VENDEDOR</span>
         </div>
 
-        <div id="panelGerencia" style="display: none; background: rgba(0,210,255,0.1);" class="mb-4 p-3 border border-info rounded-4">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="text-info small fw-bold">MODO GERENCIA</span>
-                <button onclick="salirGerencia()" class="btn btn-sm btn-outline-danger border-0" style="font-size: 0.6rem;">SALIR</button>
+        <div class="aura" onclick="escuchar()">
+            <div class="aura-inner" id="auraCircle">
+                <i class="fas fa-microphone fa-2x"></i>
             </div>
-            <form action="/subir_excel" method="POST" enctype="multipart/form-data" class="d-flex gap-2">
-            <input type="file" name="archivo" id="fileInput" class="form-control form-control-sm bg-transparent text-white" accept=".xlsx" required>
-            <button type="submit" class="btn btn-info btn-sm text-white">
-            <i class="fas fa-upload"></i> Subir
+        </div>
+
+        <h4 class="fw-bold">ELENA AI</h4>
+        <div class="res-box" id="textoElena">Toca el micrófono o escribe para consultar</div>
+        
+        <input type="text" id="userInput" class="input-elena" placeholder="¿Qué buscas hoy?" onkeypress="if(event.key==='Enter') enviar()">
+
+        <div id="adminTools" style="display: none;" class="mt-4 anim-fade-in">
+            <hr class="opacity-25">
+            <input type="file" id="fileIn" hidden onchange="subirExcel()">
+            <button class="btn btn-info btn-sm w-100 mb-2 fw-bold text-white shadow-sm" onclick="document.getElementById('fileIn').click()">
+                <i class="fas fa-file-excel me-2"></i>ACTUALIZAR INVENTARIO
             </button>
-            </form>
+            <button class="btn btn-outline-light btn-sm w-100 opacity-75" onclick="window.location.href='/admin?auth_key=1234'">
+                <i class="fas fa-users-cog me-2"></i>PANEL DE CLIENTES
+            </button>
         </div>
 
-        <div id="auraElena" class="elena-aura" onclick="iniciarEscucha()">
-            <i class="fas fa-microphone fa-2xl text-white"></i>
-        </div>
-
-        <div id="textoElena" class="response-box">Presiona para hablar</div>
-
-        <div class="input-group-elena">
-            <input type="text" id="userInput" placeholder="Buscar producto..." onkeypress="if(event.key==='Enter') enviarConsulta()">
-            <button class="btn btn-primary rounded-3" onclick="enviarConsulta()"><i class="fas fa-paper-plane"></i></button>
-        </div>
+        <a href="/logout" class="logout-link">Cerrar sesión</a>
     </div>
     {% endif %}
 
-    <script>
-        const synth = window.speechSynthesis;
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+<script>
+    let modoAdmin = false;
+    const synth = window.speechSynthesis;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-        function hablar(t) { 
-            if(!synth) return; 
-            synth.cancel(); 
-            const u = new SpeechSynthesisUtterance(t); 
-            u.lang = 'es-MX'; 
-            u.rate = 1.1; 
-            synth.speak(u); 
+    function hablar(msj) {
+        if(!synth) return;
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(msj.replace(/[📊|/]/g, ''));
+        u.lang = 'es-MX';
+        u.rate = 1.0;
+        synth.speak(u);
+    }
+
+    function escuchar() {
+        if (!SpeechRecognition) {
+            alert("Tu navegador no soporta reconocimiento de voz.");
+            return;
         }
+        const rec = new SpeechRecognition();
+        rec.lang = 'es-VE';
+        rec.onstart = () => {
+            document.getElementById('textoElena').innerText = "Escuchando...";
+            document.getElementById('auraCircle').style.boxShadow = "0 0 50px #00d2ff";
+        };
+        rec.onresult = (e) => { 
+            document.getElementById('userInput').value = e.results[0][0].transcript; 
+            enviar(); 
+        };
+        rec.onend = () => {
+            document.getElementById('auraCircle').style.boxShadow = "none";
+        };
+        rec.start();
+    }
 
-        function salirGerencia() {
-            document.getElementById('panelGerencia').style.display = 'none';
-            document.getElementById('textoElena').innerText = "Vuelto al modo vendedor.";
-            hablar("Modo vendedor.");
-        }
+    async function enviar() {
+        const query = document.getElementById('userInput').value;
+        if(!query) return;
 
-        function iniciarEscucha() {
-            const rec = new SpeechRecognition();
-            const aura = document.getElementById('auraElena');
-            rec.lang = 'es-VE';
-            rec.onstart = () => aura.classList.add('listening');
-            rec.onresult = (e) => { document.getElementById('userInput').value = e.results[0][0].transcript; enviarConsulta(); };
-            rec.onend = () => aura.classList.remove('listening');
-            rec.start();
-        }
-
-        async function enviarConsulta() {
-            const input = document.getElementById('userInput');
-            const box = document.getElementById('textoElena');
-            const query = input.value.trim();
-            if(!query) return;
-            box.innerText = "Elena pensando...";
-            input.value = "";
-
-            const res = await fetch('/preguntar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pregunta: query })
-            });
-            const data = await res.json();
-
-            if(data.modo_admin) {
-                document.getElementById('panelGerencia').style.display = 'block';
-            }
-            box.innerText = data.respuesta;
+        const res = await fetch('/preguntar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ pregunta: query, modo_admin: modoAdmin })
+        });
+        
+        const data = await res.json();
+        
+        if(data.modo_admin) {
+            activarAdmin();
+            document.getElementById('textoElena').innerText = "Modo administrativo activado, jefe.";
+            hablar("Modo administrativo activado.");
+        } else {
+            document.getElementById('textoElena').innerText = data.respuesta;
             hablar(data.respuesta);
         }
+        document.getElementById('userInput').value = "";
+    }
 
-        // Auto-ocultar alerta de confirmación
-        setTimeout(() => {
-            const alert = document.querySelector('.alert-confirm');
-            if(alert) alert.style.display = 'none';
-        }, 4000);
-    </script>
+    function activarAdmin() {
+        modoAdmin = true;
+        document.getElementById('body').classList.add('admin-mode-bg');
+        document.getElementById('mainCard').classList.add('admin-active');
+        document.getElementById('labelModo').innerText = "GERENCIA";
+        document.getElementById('labelModo').className = "fw-bold text-warning";
+        document.getElementById('adminTools').style.display = "block";
+    }
+
+    async function subirExcel() {
+        const fileIn = document.getElementById('fileIn');
+        if(!fileIn.files[0]) return;
+
+        document.getElementById('textoElena').innerText = "Procesando archivo...";
+        
+        const fd = new FormData();
+        fd.append('archivo', fileIn.files[0]);
+
+        const res = await fetch('/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        
+        if(data.success) {
+            document.getElementById('textoElena').innerText = "Inventario actualizado correctamente.";
+            hablar("Inventario actualizado.");
+        } else {
+            document.getElementById('textoElena').innerText = "Error: " + data.error;
+        }
+    }
+</script>
 </body>
 </html>
