@@ -174,6 +174,38 @@ def preguntar():
 
     except Exception as e:
         return jsonify({"respuesta": f"Error en la búsqueda: {str(e)}"})
+    @app.route('/admin/crear', methods=['POST'])
+def crear_usuario():
+    auth = request.form.get('auth_key')
+    if auth != ADMIN_PASS: return "Acceso Denegado", 403
+    
+    email = request.form.get('email', '').lower().strip()
+    vence = request.form.get('vence')
+    
+    try:
+        # Insertamos en la tabla de Supabase
+        supabase.table("suscripciones").insert({
+            "email": email, 
+            "fecha_vencimiento": vence, 
+            "activo": 1
+        }).execute()
+        return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+    except Exception as e:
+        return f"Error al crear usuario: {str(e)}"
+
+@app.route('/admin/eliminar', methods=['POST'])
+def eliminar_usuario():
+    auth = request.form.get('auth_key')
+    if auth != ADMIN_PASS: return "Acceso Denegado", 403
+    
+    email = request.form.get('email')
+    
+    try:
+        # Eliminamos de la tabla de Supabase
+        supabase.table("suscripciones").delete().eq("email", email).execute()
+        return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+    except Exception as e:
+        return f"Error al eliminar: {str(e)}"
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email', '').lower().strip()
