@@ -8,16 +8,19 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #0f172a; color: white; font-family: sans-serif; min-height: 100vh; padding: 2rem 1rem; }
-        .admin-container { max-width: 900px; margin: auto; }
+        .admin-container { max-width: 1000px; margin: auto; }
         .card-stats { background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); padding: 1.5rem; backdrop-filter: blur(10px); }
-        .table-elena { background: rgba(255,255,255,0.03); border-radius: 15px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
-        .table-elena th { background: rgba(0,210,255,0.1); color: #00d2ff; border: none; }
-        .table-elena td { border-color: rgba(255,255,255,0.05); vertical-align: middle; }
-        .input-admin { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 10px; padding: 8px 15px; width: 100%; outline: none; }
+        .table-elena { background: rgba(255,255,255,0.03); border-radius: 15px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); margin-top: 1rem; }
+        .table-elena th { background: rgba(0,210,255,0.1); color: #00d2ff; border: none; font-size: 0.8rem; text-uppercase: tracking-wider; }
+        .table-elena td { border-color: rgba(255,255,255,0.05); vertical-align: middle; font-size: 0.9rem; }
+        .input-admin, .select-admin { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 10px; padding: 8px 15px; width: 100%; outline: none; }
+        .select-admin option { background: #1e293b; color: white; }
         .badge-active { background: #2ecc71; color: #fff; }
         .badge-expired { background: #e74c3c; color: #fff; }
         .btn-add { background: #a18cd1; border: none; font-weight: bold; border-radius: 10px; transition: 0.3s; }
         .btn-add:hover { background: #8e7cc3; transform: translateY(-2px); }
+        .query-text { color: #e2e8f0; font-style: italic; background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 5px; }
+        .ip-text { font-family: monospace; font-size: 0.75rem; opacity: 0.6; }
     </style>
 </head>
 <body>
@@ -50,11 +53,11 @@
     </div>
 
     <div class="card-stats mb-4">
-        <h5 class="mb-3">Registrar Nuevo Cliente</h5>
+        <h5 class="mb-3 text-info"><i class="fas fa-user-plus me-2"></i>Registrar Nuevo Cliente</h5>
         <form action="/admin/crear" method="POST" class="row g-2">
             <input type="hidden" name="auth_key" value="{{ admin_pass }}">
             <div class="col-md-5">
-                <input type="email" name="email" class="input-admin" placeholder="Correo del Cliente" required>
+                <input type="email" name="email" class="input-admin" placeholder="Correo de la Empresa" required>
             </div>
             <div class="col-md-4">
                 <input type="date" name="vence" class="input-admin" required>
@@ -65,41 +68,102 @@
         </form>
     </div>
 
-    <div class="table-responsive table-elena">
-        <table class="table table-dark mb-0">
-            <thead>
-                <tr>
-                    <th>CLIENTE</th>
-                    <th>VENCE</th>
-                    <th class="text-center">ESTADO</th>
-                    <th class="text-end">ACCIÓN</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for u in usuarios %}
-                <tr>
-                    <td>{{ u.email }}</td>
-                    <td>{{ u.fecha_vencimiento }}</td>
-                    <td class="text-center">
-                        {% if u.vencido %}
-                        <span class="badge badge-expired">VENCIDO</span>
-                        {% else %}
-                        <span class="badge badge-active">ACTIVO</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end">
-                        <form action="/admin/eliminar" method="POST" onsubmit="return confirm('¿Eliminar cliente?');">
-                            <input type="hidden" name="auth_key" value="{{ admin_pass }}">
-                            <input type="hidden" name="email" value="{{ u.email }}">
-                            <button type="submit" class="btn btn-link text-danger p-0"><i class="fas fa-trash-alt"></i></button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card-stats mb-4">
+        <h5 class="mb-3"><i class="fas fa-users me-2"></i>Suscripciones Activas</h5>
+        <div class="table-responsive table-elena">
+            <table class="table table-dark mb-0">
+                <thead>
+                    <tr>
+                        <th>CLIENTE</th>
+                        <th>VENCE</th>
+                        <th class="text-center">ESTADO</th>
+                        <th class="text-end">ACCIÓN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in usuarios %}
+                    <tr>
+                        <td class="fw-bold">{{ u.email }}</td>
+                        <td>{{ u.fecha_vencimiento }}</td>
+                        <td class="text-center">
+                            <span class="badge {{ 'badge-expired' if u.vencido else 'badge-active' }}">
+                                {{ 'VENCIDO' if u.vencido else 'ACTIVO' }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <form action="/admin/eliminar" method="POST" onsubmit="return confirm('¿Eliminar?');" style="display:inline;">
+                                <input type="hidden" name="auth_key" value="{{ admin_pass }}">
+                                <input type="hidden" name="email" value="{{ u.email }}">
+                                <button type="submit" class="btn btn-link text-danger p-0"><i class="fas fa-trash-alt"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card-stats">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="m-0 text-warning"><i class="fas fa-bolt me-2"></i>Monitoreo de Actividad</h5>
+            <div style="width: 250px;">
+                <select id="filtroEmpresa" class="select-admin" onchange="filtrarLogs()">
+                    <option value="todos">Todas las empresas</option>
+                    {% for u in usuarios %}
+                    <option value="{{ u.email }}">{{ u.email }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <div class="table-responsive table-elena">
+            <table class="table table-dark mb-0" id="tablaLogs">
+                <thead>
+                    <tr>
+                        <th>EMPRESA</th>
+                        <th>CONSULTA</th>
+                        <th>CALIDAD</th>
+                        <th>FECHA</th>
+                        <th>IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr class="log-row" data-email="{{ log.email }}">
+                        <td class="fw-bold text-info">{{ log.email }}</td>
+                        <td><span class="query-text">"{{ log.detalle }}"</span></td>
+                        <td>
+                            {% if log.exito %}
+                            <span class="text-success small"><i class="fas fa-check-circle"></i> OK</span>
+                            {% else %}
+                            <span class="text-warning small"><i class="fas fa-times-circle"></i> FAIL</span>
+                            {% endif %}
+                        </td>
+                        <td class="small opacity-75">{{ log.fecha }}</td>
+                        <td class="ip-text">{{ log.ip_address }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
+
+<script>
+function filtrarLogs() {
+    const filtro = document.getElementById('filtroEmpresa').value;
+    const filas = document.querySelectorAll('.log-row');
+    
+    filas.forEach(fila => {
+        if (filtro === 'todos' || fila.getAttribute('data-email') === filtro) {
+            fila.style.display = '';
+        } else {
+            fila.style.display = 'none';
+        }
+    });
+}
+</script>
 
 </body>
 </html>

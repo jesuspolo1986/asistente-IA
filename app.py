@@ -6,7 +6,7 @@ from pyDolarVenezuela.pages import AlCambio
 from pyDolarVenezuela import Monitor
 from datetime import datetime, timedelta
 from supabase import create_client, Client
-
+import time
 app = Flask(__name__)
 app.secret_key = 'elena_farmacia_2026_key'
 
@@ -75,30 +75,59 @@ def upload():
 @app.route('/admin')
 def admin_panel():
     auth = request.args.get('auth_key')
-    if auth != ADMIN_PASS: return "Acceso Denegado", 403
+    if auth != ADMIN_PASS: 
+        return "Acceso Denegado: Debes usar la llave correcta en la URL", 403
     
-    # 1. Buscamos los usuarios en Supabase
-    res = supabase.table("suscripciones").select("*").execute()
-    usuarios = res.data
-    
-    # 2. Calculamos las estadísticas para llenar los {{ stats }}
-    hoy = datetime.now().date()
-    stats = {"activos": 0, "vencidos": 0, "total": len(usuarios)}
-    
-    for u in usuarios:
-        vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
-        u['vencido'] = vence < hoy
-        if u['vencido']: stats["vencidos"] += 1
-        else: stats["activos"] += 1
+    try:
+        # 1. Buscamos los usuarios en Supabase
+        res = supabase.table("suscripciones").select("*").execute()
+        usuarios = res.data
         
-    # 3. ENVIAMOS los datos al HTML
-    return render_template('admin.html', usuarios=usuarios, stats=stats, admin_pass=ADMIN_PASS)
+        # 2. Buscamos los LOGS de actividad para el monitoreo B2B
+        # Traemos los últimos 50 movimientos ordenados por fecha
+        logs_res = supabase.table("logs_actividad")\
+            .select("*")\
+            .order("fecha", desc=True)\
+            .limit(50)\
+            .execute()
+        logs = logs_res.data
+        
+        # 3. Calculamos las estadísticas para llenar los cuadros superiores
+        hoy = datetime.now().date()
+        stats = {"activos": 0, "vencidos": 0, "total": len(usuarios)}
+        
+        for u in usuarios:
+            # Convertimos la fecha de texto a objeto fecha de Python
+            vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
+            u['vencido'] = vence < hoy
+            
+            if u['vencido']: 
+                stats["vencidos"] += 1
+            else: 
+                stats["activos"] += 1
+                
+        # 4. ENVIAMOS todo al HTML (usuarios, estadísticas y logs)
+        return render_template('admin.html', 
+                               usuarios=usuarios, 
+                               stats=stats, 
+                               logs=logs, 
+                               admin_pass=ADMIN_PASS)
+
+    except Exception as e:
+        return f"Error en el Panel Admin: {str(e)}", 500
 from rapidfuzz import process, utils
+
+import time
 
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
+    t_inicio = time.time() # Iniciamos cronómetro para medir rendimiento
     data = request.get_json()
     
+    # Identificación del cliente (B2B)
+    usuario_email = session.get('usuario', 'invitado@anonimo.com')
+    ip_cliente = request.headers.get('X-Forwarded-For', request.remote_addr)
+
     # 1. Manejo de Tasa Manual (Gerencia)
     if data.get('nueva_tasa'):
         try:
@@ -122,7 +151,7 @@ def preguntar():
         else:
             return jsonify({"respuesta": "Elena no tiene datos. Por favor, sube el inventario en el panel de gerencia."})
 
-    # 4. LIMPIEZA AVANZADA: Quitamos frases comunes para dejar solo el "núcleo" del producto
+    # 4. Limpieza de lenguaje natural
     palabras_ruido = ["cuanto cuesta", "cuanto vale", "que precio tiene", "precio de", "dame el precio", "tienes", "busco", "valor"]
     pregunta_limpia = pregunta_raw
     for frase in palabras_ruido:
@@ -130,10 +159,11 @@ def preguntar():
     pregunta_limpia = pregunta_limpia.strip()
 
     tasa = inventario_memoria["tasa"]
+    respuesta_final = ""
+    busqueda_exitosa = False
 
     try:
-        # 5. BÚSQUEDA DIFUZA (Fuzzy Search)
-        # Extraemos las mejores coincidencias (score > 60 para evitar errores locos)
+        # 5. Búsqueda Difusa
         resultados = process.extract(
             pregunta_limpia, 
             df['Producto'].astype(str).tolist(), 
@@ -141,39 +171,54 @@ def preguntar():
             processor=utils.default_process
         )
         
-        # Filtramos resultados que tengan buena similitud
         matches_validos = [r for r in resultados if r[1] > 60]
 
         if not matches_validos:
-            return jsonify({"respuesta": f"Lo siento, no logré encontrar '{pregunta_limpia}' en el inventario."})
-
-        # CASO 1: Una coincidencia muy clara (Similitud mayor a 90)
-        if len(matches_validos) == 1 or matches_validos[0][1] > 90:
+            respuesta_final = f"Lo siento, no encontré '{pregunta_limpia}' en el inventario."
+            busqueda_exitosa = False
+        
+        elif len(matches_validos) == 1 or matches_validos[0][1] > 90:
             nombre_match = matches_validos[0][0]
             fila = df[df['Producto'] == nombre_match].iloc[0]
-            
             p_usd = float(fila['Precio_USD'])
             p_bs = p_usd * tasa
             stock = fila['Stock'] if 'Stock' in fila.columns else "?"
             
-            res = f"El {nombre_match} cuesta {p_usd:,.2f} dólares, que al cambio son {p_bs:,.2f} bolívares. Quedan {stock} unidades."
-            return jsonify({"respuesta": res})
+            respuesta_final = f"El {nombre_match} cuesta {p_usd:,.2f} $, que son {p_bs:,.2f} Bs. Quedan {stock} unidades."
+            busqueda_exitosa = True
 
-        # CASO 2: Varias presentaciones similares (Ej: "Atamel")
         else:
             opciones = []
-            for m in matches_validos[:3]: # Limitamos a 3 para la voz de Elena
+            for m in matches_validos[:3]:
                 nombre_p = m[0]
                 f_p = df[df['Producto'] == nombre_p].iloc[0]
                 u_p = float(f_p['Precio_USD'])
                 b_p = u_p * tasa
                 opciones.append(f"{nombre_p} en {u_p}$ ({b_p:,.2f} Bs)")
             
-            texto_opciones = " . también tengo . ".join(opciones)
-            return jsonify({"respuesta": f"Encontré varias opciones: {texto_opciones}. ¿Cuál de ellas necesitas?"})
+            respuesta_final = f"Encontré varias opciones: {' . también tengo . '.join(opciones)}. ¿Cuál buscabas?"
+            busqueda_exitosa = True
 
     except Exception as e:
-        return jsonify({"respuesta": f"Error en la búsqueda: {str(e)}"})
+        respuesta_final = f"Error en la búsqueda: {str(e)}"
+        busqueda_exitosa = False
+
+    # --- SISTEMA DE MONITOREO B2B ---
+    # Registramos la actividad silenciosamente en Supabase
+    try:
+        t_respuesta = round(time.time() - t_inicio, 3)
+        supabase.table("logs_actividad").insert({
+            "email": usuario_email,
+            "accion": "CONSULTA_PRECIO",
+            "detalle": pregunta_raw,
+            "ip_address": ip_cliente,
+            "duracion_respuesta": t_respuesta,
+            "exito": busqueda_exitosa
+        }).execute()
+    except Exception as log_err:
+        print(f"Error de monitoreo: {log_err}")
+
+    return jsonify({"respuesta": respuesta_final})
 @app.route('/admin/crear', methods=['POST'])
 def crear_usuario():
     auth = request.form.get('auth_key')
