@@ -200,15 +200,114 @@ def upload():
         return jsonify({"success": False, "error": str(e)})
 
 # --- PANEL ADMIN (Se mantiene igual pero conectado a suscripciones) ---
+# --- RUTAS ADMINISTRATIVAS COMPLETAS ---
+
 @app.route('/admin')
 def admin_panel():
     auth = request.args.get('auth_key')
-    if auth != ADMIN_PASS: return "No autorizado", 403
+    if auth != ADMIN_PASS: 
+        return "No autorizado", 403
+    
     try:
-        usuarios = supabase.table("suscripciones").select("*").execute().data
-        logs = supabase.table("logs_actividad").select("*").order("fecha", desc=True).limit(50).execute().data
-        return render_template('admin.html', usuarios=usuarios, logs=logs, admin_pass=ADMIN_PASS)
-    except Exception as e: return f"Error Admin: {e}", 500
+        # 1. Obtener usuarios y calcular estado de vencimiento
+        usuarios_res = supabase.table("suscripciones").select("*").execute()
+        usuarios = usuarios_res.data if usuarios_res.data else []
+        hoy = datetime.now().date()
+        
+        for u in usuarios:
+            try:
+                vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
+                u['vencido'] = vence < hoy
+            except:
+                u['vencido'] = True
+
+        # 2. Obtener Logs con mapeo de fecha para el HTML
+        try:
+            # Intentamos por created_at (estándar Supabase)
+            logs_res = supabase.table("logs_actividad").select("*").order("created_at", desc=True).limit(100).execute()
+        except:
+            logs_res = supabase.table("logs_actividad").select("*").limit(100).execute()
+        
+        logs_raw = logs_res.data if logs_res.data else []
+        logs = []
+        for l in logs_raw:
+            # Mapeamos 'created_at' a 'fecha' para que el HTML lo reconozca
+            l['fecha'] = l.get('created_at', '2026-01-01T00:00:00')
+            logs.append(l)
+
+        # 3. Estadísticas para los cuadros superiores
+        stats = {
+            "total": len(usuarios),
+            "activos": len([u for u in usuarios if not u['vencido']]),
+            "vencidos": len([u for u in usuarios if u['vencido']])
+        }
+
+        # 4. Ranking de Salud (Búsquedas exitosas vs fallidas)
+        from collections import Counter
+        emails_actividad = [l['email'] for l in logs if l.get('email')]
+        conteo = Counter(emails_actividad)
+        
+        ranking = []
+        for email, count in conteo.most_common(5):
+            logs_cliente = [l for l in logs if l['email'] == email]
+            exitos = len([l for l in logs_cliente if l.get('exito') == True])
+            total = len(logs_cliente)
+            salud = int((exitos / total) * 100) if total > 0 else 0
+            
+            ranking.append({
+                "email": email,
+                "count": count,
+                "salud": salud,
+                "alerta": salud < 70  # Alerta visual si el éxito es bajo
+            })
+        
+        return render_template('admin.html', 
+                               usuarios=usuarios, 
+                               stats=stats, 
+                               logs=logs, 
+                               ranking=ranking, 
+                               admin_pass=ADMIN_PASS)
+                               
+    except Exception as e:
+        print(f"ERROR EN PANEL ADMIN: {str(e)}")
+        return f"Error interno: {str(e)}", 500
+
+@app.route('/admin/crear', methods=['POST'])
+def crear_usuario():
+    auth = request.form.get('auth_key')
+    if auth != ADMIN_PASS: return "Error de autenticación", 403
+    
+    email = request.form.get('email').lower().strip()
+    data = {
+        "email": email,
+        "password": request.form.get('password'),
+        "fecha_vencimiento": request.form.get('vence'),
+        "activo": 1
+    }
+    
+    try:
+        supabase.table("suscripciones").insert(data).execute()
+        # Redirigir de vuelta al panel con la llave
+        return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+    except Exception as e:
+        return f"Error al crear usuario: {str(e)}"
+
+@app.route('/admin/eliminar', methods=['POST'])
+def eliminar_usuario():
+    auth = request.form.get('auth_key')
+    if auth != ADMIN_PASS: return "Error de autenticación", 403
+    
+    email_a_eliminar = request.form.get('email')
+    
+    try:
+        # 1. Eliminar suscripción
+        supabase.table("suscripciones").delete().eq("email", email_a_eliminar).execute()
+        # 2. Opcional: Eliminar su inventario de la DB para limpiar espacio
+        supabase.table("inventarios").delete().eq("empresa_email", email_a_eliminar).execute()
+        
+        return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+    except Exception as e:
+        return f"Error al eliminar: {str(e)}"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
