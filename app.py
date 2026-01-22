@@ -72,12 +72,34 @@ def upload():
         with open(EXCEL_FILE, "wb") as f: f.write(stream.getbuffer())
         return jsonify({"success": True, "mensaje": "Inventario cargado"})
     except Exception as e: return jsonify({"success": False, "error": str(e)})
+@app.route('/admin')
+def admin_panel():
+    auth = request.args.get('auth_key')
+    if auth != ADMIN_PASS: return "Acceso Denegado", 403
+    
+    # 1. Buscamos los usuarios en Supabase
+    res = supabase.table("suscripciones").select("*").execute()
+    usuarios = res.data
+    
+    # 2. Calculamos las estadísticas para llenar los {{ stats }}
+    hoy = datetime.now().date()
+    stats = {"activos": 0, "vencidos": 0, "total": len(usuarios)}
+    
+    for u in usuarios:
+        vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
+        u['vencido'] = vence < hoy
+        if u['vencido']: stats["vencidos"] += 1
+        else: stats["activos"] += 1
+        
+    # 3. ENVIAMOS los datos al HTML
+    return render_template('admin.html', usuarios=usuarios, stats=stats, admin_pass=ADMIN_PASS)
+from rapidfuzz import process, utils
 
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
     data = request.get_json()
     
-    # Cambio de tasa manual
+    # 1. Manejo de Tasa Manual (Gerencia)
     if data.get('nueva_tasa'):
         try:
             inventario_memoria["tasa"] = float(data.get('nueva_tasa'))
@@ -85,56 +107,73 @@ def preguntar():
             return jsonify({"respuesta": "Tasa actualizada", "tasa": inventario_memoria["tasa"]})
         except: return jsonify({"respuesta": "Error en tasa"})
 
-    raw_pregunta = data.get('pregunta', '').lower().strip()
-    if "activar modo gerencia" in raw_pregunta:
+    pregunta_raw = data.get('pregunta', '').lower().strip()
+    
+    # 2. Acceso a Gerencia
+    if "activar modo gerencia" in pregunta_raw:
         return jsonify({"respuesta": "Modo gerencia activo.", "modo_admin": True})
 
-    # Limpieza de lenguaje natural
-    palabras_sobrantes = ["cuanto", "cuesta", "vale", "precio", "de", "del", "el", "la", "tiene", "cual", "es", "busco"]
-    query_limpio = raw_pregunta
-    for palabra in palabras_sobrantes:
-        query_limpio = query_limpio.replace(f" {palabra} ", " ").replace(f"{palabra} ", "")
+    # 3. Verificación de Inventario
+    df = inventario_memoria["df"]
+    if df is None:
+        if os.path.exists(EXCEL_FILE):
+            df = pd.read_excel(EXCEL_FILE, engine='openpyxl') if EXCEL_FILE.endswith('.xlsx') else pd.read_csv(EXCEL_FILE)
+            inventario_memoria["df"] = df
+        else:
+            return jsonify({"respuesta": "Elena no tiene datos. Por favor, sube el inventario en el panel de gerencia."})
+
+    # 4. LIMPIEZA AVANZADA: Quitamos frases comunes para dejar solo el "núcleo" del producto
+    palabras_ruido = ["cuanto cuesta", "cuanto vale", "que precio tiene", "precio de", "dame el precio", "tienes", "busco", "valor"]
+    pregunta_limpia = pregunta_raw
+    for frase in palabras_ruido:
+        pregunta_limpia = pregunta_limpia.replace(frase, "")
+    pregunta_limpia = pregunta_limpia.strip()
 
     tasa = inventario_memoria["tasa"]
-    
+
     try:
-        df = inventario_memoria["df"]
-        if df is None:
-            if os.path.exists(EXCEL_FILE):
-                df = pd.read_excel(EXCEL_FILE, engine='openpyxl') if EXCEL_FILE.endswith('.xlsx') else pd.read_csv(EXCEL_FILE)
-                inventario_memoria["df"] = df
-            else: return jsonify({"respuesta": "Elena no tiene datos. Sube el inventario."})
-
-        # Búsqueda múltiple
-        matches = df[df['Producto'].str.contains(query_limpio, case=False, na=False)]
+        # 5. BÚSQUEDA DIFUZA (Fuzzy Search)
+        # Extraemos las mejores coincidencias (score > 60 para evitar errores locos)
+        resultados = process.extract(
+            pregunta_limpia, 
+            df['Producto'].astype(str).tolist(), 
+            limit=5, 
+            processor=utils.default_process
+        )
         
-        if matches.empty:
-            return jsonify({"respuesta": f"No encontré nada relacionado con {query_limpio}."})
+        # Filtramos resultados que tengan buena similitud
+        matches_validos = [r for r in resultados if r[1] > 60]
 
-        if len(matches) == 1:
-            p = matches.iloc[0]['Producto']
-            u = float(matches.iloc[0]['Precio_USD'])
-            s = matches.iloc[0]['Stock'] if 'Stock' in matches.columns else "?"
-            total_bs = round(u * tasa, 2)
-            return jsonify({"respuesta": f"El {p} tiene un precio de {u} dólares, que son {total_bs} bolívares. Quedan {s} unidades."})
-        
-        elif len(matches) > 5:
-            return jsonify({"respuesta": f"Encontré {len(matches)} productos similares a '{query_limpio}'. ¿Podrías ser más específico?"})
+        if not matches_validos:
+            return jsonify({"respuesta": f"Lo siento, no logré encontrar '{pregunta_limpia}' en el inventario."})
 
+        # CASO 1: Una coincidencia muy clara (Similitud mayor a 90)
+        if len(matches_validos) == 1 or matches_validos[0][1] > 90:
+            nombre_match = matches_validos[0][0]
+            fila = df[df['Producto'] == nombre_match].iloc[0]
+            
+            p_usd = float(fila['Precio_USD'])
+            p_bs = p_usd * tasa
+            stock = fila['Stock'] if 'Stock' in fila.columns else "?"
+            
+            res = f"El {nombre_match} cuesta {p_usd:,.2f} dólares, que al cambio son {p_bs:,.2f} bolívares. Quedan {stock} unidades."
+            return jsonify({"respuesta": res})
+
+        # CASO 2: Varias presentaciones similares (Ej: "Atamel")
         else:
             opciones = []
-            for i, row in matches.iterrows():
-                nom = row['Producto']
-                pre = row['Precio_USD']
-                bs = round(float(pre) * tasa, 2)
-                opciones.append(f"{nom} en {pre}$ ({bs} Bs)")
+            for m in matches_validos[:3]: # Limitamos a 3 para la voz de Elena
+                nombre_p = m[0]
+                f_p = df[df['Producto'] == nombre_p].iloc[0]
+                u_p = float(f_p['Precio_USD'])
+                b_p = u_p * tasa
+                opciones.append(f"{nombre_p} en {u_p}$ ({b_p:,.2f} Bs)")
             
             texto_opciones = " . también tengo . ".join(opciones)
-            return jsonify({"respuesta": f"Tengo varias presentaciones: {texto_opciones}. ¿Cuál buscabas?"})
+            return jsonify({"respuesta": f"Encontré varias opciones: {texto_opciones}. ¿Cuál de ellas necesitas?"})
 
     except Exception as e:
-        return jsonify({"respuesta": f"Error: {str(e)}"})
-
+        return jsonify({"respuesta": f"Error en la búsqueda: {str(e)}"})
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email', '').lower().strip()
