@@ -93,6 +93,7 @@ def preguntar():
     usuario_email = session.get('usuario', 'anonimo@farmacia.com')
     ip_cliente = request.headers.get('X-Forwarded-For', request.remote_addr)
 
+    # 1. Manejo de cambio de tasa (Gerencia)
     if data.get('nueva_tasa'):
         try:
             inventario_memoria["tasa"] = float(data.get('nueva_tasa'))
@@ -102,45 +103,79 @@ def preguntar():
 
     pregunta_raw = data.get('pregunta', '').lower().strip()
     
+    # 2. Acceso a modo gerencia
     if "activar modo gerencia" in pregunta_raw:
         return jsonify({"respuesta": "Modo gerencia activo.", "modo_admin": True})
 
+    # 3. Verificación de Inventario
     df = inventario_memoria["df"]
     if df is None:
         if os.path.exists(EXCEL_FILE):
             df = pd.read_excel(EXCEL_FILE, engine='openpyxl') if EXCEL_FILE.endswith('.xlsx') else pd.read_csv(EXCEL_FILE)
             inventario_memoria["df"] = df
         else:
-            return jsonify({"respuesta": "Elena no tiene datos. Sube el inventario en Gerencia."})
+            return jsonify({"respuesta": "Elena: Por favor, sube el inventario en el panel de gerencia."})
+
+    # --- 4. LIMPIEZA DE LENGUAJE NATURAL (EL MOTOR DE PRECISIÓN) ---
+    # Eliminamos las palabras que ensucian la búsqueda del nombre del producto
+    palabras_ruido = [
+        "cuanto cuesta", "cuanto vale", "que precio tiene", "precio de", 
+        "dame el precio de", "tienes", "busco", "valor de", "precio"
+    ]
+    pregunta_limpia = pregunta_raw
+    for frase in palabras_ruido:
+        pregunta_limpia = pregunta_limpia.replace(frase, "")
+    
+    pregunta_limpia = pregunta_limpia.strip()
 
     tasa = inventario_memoria["tasa"]
     busqueda_exitosa = False
-    
-    try:
-        # Búsqueda Difusa
-        resultados = process.extract(pregunta_raw, df['Producto'].astype(str).tolist(), limit=3)
-        matches_validos = [r for r in resultados if r[1] > 60]
+    respuesta_final = ""
 
-        if not matches_validos:
-            respuesta_final = f"No encontré ese producto."
-        else:
-            nombre_match = matches_validos[0][0]
-            fila = df[df['Producto'] == nombre_match].iloc[0]
-            p_usd = float(fila['Precio_USD'])
+    try:
+        # 5. Búsqueda Difusa con el texto limpio
+        # Usamos extractOne para mayor velocidad en este caso
+        match = process.extractOne(
+            pregunta_limpia, 
+            df['Producto'].astype(str).tolist(), 
+            processor=utils.default_process
+        )
+
+        if match and match[1] > 60:
+            nombre_p = match[0]
+            # Buscamos la fila original
+            f = df[df['Producto'] == nombre_p].iloc[0]
+            
+            # Manejo flexible de nombres de columnas (Precio_USD o Precio Venta)
+            col_precio = 'Precio_USD' if 'Precio_USD' in df.columns else 'Precio Venta'
+            p_usd = float(f[col_precio])
             p_bs = p_usd * tasa
-            stock = fila.get('Stock', '?')
-            respuesta_final = f"El {nombre_match} cuesta {p_usd:,.2f} $ ({p_bs:,.2f} Bs). Stock: {stock}"
-            busqueda_exitosa = True
-    except Exception as e:
-        respuesta_final = f"Error: {str(e)}"
+            
+            # Stock (opcional si existe la columna)
+            stock_info = ""
+            if 'Stock' in f:
+                stock_info = f" Quedan {f['Stock']} unidades."
 
-    # Registro en Supabase
+            # Respuesta en el formato solicitado: BS y luego USD
+            respuesta_final = f"El {nombre_p} cuesta {p_bs:,.2f} Bs, que son {p_usd:,.2f} $.{stock_info}"
+            busqueda_exitosa = True
+        else:
+            respuesta_final = f"Lo siento, no encontré '{pregunta_limpia}' en el inventario."
+            busqueda_exitosa = False
+
+    except Exception as e:
+        respuesta_final = f"Elena: Error al procesar la búsqueda ({str(e)})"
+        busqueda_exitosa = False
+
+    # 6. Registro de Logs en Supabase (Monitoreo silencioso)
     try:
+        t_respuesta = round(time.time() - t_inicio, 3)
         supabase.table("logs_actividad").insert({
             "email": usuario_email,
-            "accion": "CONSULTA",
+            "accion": "CONSULTA_PRECIO",
             "detalle": pregunta_raw,
             "ip_address": ip_cliente,
+            "duracion_respuesta": t_respuesta,
             "exito": busqueda_exitosa
         }).execute()
     except: pass
