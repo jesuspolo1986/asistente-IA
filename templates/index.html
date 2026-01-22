@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --primary: #00d2ff; --admin: #a18cd1; }
-        body { background: #0f172a; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; transition: 0.5s; overflow: hidden; }
+        body { background: #0f172a; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; transition: 0.5s; overflow: hidden; margin: 0; }
         .admin-mode-bg { background: #1a1625 !important; }
         .grace-banner { position: fixed; top: 0; width: 100%; background: #f39c12; color: #000; text-align: center; padding: 5px; font-weight: bold; z-index: 1000; font-size: 0.8rem; }
         .card-elena { background: rgba(255,255,255,0.05); border-radius: 40px; padding: 2rem; width: 380px; text-align: center; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
@@ -30,25 +30,21 @@
     <div class="grace-banner">⚠️ Suscripción vencida. Periodo de gracia activo.</div>
     {% endif %}
 
-    {% if not session.get('autenticado') %}
-    <div class="card-elena">
-        <h4 class="fw-bold mb-4">Elena AI | Acceso</h4>
-        <form action="/login" method="POST">
-            <input type="email" name="email" class="input-elena mb-3" placeholder="Correo electrónico" required>
-            <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">ENTRAR</button>
-        </form>
-    </div>
-    {% else %}
     <div class="card-elena" id="mainCard">
         <div class="d-flex justify-content-between mb-3 opacity-75 small align-items-center">
             <span>TASA: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly onchange="sincronizarTasa()"></span>
             <span id="labelModo" class="fw-bold text-info" onclick="desactivarAdmin()">VENDEDOR</span>
         </div>
+
         <div class="aura" onclick="escuchar()">
             <div class="aura-inner" id="auraCircle"><i class="fas fa-microphone fa-2x"></i></div>
         </div>
+
         <h4 class="fw-bold">ELENA AI</h4>
+        <p style="font-size: 0.7rem; opacity: 0.4; margin-top: -10px;">{{ email }}</p>
+
         <div class="res-box" id="textoElena">Pregunta por un producto o activa modo gerencia</div>
+        
         <input type="text" id="userInput" class="input-elena" placeholder="¿Qué buscas?" onkeypress="if(event.key==='Enter') enviar()">
         
         <div id="adminTools" style="display: none;" class="mt-4">
@@ -58,9 +54,9 @@
                 <i class="fas fa-file-excel me-2"></i>ACTUALIZAR INVENTARIO
             </button>
         </div>
-        <a href="/logout" class="logout-link">Cerrar sesión</a>
+
+        <a href="/logout" class="logout-link"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</a>
     </div>
-    {% endif %}
 
 <script>
     let modoAdmin = false;

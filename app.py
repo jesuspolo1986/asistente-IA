@@ -41,7 +41,7 @@ def obtener_tasa_real():
     except: return 54.20
 
 # --- RUTAS DE AUTENTICACIÓN ---
-@app.route('/login', methods=['GET', 'POST'])
+@@app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form.get('email', '').lower().strip()
@@ -52,15 +52,15 @@ def login():
         if res.data:
             user = res.data[0]
             if user.get('password') == password:
-                session['logged_in'] = True
+                # IMPORTANTE: Usamos 'logged_in' para el index
+                session['logged_in'] = True 
                 session['usuario'] = email
                 session['fecha_vencimiento'] = user['fecha_vencimiento']
                 return redirect(url_for('index'))
             else:
                 return render_template('login.html', error="Clave incorrecta")
-        return render_template('login.html', error="Usuario no activo o no registrado")
+        return render_template('login.html', error="Usuario no registrado")
     return render_template('login.html')
-
 @app.route('/logout')
 def logout():
     session.clear()
