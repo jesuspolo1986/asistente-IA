@@ -41,7 +41,7 @@ def obtener_tasa_real():
     except: return 54.20
 
 # --- RUTAS DE AUTENTICACIÓN ---
-@@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form.get('email', '').lower().strip()
