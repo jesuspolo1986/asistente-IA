@@ -13,7 +13,9 @@
         .table-elena { background: rgba(255,255,255,0.03); border-radius: 15px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); margin-top: 1rem; }
         .table-elena th { background: rgba(0,210,255,0.1); color: #00d2ff; border: none; font-size: 0.8rem; text-uppercase: tracking-wider; }
         .table-elena td { border-color: rgba(255,255,255,0.05); vertical-align: middle; font-size: 0.9rem; }
-        .input-admin, .select-admin { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 10px; padding: 8px 15px; width: 100%; outline: none; }
+        .input-admin { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 10px; padding: 8px 15px; width: 100%; outline: none; transition: 0.3s; }
+        .input-admin:focus { border-color: #00d2ff; background: rgba(255,255,255,0.15); }
+        .select-admin { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 10px; padding: 8px 15px; width: 100%; outline: none; }
         .select-admin option { background: #1e293b; color: white; }
         .badge-active { background: #2ecc71; color: #fff; }
         .badge-expired { background: #e74c3c; color: #fff; }
@@ -68,10 +70,17 @@
                 <h5 class="mb-4 text-info"><i class="fas fa-user-plus me-2"></i>Registrar Nuevo Cliente</h5>
                 <form action="/admin/crear" method="POST">
                     <input type="hidden" name="auth_key" value="{{ admin_pass }}">
+                    
                     <div class="mb-3">
-                        <label class="small mb-1 opacity-50">Email de Empresa</label>
-                        <input type="email" name="email" class="input-admin" placeholder="cliente@farmacia.com" required>
+                        <label class="small mb-1 opacity-50">Email de la Empresa</label>
+                        <input type="email" name="email" class="input-admin" placeholder="farmacia@ejemplo.com" required>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="small mb-1 opacity-50">Asignar Clave Maestra (Login)</label>
+                        <input type="text" name="password" class="input-admin" placeholder="Ej: Clave2026" required>
+                    </div>
+
                     <div class="row g-2">
                         <div class="col-8">
                             <label class="small mb-1 opacity-50">Vencimiento</label>
@@ -102,10 +111,12 @@
                              style="width: {{ r.salud }}%"></div>
                     </div>
                     <div class="d-flex justify-content-between mt-1" style="font-size: 0.7rem;">
-                        <span class="opacity-50">Efectividad de búsquedas</span>
+                        <span class="opacity-50">Éxito en búsquedas</span>
                         <span class="{{ 'text-danger' if r.alerta else 'text-success' }}">{{ r.salud }}%</span>
                     </div>
                 </div>
+                {% else %}
+                <p class="small opacity-50 text-center mt-4">Sin actividad reciente</p>
                 {% endfor %}
             </div>
         </div>
@@ -134,7 +145,7 @@
                             </span>
                         </td>
                         <td class="text-end">
-                            <form action="/admin/eliminar" method="POST" onsubmit="return confirm('¿Eliminar?');">
+                            <form action="/admin/eliminar" method="POST" onsubmit="return confirm('¿Eliminar cliente?');">
                                 <input type="hidden" name="auth_key" value="{{ admin_pass }}">
                                 <input type="hidden" name="email" value="{{ u.email }}">
                                 <button type="submit" class="btn btn-link text-danger p-0"><i class="fas fa-trash-alt"></i></button>
@@ -175,7 +186,7 @@
                     {% for log in logs %}
                     <tr class="log-row" data-email="{{ log.email }}">
                         <td class="fw-bold text-info small">{{ log.email }}</td>
-                        <td><span class="query-text">{{ log.detalle }}</span></td>
+                        <td><span class="query-text">"{{ log.detalle }}"</span></td>
                         <td>
                             {% if log.exito %}
                             <span class="text-success small"><i class="fas fa-check-circle"></i> OK</span>
@@ -194,20 +205,14 @@
 </div>
 
 <script>
-// Función para filtrar manualmente desde el select
 function filtrarLogs() {
     const filtro = document.getElementById('filtroEmpresa').value;
     const filas = document.querySelectorAll('.log-row');
     filas.forEach(fila => {
-        if (filtro === 'todos' || fila.getAttribute('data-email') === filtro) {
-            fila.style.display = '';
-        } else {
-            fila.style.display = 'none';
-        }
+        fila.style.display = (filtro === 'todos' || fila.getAttribute('data-email') === filtro) ? '' : 'none';
     });
 }
 
-// Función automática al hacer clic en una empresa del ranking
 function autoFiltrar(email) {
     document.getElementById('filtroEmpresa').value = email;
     filtrarLogs();

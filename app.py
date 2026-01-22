@@ -26,7 +26,45 @@ MAPEO_COLUMNAS = {
 }
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+from flask import Flask, render_template, request, redirect, session, url_for
 
+# ... (tus configuraciones previas de Supabase y ADMIN_PASS)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email').lower().strip()
+        password = request.form.get('password')
+
+        # 1. Buscamos al usuario por email en Supabase
+        res = supabase.table("suscripciones").select("*").eq("email", email).execute()
+        
+        if res.data:
+            user = res.data[0]
+            # 2. Verificamos la clave maestra
+            if user.get('password') == password:
+                # 3. Guardamos la sesión
+                session['user_email'] = email
+                session['logged_in'] = True
+                return redirect(url_for('index')) # Redirige a Elena
+            else:
+                return render_template('login.html', error="Clave incorrecta")
+        else:
+            return render_template('login.html', error="Empresa no registrada")
+
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+# --- PROTECCIÓN DE LA RUTA PRINCIPAL ---
+@app.route('/')
+def index():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    return render_template('index.html', email=session['user_email'])
 def obtener_tasa_real():
     try:
         monitor = Monitor(AlCambio, 'USD')
@@ -240,20 +278,25 @@ def crear_usuario():
     auth = request.form.get('auth_key')
     if auth != ADMIN_PASS: return "Acceso Denegado", 403
     
+    # Capturamos los datos del formulario
     email = request.form.get('email', '').lower().strip()
     vence = request.form.get('vence')
-    
+    password = request.form.get('password') # <-- NUEVO: Captura la clave maestra
+
     try:
-        # Insertamos en la tabla de Supabase
+        # Insertamos en la tabla de Supabase incluyendo la contraseña
         supabase.table("suscripciones").insert({
             "email": email, 
             "fecha_vencimiento": vence, 
-            "activo": 1
+            "password": password, # <-- NUEVO: Se guarda en la BD
+            "activo": 1,
+            "plan": "Mensual",
+            "creditos_totales": 50
         }).execute()
+        
         return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
     except Exception as e:
         return f"Error al crear usuario: {str(e)}"
-
 @app.route('/admin/eliminar', methods=['POST'])
 def eliminar_usuario():
     auth = request.form.get('auth_key')
