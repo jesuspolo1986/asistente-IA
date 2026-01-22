@@ -72,50 +72,66 @@ def upload():
         with open(EXCEL_FILE, "wb") as f: f.write(stream.getbuffer())
         return jsonify({"success": True, "mensaje": "Inventario cargado"})
     except Exception as e: return jsonify({"success": False, "error": str(e)})
+from collections import Counter
+
+from collections import Counter
+
 @app.route('/admin')
 def admin_panel():
     auth = request.args.get('auth_key')
     if auth != ADMIN_PASS: 
-        return "Acceso Denegado: Debes usar la llave correcta en la URL", 403
+        return "Acceso Denegado: Llave incorrecta", 403
     
     try:
-        # 1. Buscamos los usuarios en Supabase
-        res = supabase.table("suscripciones").select("*").execute()
-        usuarios = res.data
+        # 1. Obtener datos de Supabase
+        res_usuarios = supabase.table("suscripciones").select("*").execute()
+        usuarios = res_usuarios.data
         
-        # 2. Buscamos los LOGS de actividad para el monitoreo B2B
-        # Traemos los últimos 50 movimientos ordenados por fecha
-        logs_res = supabase.table("logs_actividad")\
-            .select("*")\
-            .order("fecha", desc=True)\
-            .limit(50)\
-            .execute()
-        logs = logs_res.data
+        # Traemos los últimos 100 logs para un análisis de salud confiable
+        res_logs = supabase.table("logs_actividad").select("*").order("fecha", desc=True).limit(100).execute()
+        logs = res_logs.data
         
-        # 3. Calculamos las estadísticas para llenar los cuadros superiores
+        # 2. PROCESAR RANKING Y SALUD (FAIL-CHECK)
+        emails_en_logs = [l['email'] for l in logs if l['email']]
+        conteo_actividad = Counter(emails_en_logs)
+        
+        ranking = []
+        for email, count in conteo_actividad.most_common(5): # Top 5 empresas
+            # Analizar logs específicos de esta empresa
+            logs_empresa = [l for l in logs if l['email'] == email]
+            exitosos = len([l for l in logs_empresa if l['exito'] == True])
+            
+            # Calcular % de salud (búsquedas exitosas vs totales)
+            salud = (exitosos / len(logs_empresa)) * 100 if logs_empresa else 0
+            
+            ranking.append({
+                "email": email,
+                "count": count,
+                "salud": round(salud),
+                "alerta": salud < 70  # Alerta si fallan más del 30% de las veces
+            })
+
+        # 3. ESTADÍSTICAS DE SUSCRIPCIÓN
         hoy = datetime.now().date()
         stats = {"activos": 0, "vencidos": 0, "total": len(usuarios)}
         
         for u in usuarios:
-            # Convertimos la fecha de texto a objeto fecha de Python
             vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
             u['vencido'] = vence < hoy
-            
             if u['vencido']: 
                 stats["vencidos"] += 1
             else: 
                 stats["activos"] += 1
-                
-        # 4. ENVIAMOS todo al HTML (usuarios, estadísticas y logs)
+        
         return render_template('admin.html', 
                                usuarios=usuarios, 
                                stats=stats, 
                                logs=logs, 
+                               ranking=ranking,
                                admin_pass=ADMIN_PASS)
 
     except Exception as e:
-        return f"Error en el Panel Admin: {str(e)}", 500
-from rapidfuzz import process, utils
+        return f"Error crítico en el Panel Admin: {str(e)}", 500from rapidfuzz import process, utils
 
 import time
 
