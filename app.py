@@ -174,7 +174,7 @@ def preguntar():
 
     except Exception as e:
         return jsonify({"respuesta": f"Error en la búsqueda: {str(e)}"})
-    @app.route('/admin/crear', methods=['POST'])
+@app.route('/admin/crear', methods=['POST'])
 def crear_usuario():
     auth = request.form.get('auth_key')
     if auth != ADMIN_PASS: return "Acceso Denegado", 403
