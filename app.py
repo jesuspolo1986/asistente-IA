@@ -165,43 +165,87 @@ def preguntar():
     return jsonify({"respuesta": respuesta_final})
 
 @app.route('/upload', methods=['POST'])
-def upload():
+def upload_file():
     usuario_email = session.get('usuario')
-    if not usuario_email: return jsonify({"success": False, "error": "No session"})
+    if not usuario_email: return jsonify({"success": False, "error": "No login"}), 401
     
     file = request.files.get('archivo')
-    if not file: return jsonify({"success": False})
-    
-    try:
-        stream = io.BytesIO(file.read())
-        df = pd.read_excel(stream) if file.filename.endswith('.xlsx') else pd.read_csv(stream)
-        
-        # Aplicar Mapeo de Columnas
-        nuevas = {c: est for est, sin in MAPEO_COLUMNAS.items() for c in df.columns if str(c).lower().strip() in sin}
-        df.rename(columns=nuevas, inplace=True)
+    if not file: return jsonify({"success": False, "error": "No file"})
 
-        # Preparar datos para Supabase
-        # Borrar inventario anterior de esta empresa
+    try:
+        # 1. Leer Excel (Intentamos detectar dónde empiezan los datos reales)
+        df = pd.read_excel(file)
+        
+        # SI el Excel tiene filas vacías o basura arriba, buscamos la fila de títulos
+        if not any(x in str(df.columns).lower() for x in ['producto', 'precio', 'articulo']):
+            for i in range(10): # Buscamos en las primeras 10 filas
+                df = pd.read_excel(file, skiprows=i+1)
+                if any(x in str(df.columns).lower() for x in ['producto', 'precio', 'articulo']):
+                    break
+
+        # 2. Encontrar columnas automáticamente
+        cols_encontradas = encontrar_columnas_maestras(df.columns)
+        
+        if 'producto' not in cols_encontradas or 'precio' not in cols_encontradas:
+            return jsonify({"success": False, "error": "No detecto columnas de Producto o Precio"})
+
+        # 3. Limpiar y Estandarizar Datos
+        df_limpio = pd.DataFrame()
+        df_limpio['producto'] = df[cols_encontradas['producto']].astype(str).str.upper().str.strip()
+        df_limpio['precio_usd'] = df[cols_encontradas['precio']].apply(limpiar_precio)
+        
+        if 'stock' in cols_encontradas:
+            df_limpio['stock'] = df[cols_encontradas['stock']].fillna(0).astype(int)
+        else:
+            df_limpio['stock'] = 0
+
+        df_limpio['empresa_email'] = usuario_email
+
+        # 4. Guardar en Supabase (Borrar anterior y subir nuevo)
         supabase.table("inventarios").delete().eq("empresa_email", usuario_email).execute()
         
-        registros = []
-        for _, fila in df.iterrows():
-            registros.append({
-                "empresa_email": usuario_email,
-                "producto": str(fila.get('Producto', 'Sin nombre')),
-                "precio_usd": float(fila.get('Precio_USD', 0)),
-                "stock": str(fila.get('Stock', '0'))
-            })
-        
-        # Inserción masiva
-        supabase.table("inventarios").insert(registros).execute()
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        # Subir por bloques para no saturar la conexión
+        datos_finales = df_limpio.to_dict(orient='records')
+        for i in range(0, len(datos_finales), 100):
+            supabase.table("inventarios").insert(datos_finales[i:i+100]).execute()
 
+        return jsonify({"success": True, "productos": len(datos_finales)})
+
+    except Exception as e:
+        print(f"Error en carga: {str(e)}")
+        return jsonify({"success": False, "error": str(e)})
 # --- PANEL ADMIN (Se mantiene igual pero conectado a suscripciones) ---
 # --- RUTAS ADMINISTRATIVAS COMPLETAS ---
+def limpiar_precio(valor):
+    """Convierte 'Ref 1.50$', '1,50' o ' 2.00 ' en float 1.50"""
+    if pd.isna(valor) or valor == '': return 0.0
+    try:
+        s = str(valor).lower()
+        # Eliminar todo lo que no sea número, punto o coma
+        s = ''.join(c for c in s if c.isdigit() or c in '.,')
+        s = s.replace(',', '.') # Estandarizar decimales
+        # Si hay más de un punto (error de tipeo), dejamos solo el último
+        if s.count('.') > 1:
+            partes = s.split('.')
+            s = "".join(partes[:-1]) + "." + partes[-1]
+        return float(s)
+    except:
+        return 0.0
 
+def encontrar_columnas_maestras(columnas):
+    """Identifica Producto, Precio y Stock entre nombres caóticos"""
+    mapeo = {
+        'producto': ['producto', 'descripcion', 'nombre', 'articulo', 'item', 'descrip'],
+        'precio': ['precio', 'pvp', 'venta', 'usd', 'ref', 'dolar', 'p.v.p'],
+        'stock': ['stock', 'cantidad', 'existencia', 'disponible', 'cant', 'unidades']
+    }
+    resultado = {}
+    for clave, variaciones in mapeo.items():
+        for col in columnas:
+            if any(v in str(col).lower() for v in variaciones):
+                resultado[clave] = col
+                break
+    return resultado
 @app.route('/admin')
 def admin_panel():
     auth = request.args.get('auth_key')
