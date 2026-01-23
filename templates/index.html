@@ -19,7 +19,7 @@
             color: white; height: 100vh; display: flex; align-items: center; justify-content: center; 
             font-family: 'Plus Jakarta Sans', sans-serif; transition: 0.5s; overflow: hidden; margin: 0; 
         }
-        
+
         .admin-mode-bg { background: radial-gradient(circle at top right, #2d1b4e, #0f172a) !important; }
 
         .card-elena { 
@@ -28,40 +28,39 @@
             box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative;
         }
 
-        /* --- VISUAL DE PRECIO PRO --- */
+        /* TARJETA DE PRODUCTO */
         .price-card {
-            background: rgba(0,0,0,0.3); border-radius: 25px; padding: 18px; margin-bottom: 20px;
-            border: 1px solid rgba(255,255,255,0.1); display: none; animation: slideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            background: rgba(0,0,0,0.4); border-radius: 25px; padding: 20px; margin-bottom: 20px;
+            border: 1px solid rgba(0, 210, 255, 0.3); display: none; 
+            animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes bounceIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
 
-        .img-producto {
-            width: 80px; height: 80px; border-radius: 18px; object-fit: cover;
-            margin-bottom: 12px; border: 2px solid var(--primary); background: white;
-            box-shadow: 0 0 15px rgba(0,210,255,0.3);
+        .img-wrapper {
+            width: 120px; height: 120px; margin: 0 auto 15px; border-radius: 20px;
+            overflow: hidden; border: 2px solid var(--primary); background: white;
+            box-shadow: 0 0 20px rgba(0,210,255,0.4);
         }
+        .img-producto { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
 
-        .val-bs { font-size: 1.4rem; font-weight: 800; color: white; }
-        .val-usd { font-size: 1.1rem; font-weight: 600; color: #4ade80; }
+        .val-bs { font-size: 1.5rem; font-weight: 800; color: white; display: block; }
+        .val-usd { font-size: 1.2rem; font-weight: 600; color: #4ade80; display: block; }
 
-        /* --- MICROFONO Y AURA --- */
-        .aura { width: 110px; height: 110px; margin: 0 auto 1.5rem; cursor: pointer; position: relative; }
+        .aura { width: 100px; height: 100px; margin: 0 auto 1.5rem; cursor: pointer; }
         .aura-inner { 
-            inset: 0; position: absolute; border-radius: 50%; 
-            background: linear-gradient(135deg, var(--primary), var(--secondary)); 
-            display: flex; align-items: center; justify-content: center; transition: 0.4s;
+            inset: 0; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--secondary)); 
+            display: flex; align-items: center; justify-content: center; height: 100px;
         }
-        .listening-active { animation: pulse-ring 1.2s infinite; box-shadow: 0 0 40px var(--primary); }
-        @keyframes pulse-ring { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .listening-active { animation: pulse-glow 1s infinite; }
+        @keyframes pulse-glow { 0% { box-shadow: 0 0 0 0 rgba(0,210,255,0.7); } 70% { box-shadow: 0 0 0 20px rgba(0,210,255,0); } 100% { box-shadow: 0 0 0 0 rgba(0,210,255,0); } }
 
-        .res-box { min-height: 70px; margin-bottom: 1rem; font-size: 0.95rem; line-height: 1.4; color: #cbd5e1; }
-        
-        .input-group-elena { background: rgba(0,0,0,0.2); border-radius: 50px; padding: 5px; border: 1px solid rgba(255,255,255,0.1); }
+        .res-box { min-height: 60px; margin-bottom: 1rem; font-size: 0.9rem; color: #cbd5e1; }
+        .input-group-elena { background: rgba(0,0,0,0.3); border-radius: 50px; border: 1px solid rgba(255,255,255,0.1); padding: 5px; }
         .input-elena { background: transparent; border: none; color: white; padding: 10px 20px; width: 100%; outline: none; }
+        
+        #tasaInput { background: transparent; border: none; color: var(--primary); width: 60px; font-weight: 800; text-align: center; outline: none; }
+        #tasaInput:not([readonly]) { border-bottom: 1px dashed var(--primary); }
 
-        #tasaInput { background: transparent; border: 1px solid rgba(0,210,255,0.3); color: var(--primary); width: 70px; text-align: center; border-radius: 10px; font-weight: bold; }
-        #labelModo { cursor: pointer; transition: 0.3s; }
-        #labelModo:hover { transform: scale(1.1); }
         .logout-link { position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.3); text-decoration: none; font-size: 0.7rem; font-weight: bold; }
     </style>
 </head>
@@ -69,38 +68,38 @@
 
     <div class="card-elena" id="mainCard">
         <div class="d-flex justify-content-between mb-3 align-items-center">
-            <div class="small opacity-50">Tasa: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly onchange="sincronizarTasa()"></div>
-            <div id="labelModo" class="badge rounded-pill bg-info text-dark px-3 py-2 fw-bold" onclick="desactivarAdmin()">VENDEDOR</div>
+            <div class="small opacity-75">Tasa: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly onchange="sincronizarTasa()"></div>
+            <div id="labelModo" class="badge rounded-pill bg-info text-dark px-3 py-2 fw-bold" style="cursor: pointer;" onclick="desactivarAdmin()">VENDEDOR</div>
         </div>
 
         <div class="aura" onclick="escuchar()">
-            <div class="aura-inner" id="auraCircle">
-                <i class="fas fa-microphone fa-2x"></i>
-            </div>
+            <div class="aura-inner" id="auraCircle"><i class="fas fa-microphone fa-2x"></i></div>
         </div>
 
         <h3 class="fw-800 mb-0">ELENA AI</h3>
-        <p class="opacity-40 mb-3" style="font-size: 0.65rem;">SISTEMA INTELIGENTE DE FARMACIA</p>
+        <p class="opacity-40 mb-3" style="font-size: 0.65rem;">FARMACIA INTELIGENTE</p>
 
         <div id="priceDisplay" class="price-card">
-            <img id="prodImg" src="" class="img-producto" onerror="this.src='https://cdn-icons-png.flaticon.com/512/883/883356.png'">
-            <div id="productTitle" class="fw-bold text-info mb-2 small text-uppercase"></div>
+            <div class="img-wrapper">
+                <img id="prodImg" src="" class="img-producto" onerror="this.src='https://cdn-icons-png.flaticon.com/512/883/883356.png'">
+            </div>
+            <div id="productTitle" class="fw-bold text-info mb-2 text-uppercase" style="font-size: 0.85rem;"></div>
             <div class="row g-0">
-                <div class="col-6">
-                    <div id="valBs" class="val-bs"></div>
-                    <div class="small opacity-50" style="font-size: 0.6rem;">BOLÍVARES</div>
+                <div class="col-6 border-end border-white border-opacity-10">
+                    <span id="valBs" class="val-bs"></span>
+                    <span class="small opacity-50" style="font-size: 0.55rem;">BOLÍVARES</span>
                 </div>
                 <div class="col-6">
-                    <div id="valUsd" class="val-usd"></div>
-                    <div class="small opacity-50" style="font-size: 0.6rem;">DÓLARES</div>
+                    <span id="valUsd" class="val-usd"></span>
+                    <span class="small opacity-50" style="font-size: 0.55rem;">DÓLARES</span>
                 </div>
             </div>
         </div>
 
-        <div class="res-box" id="textoElena">¿En qué puedo ayudarte hoy?</div>
+        <div class="res-box" id="textoElena">Haz tu consulta por voz o texto</div>
         
         <div class="input-group-elena">
-            <input type="text" id="userInput" class="input-elena" placeholder="Busca un medicamento..." onkeypress="if(event.key==='Enter') enviar()">
+            <input type="text" id="userInput" class="input-elena" placeholder="Consultar producto..." onkeypress="if(event.key==='Enter') enviar()">
         </div>
 
         <div id="adminTools" style="display: none;" class="mt-3">
@@ -110,7 +109,7 @@
             <input type="file" id="fileIn" hidden onchange="subirExcel()">
         </div>
 
-        <a href="/logout" class="logout-link uppercase"><i class="fas fa-power-off"></i> CERRAR SESIÓN</a>
+        <a href="/logout" class="logout-link"><i class="fas fa-sign-out-alt"></i> CERRAR SESIÓN</a>
     </div>
 
 <script>
@@ -127,13 +126,12 @@
     }
 
     function escuchar() {
-        if (!SpeechRecognition) return;
         const rec = new SpeechRecognition();
         rec.lang = 'es-VE';
         rec.onstart = () => {
             document.getElementById('auraCircle').classList.add('listening-active');
+            document.getElementById('textoElena').innerText = "Elena te escucha...";
             document.getElementById('priceDisplay').style.display = "none";
-            document.getElementById('textoElena').innerText = "Escuchando...";
         };
         rec.onresult = (e) => { 
             document.getElementById('userInput').value = e.results[0][0].transcript; 
@@ -144,8 +142,13 @@
     }
 
     async function enviar() {
-        const query = document.getElementById('userInput').value.trim();
+        const query = document.getElementById('userInput').value.toLowerCase().trim();
         if(!query) return;
+
+        // COMANDO PARA ENTRAR O SALIR DE GERENCIA
+        if (query.includes("activar modo gerencia") || query.includes("modo administrador")) {
+            // Se procesa en el servidor para validar
+        }
 
         const res = await fetch('/preguntar', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -156,28 +159,29 @@
         if(data.modo_admin) {
             activarAdmin();
             document.getElementById('textoElena').innerText = "Modo gerencia activo.";
+            hablar("Modo administrativo activado.");
         } else {
             const texto = data.respuesta;
             document.getElementById('textoElena').innerText = texto;
+
+            const precios = texto.match(/(\d+[\d.,]*\s*con\s*\d+)|(\d+[\d.,]*)/g);
             
-            // --- MOTOR DE DETECCIÓN INTELIGENTE ---
-            const regexPrecio = /cuesta|vale/i;
-            if(regexPrecio.test(texto)) {
-                const partes = texto.split(regexPrecio);
-                const precios = texto.match(/(\d+[\d.,]*\s*con\s*\d+)|(\d+[\d.,]*)/g);
+            if(precios && precios.length >= 2 && (texto.includes("cuesta") || texto.includes("son"))) {
+                let nombreLimpio = texto.split(/cuesta|vale|son/i)[0]
+                                       .replace(/^(el|la|un|una|vitamina)\s+/i, "")
+                                       .trim();
                 
-                if(precios && precios.length >= 2) {
-                    let nombre = partes[0].replace(/^(el|la|un|una)\s+/i, "").trim();
-                    document.getElementById('productTitle').innerText = nombre;
-                    document.getElementById('valBs').innerText = precios[0];
-                    document.getElementById('valUsd').innerText = precios[1];
-                    
-                    // BUSQUEDA DE IMAGEN AUTOMÁTICA
-                    const queryImg = encodeURIComponent(nombre + " medicamento caja");
-                    document.getElementById('prodImg').src = `https://api.duckduckgo.com/t/visual?q=${queryImg}`; 
-                    
-                    document.getElementById('priceDisplay').style.display = "block";
-                }
+                if(texto.toLowerCase().includes("vitamina c")) nombreLimpio = "Vitamina C 1g";
+
+                document.getElementById('productTitle').innerText = nombreLimpio;
+                document.getElementById('valBs').innerText = precios[0] + " Bs";
+                document.getElementById('valUsd').innerText = precios[1] + " $";
+                
+                // BUSQUEDA DE IMAGEN GOOGLE/UNSPLASH
+                const queryImg = encodeURIComponent(nombreLimpio + " medicine");
+                document.getElementById('prodImg').src = `https://source.unsplash.com/featured/?pill,medicine,${nombreLimpio.replace(" ","")}`;
+                
+                document.getElementById('priceDisplay').style.display = "block";
             } else {
                 document.getElementById('priceDisplay').style.display = "none";
             }
@@ -196,18 +200,22 @@
     }
 
     function desactivarAdmin() {
+        if(!modoAdmin) return; // Solo funciona si ya eres admin
         modoAdmin = false;
         document.getElementById('body').classList.remove('admin-mode-bg');
         document.getElementById('labelModo').innerText = "VENDEDOR";
         document.getElementById('labelModo').className = "badge rounded-pill bg-info text-dark px-3 py-2 fw-bold";
         document.getElementById('adminTools').style.display = "none";
         document.getElementById('tasaInput').readOnly = true;
+        document.getElementById('textoElena').innerText = "Modo vendedor activo.";
+        hablar("Modo vendedor activado.");
     }
 
     async function sincronizarTasa() {
+        const nt = document.getElementById('tasaInput').value;
         await fetch('/preguntar', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ nueva_tasa: document.getElementById('tasaInput').value })
+            body: JSON.stringify({ nueva_tasa: nt })
         });
     }
 
