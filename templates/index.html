@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elena AI | Farmacia Pro</title>
+    <title>Elena AI | Farma Asistencia</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
@@ -11,7 +11,7 @@
     <style>
         :root { 
             --primary: #00d2ff; --secondary: #3a7bd5; --admin: #a18cd1; 
-            --error: #ff4b2b; --whatsapp: #25d366; --glass: rgba(255, 255, 255, 0.08);
+            --error: #ff4b2b; --glass: rgba(255, 255, 255, 0.08);
         }
         
         body { 
@@ -25,91 +25,92 @@
         .card-elena { 
             background: var(--glass); border-radius: 40px; padding: 2.2rem; width: 400px; 
             text-align: center; backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.1); 
-            box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; z-index: 10;
         }
 
-        /* TARJETA DE PRODUCTO */
+        /* TARJETA DE PRODUCTO PROFESIONAL */
         .price-card {
-            background: rgba(0,0,0,0.4); border-radius: 25px; padding: 20px; margin-bottom: 20px;
-            border: 1px solid rgba(0, 210, 255, 0.3); display: none; 
+            background: rgba(255,255,255,0.05); border-radius: 30px; padding: 20px; margin-bottom: 20px;
+            border: 1px solid rgba(0, 210, 255, 0.2); display: none; 
             animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
         @keyframes bounceIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
 
         .img-wrapper {
-            width: 120px; height: 120px; margin: 0 auto 15px; border-radius: 20px;
-            overflow: hidden; border: 2px solid var(--primary); background: white;
-            box-shadow: 0 0 20px rgba(0,210,255,0.4);
+            width: 130px; height: 80px; margin: 0 auto 15px; border-radius: 15px;
+            overflow: hidden; background: white; padding: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
-        .img-producto { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
+        .img-producto { width: 100%; height: 100%; object-fit: contain; }
 
-        .val-bs { font-size: 1.5rem; font-weight: 800; color: white; display: block; }
-        .val-usd { font-size: 1.2rem; font-weight: 600; color: #4ade80; display: block; }
+        .val-bs { font-size: 1.6rem; font-weight: 800; color: white; display: block; line-height: 1; }
+        .val-usd { font-size: 1.3rem; font-weight: 600; color: #4ade80; display: block; }
 
-        .aura { width: 100px; height: 100px; margin: 0 auto 1.5rem; cursor: pointer; }
+        /* MICROFONO */
+        .aura { width: 90px; height: 90px; margin: 0 auto 1.2rem; cursor: pointer; }
         .aura-inner { 
-            inset: 0; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--secondary)); 
-            display: flex; align-items: center; justify-content: center; height: 100px;
+            height: 90px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--secondary)); 
+            display: flex; align-items: center; justify-content: center; transition: 0.4s;
         }
-        .listening-active { animation: pulse-glow 1s infinite; }
+        .listening-active { animation: pulse-glow 1s infinite; transform: scale(1.1); }
         @keyframes pulse-glow { 0% { box-shadow: 0 0 0 0 rgba(0,210,255,0.7); } 70% { box-shadow: 0 0 0 20px rgba(0,210,255,0); } 100% { box-shadow: 0 0 0 0 rgba(0,210,255,0); } }
 
-        .res-box { min-height: 60px; margin-bottom: 1rem; font-size: 0.9rem; color: #cbd5e1; }
+        .res-box { min-height: 50px; margin-bottom: 1rem; font-size: 0.9rem; color: #cbd5e1; font-weight: 400; }
         .input-group-elena { background: rgba(0,0,0,0.3); border-radius: 50px; border: 1px solid rgba(255,255,255,0.1); padding: 5px; }
-        .input-elena { background: transparent; border: none; color: white; padding: 10px 20px; width: 100%; outline: none; }
+        .input-elena { background: transparent; border: none; color: white; padding: 10px 20px; width: 100%; outline: none; text-align: center; }
         
-        #tasaInput { background: transparent; border: none; color: var(--primary); width: 60px; font-weight: 800; text-align: center; outline: none; }
-        #tasaInput:not([readonly]) { border-bottom: 1px dashed var(--primary); }
+        #tasaInput { background: transparent; border: none; color: var(--primary); width: 65px; font-weight: 800; text-align: center; outline: none; cursor: default; }
+        #tasaInput:not([readonly]) { border-bottom: 2px solid var(--primary); cursor: text; }
 
-        .logout-link { position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.3); text-decoration: none; font-size: 0.7rem; font-weight: bold; }
+        .logout-link { position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.3); text-decoration: none; font-size: 0.7rem; font-weight: bold; letter-spacing: 1px; }
     </style>
 </head>
 <body id="body">
 
     <div class="card-elena" id="mainCard">
         <div class="d-flex justify-content-between mb-3 align-items-center">
-            <div class="small opacity-75">Tasa: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly onchange="sincronizarTasa()"></div>
-            <div id="labelModo" class="badge rounded-pill bg-info text-dark px-3 py-2 fw-bold" style="cursor: pointer;" onclick="desactivarAdmin()">VENDEDOR</div>
+            <div class="small opacity-75 fw-bold">TASA: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly onchange="sincronizarTasa()"></div>
+            <div id="labelModo" class="badge rounded-pill bg-info text-dark px-3 py-2 fw-bold" style="cursor: pointer; font-size: 0.65rem;" onclick="desactivarAdmin()">MODO VENDEDOR</div>
         </div>
 
         <div class="aura" onclick="escuchar()">
             <div class="aura-inner" id="auraCircle"><i class="fas fa-microphone fa-2x"></i></div>
         </div>
 
-        <h3 class="fw-800 mb-0">ELENA AI</h3>
-        <p class="opacity-40 mb-3" style="font-size: 0.65rem;">FARMACIA INTELIGENTE</p>
+        <h3 class="fw-800 mb-0" style="letter-spacing: -1px;">ELENA AI</h3>
+        <p class="opacity-40 mb-3" style="font-size: 0.65rem; font-weight: 600;">FARMA ASISTENCIA</p>
 
         <div id="priceDisplay" class="price-card">
             <div class="img-wrapper">
-                <img id="prodImg" src="" class="img-producto" onerror="this.src='https://cdn-icons-png.flaticon.com/512/883/883356.png'">
+                <img id="prodImg" src="https://i.ibb.co/6R0D9YV/farma-asistencia-logo.png" class="img-producto">
             </div>
-            <div id="productTitle" class="fw-bold text-info mb-2 text-uppercase" style="font-size: 0.85rem;"></div>
+            <div id="productTitle" class="fw-bold text-info mb-3 text-uppercase" style="font-size: 0.85rem;"></div>
             <div class="row g-0">
                 <div class="col-6 border-end border-white border-opacity-10">
                     <span id="valBs" class="val-bs"></span>
-                    <span class="small opacity-50" style="font-size: 0.55rem;">BOLÍVARES</span>
+                    <span class="small opacity-50" style="font-size: 0.55rem; font-weight: 800;">BOLÍVARES</span>
                 </div>
                 <div class="col-6">
                     <span id="valUsd" class="val-usd"></span>
-                    <span class="small opacity-50" style="font-size: 0.55rem;">DÓLARES</span>
+                    <span class="small opacity-50" style="font-size: 0.55rem; font-weight: 800;">DÓLARES</span>
                 </div>
             </div>
         </div>
 
-        <div class="res-box" id="textoElena">Haz tu consulta por voz o texto</div>
+        <div class="res-box" id="textoElena">Haz clic en el micro para consultar</div>
         
         <div class="input-group-elena">
-            <input type="text" id="userInput" class="input-elena" placeholder="Consultar producto..." onkeypress="if(event.key==='Enter') enviar()">
+            <input type="text" id="userInput" class="input-elena" placeholder="Buscar medicamento..." onkeypress="if(event.key==='Enter') enviar()">
         </div>
 
         <div id="adminTools" style="display: none;" class="mt-3">
             <button class="btn btn-sm w-100 fw-bold text-white shadow-sm" style="background: var(--admin); border-radius: 12px; padding: 10px;" onclick="document.getElementById('fileIn').click()">
-                <i class="fas fa-file-excel me-2"></i>ACTUALIZAR INVENTARIO
+                <i class="fas fa-file-excel me-2"></i>SUBIR NUEVO INVENTARIO
             </button>
             <input type="file" id="fileIn" hidden onchange="subirExcel()">
         </div>
 
-        <a href="/logout" class="logout-link"><i class="fas fa-sign-out-alt"></i> CERRAR SESIÓN</a>
+        <a href="/logout" class="logout-link"><i class="fas fa-power-off me-1"></i> CERRAR SESIÓN</a>
     </div>
 
 <script>
@@ -121,11 +122,12 @@
         if(!synth) return;
         synth.cancel();
         const u = new SpeechSynthesisUtterance(msj.replace(/[📊|/]/g, ''));
-        u.lang = 'es-MX'; u.rate = 1.05;
+        u.lang = 'es-MX'; u.rate = 1.1; // Un poco más rápido para fluidez
         synth.speak(u);
     }
 
     function escuchar() {
+        if (!SpeechRecognition) return;
         const rec = new SpeechRecognition();
         rec.lang = 'es-VE';
         rec.onstart = () => {
@@ -145,11 +147,6 @@
         const query = document.getElementById('userInput').value.toLowerCase().trim();
         if(!query) return;
 
-        // COMANDO PARA ENTRAR O SALIR DE GERENCIA
-        if (query.includes("activar modo gerencia") || query.includes("modo administrador")) {
-            // Se procesa en el servidor para validar
-        }
-
         const res = await fetch('/preguntar', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ pregunta: query, modo_admin: modoAdmin })
@@ -159,28 +156,29 @@
         if(data.modo_admin) {
             activarAdmin();
             document.getElementById('textoElena').innerText = "Modo gerencia activo.";
-            hablar("Modo administrativo activado.");
+            hablar("Acceso concedido. Modo administrativo activado.");
         } else {
             const texto = data.respuesta;
             document.getElementById('textoElena').innerText = texto;
 
-            const precios = texto.match(/(\d+[\d.,]*\s*con\s*\d+)|(\d+[\d.,]*)/g);
+            // --- FILTRO INTELIGENTE DE PRECIOS ---
+            // Buscamos números asociados solo a Bolívares o Dólares
+            const regexBs = /(\d+[\d.,]*\s*con\s*\d+|\d+[\d.,]*)\s*(?=bolívares|bs)/i;
+            const regexUsd = /(\d+[\d.,]*\s*con\s*\d+|\d+[\d.,]*)\s*(?=dólares|usd|\$)/i;
+
+            const matchBs = texto.match(regexBs);
+            const matchUsd = texto.match(regexUsd);
             
-            if(precios && precios.length >= 2 && (texto.includes("cuesta") || texto.includes("son"))) {
+            if(matchBs && matchUsd) {
                 let nombreLimpio = texto.split(/cuesta|vale|son/i)[0]
                                        .replace(/^(el|la|un|una|vitamina)\s+/i, "")
                                        .trim();
                 
-                if(texto.toLowerCase().includes("vitamina c")) nombreLimpio = "Vitamina C 1g";
+                if(texto.toLowerCase().includes("vitamina c")) nombreLimpio = "Vitamina C";
 
                 document.getElementById('productTitle').innerText = nombreLimpio;
-                document.getElementById('valBs').innerText = precios[0] + " Bs";
-                document.getElementById('valUsd').innerText = precios[1] + " $";
-                
-                // BUSQUEDA DE IMAGEN GOOGLE/UNSPLASH
-                const queryImg = encodeURIComponent(nombreLimpio + " medicine");
-                document.getElementById('prodImg').src = `https://source.unsplash.com/featured/?pill,medicine,${nombreLimpio.replace(" ","")}`;
-                
+                document.getElementById('valBs').innerText = matchBs[0].trim() + " Bs";
+                document.getElementById('valUsd').innerText = matchUsd[0].trim() + " $";
                 document.getElementById('priceDisplay').style.display = "block";
             } else {
                 document.getElementById('priceDisplay').style.display = "none";
@@ -200,10 +198,10 @@
     }
 
     function desactivarAdmin() {
-        if(!modoAdmin) return; // Solo funciona si ya eres admin
+        if(!modoAdmin) return;
         modoAdmin = false;
         document.getElementById('body').classList.remove('admin-mode-bg');
-        document.getElementById('labelModo').innerText = "VENDEDOR";
+        document.getElementById('labelModo').innerText = "MODO VENDEDOR";
         document.getElementById('labelModo').className = "badge rounded-pill bg-info text-dark px-3 py-2 fw-bold";
         document.getElementById('adminTools').style.display = "none";
         document.getElementById('tasaInput').readOnly = true;
@@ -222,12 +220,12 @@
     async function subirExcel() {
         const fd = new FormData();
         fd.append('archivo', document.getElementById('fileIn').files[0]);
-        document.getElementById('textoElena').innerText = "Actualizando inventario...";
+        document.getElementById('textoElena').innerText = "Cargando inventario...";
         const res = await fetch('/upload', { method: 'POST', body: fd });
         const data = await res.json();
         if(data.success) {
-            document.getElementById('textoElena').innerText = "¡Inventario cargado!";
-            hablar("Inventario actualizado.");
+            document.getElementById('textoElena').innerText = "¡Base de datos actualizada!";
+            hablar("El inventario ha sido actualizado correctamente.");
         }
     }
 </script>
