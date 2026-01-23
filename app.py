@@ -364,6 +364,58 @@ def eliminar_usuario():
         return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
     except Exception as e:
         return f"Error al eliminar: {str(e)}"
+# --- PANEL ADMINISTRATIVO (ADMIN) ---
+@app.route('/admin')
+def admin():
+    # 1. Seguridad básica: solo tú entras con la clave en la URL (ej: /admin?pass=1234)
+    if request.args.get('pass') != ADMIN_PASS:
+        return "Acceso denegado", 403
+
+    # 2. Obtener datos de Supabase
+    res_usuarios = supabase.table("suscripciones").select("*").execute()
+    res_logs = supabase.table("logs_actividad").select("*").order("fecha", desc=True).execute()
+    
+    logs_data = res_logs.data
+    usuarios_data = res_usuarios.data
+
+    # --- INICIO DEL SÚPER RESUMEN DE TRÁFICO ---
+    from collections import Counter
+    
+    conteo_diario = {}
+    for log in logs_data:
+        # Extraemos solo la fecha (YYYY-MM-DD) del timestamp de Supabase
+        fecha = log['fecha'].split('T')[0]
+        email = log['email']
+        
+        if email not in conteo_diario:
+            conteo_diario[email] = Counter()
+        conteo_diario[email][fecha] += 1
+
+    # Estructura limpia para el HTML
+    resumen_uso = []
+    for email, conteos in conteo_diario.items():
+        # Tomamos los últimos 7 días con actividad
+        dias = [{"fecha": f, "cantidad": c} for f, c in sorted(conteos.items(), reverse=True)[:7]]
+        resumen_uso.append({"email": email, "actividad": dias})
+    # --- FIN DEL RESUMEN ---
+
+    # 3. Calcular estadísticas rápidas para los cuadritos superiores
+    hoy = datetime.now().date()
+    stats = {
+        "total": len(usuarios_data),
+        "activos": sum(1 for u in usuarios_data if datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date() >= hoy),
+        "vencidos": sum(1 for u in usuarios_data if datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date() < hoy)
+    }
+
+    # 4. Enviar todo al HTML
+    return render_template(
+        'admin.html', 
+        usuarios=usuarios_data, 
+        logs=logs_data, 
+        stats=stats, 
+        resumen_uso=resumen_uso, # <--- Esta es la variable que alimenta los chips de tráfico
+        admin_pass=ADMIN_PASS
+    )
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
