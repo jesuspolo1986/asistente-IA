@@ -144,14 +144,22 @@ def preguntar():
             p_usd = float(fila['precio_usd'])
             p_bs = p_usd * datos_tasa["tasa"]
             
-            # --- AJUSTE DE PRONUNCIACIÓN Y VISIBILIDAD ---
+            # --- AJUSTE DE PRONUNCIACIÓN MEJORADO ---
             
-            # Formateamos para que Elena diga "Bolívares" y "con X centavos" (evita que diga pesos)
-            # Reemplazamos el punto decimal por la palabra "con" para los dólares
-            texto_usd = f"{p_usd:,.2f}".replace(".00", "").replace(".", " con ")
-            texto_bs = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            # Para Bolívares: Quitamos puntos de mil y usamos "con" para decimales
+            # Ejemplo: 1345.56 -> "1345 con 56"
+            texto_bs = f"{p_bs:.2f}".replace(".", " con ")
+            
+            # Para Dólares: Igual, usamos "con"
+            texto_usd = f"{p_usd:.2f}".replace(".00", "").replace(".", " con ")
 
-            respuesta_final = f"El {nombre_p} cuesta {texto_bs} Bolívares, que son {texto_usd} Dólares."
+            # Limpiamos el nombre del producto para que diga "miligramos" o "mililitros"
+            nombre_audio = nombre_p.lower()
+            nombre_audio = nombre_audio.replace(" mg", " miligramos").replace("mg", " miligramos")
+            nombre_audio = nombre_audio.replace(" ml", " mililitros").replace("ml", " mililitros")
+            nombre_audio = nombre_audio.replace(" g ", " gramos ").replace(" gr ", " gramos ")
+
+            respuesta_final = f"El {nombre_audio} cuesta {texto_bs} Bolívares, que son {texto_usd} Dólares."
             
             # El stock SOLO se muestra si el modo_admin está activo en la sesión
             if es_modo_admin:
