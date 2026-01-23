@@ -10,189 +10,107 @@
     
     <style>
         :root { 
-            --primary: #00d2ff; 
-            --secondary: #3a7bd5;
-            --admin: #a18cd1; 
-            --error: #ff4b2b; 
-            --whatsapp: #25d366;
-            --glass: rgba(255, 255, 255, 0.07);
-            --bg-dark: #0f172a;
+            --primary: #00d2ff; --secondary: #3a7bd5; --admin: #a18cd1; 
+            --error: #ff4b2b; --whatsapp: #25d366; --glass: rgba(255, 255, 255, 0.08);
         }
         
         body { 
             background: radial-gradient(circle at top right, #1e293b, #0f172a);
-            color: white; 
-            height: 100vh; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            transition: background 0.5s ease;
-            overflow: hidden; 
-            margin: 0; 
+            color: white; height: 100vh; display: flex; align-items: center; justify-content: center; 
+            font-family: 'Plus Jakarta Sans', sans-serif; transition: 0.5s; overflow: hidden; margin: 0; 
         }
         
         .admin-mode-bg { background: radial-gradient(circle at top right, #2d1b4e, #0f172a) !important; }
 
-        /* BANNER DE GRACIA */
-        .grace-banner { 
-            position: fixed; top: 0; width: 100%; background: linear-gradient(90deg, #f39c12, #e67e22); color: white; 
-            text-align: center; padding: 12px; font-weight: 600; z-index: 1000; 
-            font-size: 0.85rem; display: flex; align-items: center; justify-content: center; 
-            gap: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
-        }
-        .btn-whatsapp-banner {
-            background: var(--whatsapp); color: white !important; padding: 6px 18px; 
-            border-radius: 50px; text-decoration: none; font-size: 0.75rem; 
-            display: flex; align-items: center; gap: 8px; font-weight: bold;
-            box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3); transition: 0.3s;
+        .card-elena { 
+            background: var(--glass); border-radius: 40px; padding: 2.2rem; width: 400px; 
+            text-align: center; backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.1); 
+            box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative;
         }
 
-        /* CARD PRINCIPAL GLASSMORPHISM */
-        .card-elena { 
-            background: var(--glass); 
-            border-radius: 40px; 
-            padding: 2.5rem 2rem; 
-            width: 400px; 
-            text-align: center; 
-            backdrop-filter: blur(25px); 
-            border: 1px solid rgba(255, 255, 255, 0.12); 
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); 
-            position: relative;
-            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        /* --- VISUAL DE PRECIO PRO --- */
+        .price-card {
+            background: rgba(0,0,0,0.3); border-radius: 25px; padding: 18px; margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1); display: none; animation: slideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .admin-active { border-color: var(--admin); box-shadow: 0 25px 50px -12px rgba(161, 140, 209, 0.3); }
-        
-        /* AURA Y MICROFONO */
-        .aura { width: 120px; height: 120px; margin: 0 auto 1.8rem; position: relative; cursor: pointer; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+        .img-producto {
+            width: 80px; height: 80px; border-radius: 18px; object-fit: cover;
+            margin-bottom: 12px; border: 2px solid var(--primary); background: white;
+            box-shadow: 0 0 15px rgba(0,210,255,0.3);
+        }
+
+        .val-bs { font-size: 1.4rem; font-weight: 800; color: white; }
+        .val-usd { font-size: 1.1rem; font-weight: 600; color: #4ade80; }
+
+        /* --- MICROFONO Y AURA --- */
+        .aura { width: 110px; height: 110px; margin: 0 auto 1.5rem; cursor: pointer; position: relative; }
         .aura-inner { 
             inset: 0; position: absolute; border-radius: 50%; 
             background: linear-gradient(135deg, var(--primary), var(--secondary)); 
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 30px rgba(0, 210, 255, 0.4);
-            transition: 0.5s ease;
+            display: flex; align-items: center; justify-content: center; transition: 0.4s;
         }
-        .aura-inner i { font-size: 2.2rem; color: white; text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .listening-active { animation: pulse-ring 1.2s infinite; box-shadow: 0 0 40px var(--primary); }
+        @keyframes pulse-ring { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        .res-box { min-height: 70px; margin-bottom: 1rem; font-size: 0.95rem; line-height: 1.4; color: #cbd5e1; }
         
-        .listening-active { 
-            animation: pulse-ring 1.5s infinite; 
-            box-shadow: 0 0 60px var(--primary) !important;
-        }
+        .input-group-elena { background: rgba(0,0,0,0.2); border-radius: 50px; padding: 5px; border: 1px solid rgba(255,255,255,0.1); }
+        .input-elena { background: transparent; border: none; color: white; padding: 10px 20px; width: 100%; outline: none; }
 
-        @keyframes pulse-ring {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 210, 255, 0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(0, 210, 255, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 210, 255, 0); }
-        }
-
-        /* DISPLAY DE RESPUESTA */
-        .res-box { 
-            min-height: 80px; margin-bottom: 1.5rem; font-size: 1rem; color: #e2e8f0; 
-            display: flex; align-items: center; justify-content: center; font-weight: 400;
-        }
-
-        /* TARJETA DE PRECIO (NUEVA) */
-        .price-card {
-            background: rgba(255,255,255,0.08);
-            border-radius: 20px;
-            padding: 15px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(255,255,255,0.1);
-            display: none; /* Se activa con JS */
-            animation: slideUp 0.4s ease-out;
-        }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* INPUTS */
-        .input-group-elena {
-            position: relative;
-            background: rgba(0,0,0,0.2);
-            border-radius: 20px;
-            padding: 5px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .input-elena { 
-            background: transparent; border: none; color: white; padding: 12px 20px; 
-            width: 100%; outline: none; font-size: 0.95rem;
-        }
-        
-        #tasaInput { 
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(0,210,255,0.2); 
-            color: #00d2ff; width: 75px; text-align: center; border-radius: 12px; font-weight: 800; 
-        }
-        #tasaInput[readonly] { background: transparent; border: none; color: #64748b; }
-
-        .btn-admin { 
-            background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); 
-            border: none; border-radius: 15px; font-weight: bold; padding: 12px;
-        }
-
-        .logout-link { 
-            position: absolute; bottom: -50px; left: 50%; transform: translateX(-50%); 
-            color: rgba(255,255,255,0.4); text-decoration: none; font-size: 0.75rem; 
-            letter-spacing: 1px; transition: 0.3s;
-        }
-        .logout-link:hover { color: white; text-shadow: 0 0 10px white; }
+        #tasaInput { background: transparent; border: 1px solid rgba(0,210,255,0.3); color: var(--primary); width: 70px; text-align: center; border-radius: 10px; font-weight: bold; }
+        #labelModo { cursor: pointer; transition: 0.3s; }
+        #labelModo:hover { transform: scale(1.1); }
+        .logout-link { position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.3); text-decoration: none; font-size: 0.7rem; font-weight: bold; }
     </style>
 </head>
 <body id="body">
 
-    {% if dias_restantes is defined and dias_restantes <= 0 %}
-    <div class="grace-banner">
-        <span><i class="fas fa-clock me-2"></i> Suscripción vencida (Periodo de gracia)</span>
-        <a href="https://wa.me/584128598727?text=Renovación%20Elena%20AI:%20{{ email }}" target="_blank" class="btn-whatsapp-banner">
-            <i class="fab fa-whatsapp"></i> RENOVAR AHORA
-        </a>
-    </div>
-    {% endif %}
-
     <div class="card-elena" id="mainCard">
-        <div class="d-flex justify-content-between mb-4 align-items-center">
-            <div class="small fw-bold text-uppercase tracking-wider opacity-50" style="font-size: 0.6rem;">
-                Tasa BCV: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly onchange="sincronizarTasa()">
-            </div>
-            <div id="labelModo" class="badge rounded-pill bg-info text-dark px-3 py-2" style="cursor: pointer; font-size: 0.65rem;" onclick="desactivarAdmin()">
-                MODO VENDEDOR
-            </div>
+        <div class="d-flex justify-content-between mb-3 align-items-center">
+            <div class="small opacity-50">Tasa: <input type="number" id="tasaInput" step="0.01" value="{{ tasa }}" readonly onchange="sincronizarTasa()"></div>
+            <div id="labelModo" class="badge rounded-pill bg-info text-dark px-3 py-2 fw-bold" onclick="desactivarAdmin()">VENDEDOR</div>
         </div>
 
         <div class="aura" onclick="escuchar()">
             <div class="aura-inner" id="auraCircle">
-                <i class="fas fa-microphone" id="micIcon"></i>
+                <i class="fas fa-microphone fa-2x"></i>
             </div>
         </div>
 
-        <h3 class="fw-800 mb-1" style="letter-spacing: -1px;">ELENA AI</h3>
-        <p class="opacity-40 mb-4" style="font-size: 0.7rem;">{{ email }}</p>
+        <h3 class="fw-800 mb-0">ELENA AI</h3>
+        <p class="opacity-40 mb-3" style="font-size: 0.65rem;">SISTEMA INTELIGENTE DE FARMACIA</p>
 
         <div id="priceDisplay" class="price-card">
-            <div id="productTitle" class="fw-bold text-info mb-1 small"></div>
-            <div class="row g-0 align-items-center">
-                <div class="col-6 border-end border-white border-opacity-10">
+            <img id="prodImg" src="" class="img-producto" onerror="this.src='https://cdn-icons-png.flaticon.com/512/883/883356.png'">
+            <div id="productTitle" class="fw-bold text-info mb-2 small text-uppercase"></div>
+            <div class="row g-0">
+                <div class="col-6">
+                    <div id="valBs" class="val-bs"></div>
                     <div class="small opacity-50" style="font-size: 0.6rem;">BOLÍVARES</div>
-                    <div id="valBs" class="fw-bold h5 mb-0"></div>
                 </div>
                 <div class="col-6">
+                    <div id="valUsd" class="val-usd"></div>
                     <div class="small opacity-50" style="font-size: 0.6rem;">DÓLARES</div>
-                    <div id="valUsd" class="fw-bold h5 mb-0 text-success"></div>
                 </div>
             </div>
         </div>
 
-        <div class="res-box" id="textoElena">Haz click en el micrófono para consultar</div>
+        <div class="res-box" id="textoElena">¿En qué puedo ayudarte hoy?</div>
         
         <div class="input-group-elena">
-            <input type="text" id="userInput" class="input-elena" placeholder="Escribe tu pregunta aquí..." onkeypress="if(event.key==='Enter') enviar()">
-        </div>
-        
-        <div id="adminTools" style="display: none;" class="mt-4">
-            <input type="file" id="fileIn" hidden onchange="subirExcel()">
-            <button class="btn btn-admin w-100 text-white shadow" onclick="document.getElementById('fileIn').click()">
-                <i class="fas fa-cloud-upload-alt me-2"></i>SUBIR INVENTARIO
-            </button>
+            <input type="text" id="userInput" class="input-elena" placeholder="Busca un medicamento..." onkeypress="if(event.key==='Enter') enviar()">
         </div>
 
-        <a href="/logout" class="logout-link text-uppercase fw-bold">Cerrar sesión <i class="fas fa-power-off ms-1"></i></a>
+        <div id="adminTools" style="display: none;" class="mt-3">
+            <button class="btn btn-sm w-100 fw-bold text-white shadow-sm" style="background: var(--admin); border-radius: 12px; padding: 10px;" onclick="document.getElementById('fileIn').click()">
+                <i class="fas fa-file-excel me-2"></i>ACTUALIZAR INVENTARIO
+            </button>
+            <input type="file" id="fileIn" hidden onchange="subirExcel()">
+        </div>
+
+        <a href="/logout" class="logout-link uppercase"><i class="fas fa-power-off"></i> CERRAR SESIÓN</a>
     </div>
 
 <script>
@@ -204,51 +122,33 @@
         if(!synth) return;
         synth.cancel();
         const u = new SpeechSynthesisUtterance(msj.replace(/[📊|/]/g, ''));
-        u.lang = 'es-MX';
-        u.rate = 1.05;
+        u.lang = 'es-MX'; u.rate = 1.05;
         synth.speak(u);
     }
 
     function escuchar() {
-        if (!SpeechRecognition) { alert("Navegador no compatible."); return; }
+        if (!SpeechRecognition) return;
         const rec = new SpeechRecognition();
         rec.lang = 'es-VE';
-        const aura = document.getElementById('auraCircle');
-
         rec.onstart = () => {
-            document.getElementById('textoElena').innerText = "Elena te escucha...";
-            aura.classList.add('listening-active');
+            document.getElementById('auraCircle').classList.add('listening-active');
             document.getElementById('priceDisplay').style.display = "none";
+            document.getElementById('textoElena').innerText = "Escuchando...";
         };
-
         rec.onresult = (e) => { 
-            const texto = e.results[0][0].transcript;
-            document.getElementById('userInput').value = texto; 
+            document.getElementById('userInput').value = e.results[0][0].transcript; 
             enviar(); 
         };
-
-        rec.onerror = () => {
-            document.getElementById('textoElena').innerText = "No logré escucharte...";
-            aura.classList.add('aura-error');
-        };
-
-        rec.onend = () => { aura.classList.remove('listening-active'); };
+        rec.onend = () => document.getElementById('auraCircle').classList.remove('listening-active');
         rec.start();
     }
 
     async function enviar() {
-        const query = document.getElementById('userInput').value.toLowerCase().trim();
+        const query = document.getElementById('userInput').value.trim();
         if(!query) return;
 
-        if (query === "activar modo vendedor" || query === "salir de gerencia") {
-            desactivarAdmin();
-            document.getElementById('userInput').value = "";
-            return;
-        }
-
         const res = await fetch('/preguntar', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ pregunta: query, modo_admin: modoAdmin })
         });
         const data = await res.json();
@@ -256,27 +156,31 @@
         if(data.modo_admin) {
             activarAdmin();
             document.getElementById('textoElena').innerText = "Modo gerencia activo.";
-            hablar("Modo administrativo activado.");
         } else {
-            // Lógica para separar la respuesta y llenar la price-card
             const texto = data.respuesta;
             document.getElementById('textoElena').innerText = texto;
             
-            // Si la respuesta tiene formato de precio, mostramos la tarjeta
-            if(texto.includes("cuesta")) {
-                const partes = texto.split("cuesta");
-                const precios = texto.match(/[\d.,]+ con \d+/g) || texto.match(/[\d.,]+/g);
+            // --- MOTOR DE DETECCIÓN INTELIGENTE ---
+            const regexPrecio = /cuesta|vale/i;
+            if(regexPrecio.test(texto)) {
+                const partes = texto.split(regexPrecio);
+                const precios = texto.match(/(\d+[\d.,]*\s*con\s*\d+)|(\d+[\d.,]*)/g);
                 
                 if(precios && precios.length >= 2) {
-                    document.getElementById('productTitle').innerText = partes[0].replace("El ", "").toUpperCase();
-                    document.getElementById('valBs').innerText = precios[0] + " Bs";
-                    document.getElementById('valUsd').innerText = precios[1] + " $";
+                    let nombre = partes[0].replace(/^(el|la|un|una)\s+/i, "").trim();
+                    document.getElementById('productTitle').innerText = nombre;
+                    document.getElementById('valBs').innerText = precios[0];
+                    document.getElementById('valUsd').innerText = precios[1];
+                    
+                    // BUSQUEDA DE IMAGEN AUTOMÁTICA
+                    const queryImg = encodeURIComponent(nombre + " medicamento caja");
+                    document.getElementById('prodImg').src = `https://api.duckduckgo.com/t/visual?q=${queryImg}`; 
+                    
                     document.getElementById('priceDisplay').style.display = "block";
                 }
             } else {
                 document.getElementById('priceDisplay').style.display = "none";
             }
-            
             hablar(texto);
         }
         document.getElementById('userInput').value = "";
@@ -285,44 +189,36 @@
     function activarAdmin() {
         modoAdmin = true;
         document.getElementById('body').classList.add('admin-mode-bg');
-        document.getElementById('mainCard').classList.add('admin-active');
         document.getElementById('labelModo').innerText = "GERENCIA";
-        document.getElementById('labelModo').className = "badge rounded-pill bg-warning text-dark px-3 py-2";
+        document.getElementById('labelModo').className = "badge rounded-pill bg-warning text-dark px-3 py-2 fw-bold";
         document.getElementById('adminTools').style.display = "block";
         document.getElementById('tasaInput').readOnly = false;
     }
 
     function desactivarAdmin() {
-        if(!modoAdmin) return;
         modoAdmin = false;
         document.getElementById('body').classList.remove('admin-mode-bg');
-        document.getElementById('mainCard').classList.remove('admin-active');
-        document.getElementById('labelModo').innerText = "MODO VENDEDOR";
-        document.getElementById('labelModo').className = "badge rounded-pill bg-info text-dark px-3 py-2";
+        document.getElementById('labelModo').innerText = "VENDEDOR";
+        document.getElementById('labelModo').className = "badge rounded-pill bg-info text-dark px-3 py-2 fw-bold";
         document.getElementById('adminTools').style.display = "none";
         document.getElementById('tasaInput').readOnly = true;
-        document.getElementById('textoElena').innerText = "Vendedor activo.";
-        hablar("Modo vendedor activado.");
     }
 
     async function sincronizarTasa() {
-        const nt = document.getElementById('tasaInput').value;
         await fetch('/preguntar', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ nueva_tasa: nt })
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nueva_tasa: document.getElementById('tasaInput').value })
         });
     }
 
     async function subirExcel() {
-        const fileIn = document.getElementById('fileIn');
         const fd = new FormData();
-        fd.append('archivo', fileIn.files[0]);
-        document.getElementById('textoElena').innerText = "Actualizando Base de Datos...";
+        fd.append('archivo', document.getElementById('fileIn').files[0]);
+        document.getElementById('textoElena').innerText = "Actualizando inventario...";
         const res = await fetch('/upload', { method: 'POST', body: fd });
         const data = await res.json();
         if(data.success) {
-            document.getElementById('textoElena').innerText = "¡Inventario listo!";
+            document.getElementById('textoElena').innerText = "¡Inventario cargado!";
             hablar("Inventario actualizado.");
         }
     }
