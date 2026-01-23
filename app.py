@@ -95,6 +95,7 @@ def preguntar():
     if not usuario_email: return jsonify({"respuesta": "Sesión expirada"}), 401
     
     ip_cliente = request.headers.get('X-Forwarded-For', request.remote_addr)
+    es_modo_admin = data.get('modo_admin', False)
 
     # 1. Manejo de tasa por empresa
     datos_tasa = get_tasa_usuario(usuario_email)
@@ -110,7 +111,7 @@ def preguntar():
     if "activar modo gerencia" in pregunta_raw:
         return jsonify({"respuesta": "Modo gerencia activo.", "modo_admin": True})
 
-    # 2. OBTENER INVENTARIO DESDE SUPABASE (Filtrado por empresa)
+    # 2. OBTENER INVENTARIO DESDE SUPABASE
     try:
         res_inv = supabase.table("inventarios").select("*").eq("empresa_email", usuario_email).execute()
         if not res_inv.data:
@@ -129,7 +130,7 @@ def preguntar():
 
     busqueda_exitosa = False
     try:
-        # 4. Búsqueda Difusa sobre los datos de la empresa
+        # 4. Búsqueda Difusa
         match = process.extractOne(
             pregunta_limpia, 
             df['producto'].astype(str).tolist(), 
@@ -142,9 +143,21 @@ def preguntar():
             
             p_usd = float(fila['precio_usd'])
             p_bs = p_usd * datos_tasa["tasa"]
-            stock = fila.get('stock', '0')
+            
+            # --- AJUSTE DE PRONUNCIACIÓN Y VISIBILIDAD ---
+            
+            # Formateamos para que Elena diga "Bolívares" y "con X centavos" (evita que diga pesos)
+            # Reemplazamos el punto decimal por la palabra "con" para los dólares
+            texto_usd = f"{p_usd:,.2f}".replace(".00", "").replace(".", " con ")
+            texto_bs = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-            respuesta_final = f"El {nombre_p} cuesta {p_bs:,.2f} Bs, que son {p_usd:,.2f} $. Stock: {stock}"
+            respuesta_final = f"El {nombre_p} cuesta {texto_bs} Bolívares, que son {texto_usd} Dólares."
+            
+            # El stock SOLO se muestra si el modo_admin está activo en la sesión
+            if es_modo_admin:
+                stock = fila.get('stock', '0')
+                respuesta_final += f" El stock actual es de {stock} unidades."
+            
             busqueda_exitosa = True
         else:
             respuesta_final = f"Lo siento, no encontré '{pregunta_limpia}' en tu inventario."
@@ -163,7 +176,6 @@ def preguntar():
     except: pass
 
     return jsonify({"respuesta": respuesta_final})
-
 @app.route('/upload', methods=['POST'])
 def upload_file():
     usuario_email = session.get('usuario')

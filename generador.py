@@ -1,29 +1,27 @@
 import pandas as pd
 
-# ARCHIVO A: Retail (Tiendas y Ventas)
-retail_data = {
-    'Tienda': ['Norte', 'Sur', 'Este', 'Oeste', 'Centro'],
-    'SKU': ['LAP-001', 'MOU-99', 'KEY-12', 'MON-45', 'SUR-01'],
-    'Ventas_Netas': [15200.50, 8900.00, 12450.75, 21000.00, 5600.20]
+# Creamos los datos "sucios"
+data = {
+    "ARTICULO": ["ATAMEL ADULTO 650MG", "ACETAMINOFEN GENERICO", "VITAMINA C MK", "IBUPROFENO 400MG"],
+    "P.V.P (REF)": ["Ref 2,50 $", "$ 1.15", "4,20 USD", "  3.00  "],
+    "EXISTENCIA": ["12", "100", "5", "20"]
 }
-pd.DataFrame(retail_data).to_csv('retail_test.csv', index=False)
 
-# ARCHIVO B: Recursos Humanos (Nómina)
-rrhh_data = {
-    'Empleado': ['Laura Cano', 'Pedro Picapiedra', 'Marta Sánchez', 'Juan Soler'],
-    'Departamento': ['Sistemas', 'Ventas', 'Sistemas', 'Marketing'],
-    'Sueldo': [3500, 2800, 3600, 2200],
-    'Horas_Extra': [10, 5, 12, 0]
-}
-pd.DataFrame(rrhh_data).to_csv('rrhh_test.csv', index=False)
+df_datos = pd.DataFrame(data)
 
-# ARCHIVO C: Logística (Transporte)
-logistica_data = {
-    'Ruta': ['Madrid-Barcelona', 'Valencia-Sevilla', 'Bilbao-Madrid'],
-    'Conductor': ['Antonio G.', 'Josefa M.', 'Ricardo L.'],
-    'Costo_Combustible': [450.20, 380.00, 210.50],
-    'Kilometros': [620, 540, 400]
-}
-pd.DataFrame(logistica_data).to_csv('logistica_test.csv', index=False)
+# Creamos la "basura" del encabezado
+basura = [
+    ["FARMACIA LA BENDICIÓN C.A.", "", ""],
+    ["RIF: J-12345678-0", "FECHA: 23/01/2026", ""],
+    ["REPORTE DE INVENTARIO CAÓTICO", "", ""],
+    ["", "", ""] # Fila vacía
+]
+df_basura = pd.DataFrame(basura)
 
-print("¡Archivos retail_test.csv, rrhh_test.csv y logistica_test.csv creados!")
+# Unimos todo: la basura arriba y los datos abajo
+# Nota: Ignoramos los índices para que parezca un Excel real
+with pd.ExcelWriter("inventario_sucio.xlsx") as writer:
+    df_basura.to_excel(writer, index=False, header=False)
+    df_datos.to_excel(writer, index=False, startrow=4) # Empezamos en la fila 5
+
+print("✅ Archivo 'inventario_sucio.xlsx' creado con éxito.")
