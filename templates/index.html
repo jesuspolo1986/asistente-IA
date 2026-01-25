@@ -13,8 +13,11 @@
         .admin-mode-bg { background: radial-gradient(circle at top right, #2d1b4e, #0f172a) !important; }
         .card-elena { background: var(--glass); border-radius: 40px; padding: 2.2rem; width: 400px; text-align: center; backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; }
         .price-card { background: rgba(255,255,255,0.05); border-radius: 30px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(0, 210, 255, 0.2); display: none; animation: bounceIn 0.6s ease; }
-        .img-wrapper { width: 100%; max-width: 150px; height: 80px; margin: 0 auto 15px; background: white; border-radius: 15px; padding: 10px; display: flex; align-items: center; justify-content: center; }
+        
+        /* Contenedor de logo centrado y limpio */
+        .img-wrapper { width: 100%; max-width: 150px; height: 85px; margin: 0 auto 15px; background: white; border-radius: 15px; padding: 10px; display: flex; align-items: center; justify-content: center; }
         .img-logo-farma { max-width: 100%; max-height: 100%; object-fit: contain; }
+        
         .val-bs { font-size: 1.8rem; font-weight: 800; color: white; }
         .val-usd { font-size: 1.4rem; font-weight: 600; color: #4ade80; }
         .aura { width: 80px; height: 80px; margin: 0 auto 1.2rem; cursor: pointer; }
@@ -44,7 +47,7 @@
 
         <div id="priceDisplay" class="price-card">
             <div class="img-wrapper">
-                <img src="/static/img/logo_farma.png" class="img-logo-farma" onerror="this.src='https://cdn-icons-png.flaticon.com/512/4320/4320337.png'">
+                <img src="/static/img/logodesk-blanco.png" class="img-logo-farma" onerror="this.src='https://cdn-icons-png.flaticon.com/512/4320/4320337.png'">
             </div>
             <div id="productTitle" class="fw-bold text-info mb-2 text-uppercase" style="font-size: 0.8rem;"></div>
             <div class="row g-0">
@@ -56,7 +59,6 @@
                     <span id="valUsd" class="val-usd"></span><br>
                     <span class="small opacity-50" style="font-size: 0.5rem;">DÓLARES</span>
                 </div>
-                <img src="/static/img/logo_farma.png?v=2" class="img-logo-farma" alt="Farma Asistencia">
             </div>
         </div>
 
@@ -124,26 +126,24 @@
             const texto = data.respuesta;
             document.getElementById('textoElena').innerText = texto;
 
-            // EXTRACCIÓN MEJORADA DE PRECIOS
             const regexBs = /(\d+[\d.,\s]*con\s*\d+|\d+[\d.,]*)\s*(?=bolívares|bs)/i;
             const regexUsd = /(\d+[\d.,\s]*con\s*\d+|\d+[\d.,]*)\s*(?=dólares|usd|\$)/i;
 
             const mBs = texto.match(regexBs);
             const mUsd = texto.match(regexUsd);
 
-            // Dentro de la función enviar(), donde se procesan los precios:
-           if(mBs && mUsd) {
-           let nombre = texto.split(/cuesta|vale|son/i)[0].replace(/^(el|la|un|una)\s+/i, "").trim();
-           document.getElementById('productTitle').innerText = nombre;
-    
-    // Transformamos "531 con 30" -> "531,30"
-          const fBs = mBs[0].replace(/\s*con\s*/g, ",").replace(".", ",").trim();
-          const fUsd = mUsd[0].replace(/\s*con\s*/g, ",").replace(".", ",").trim();
+            if(mBs && mUsd) {
+                let nombre = texto.split(/cuesta|vale|son/i)[0].replace(/^(el|la|un|una)\s+/i, "").trim();
+                document.getElementById('productTitle').innerText = nombre;
+                
+                // Formateo visual impecable: 531,30
+                const fBs = mBs[0].replace(/\s*con\s*/g, ",").replace(".", ",").trim();
+                const fUsd = mUsd[0].replace(/\s*con\s*/g, ",").replace(".", ",").trim();
 
-          document.getElementById('valBs').innerText = fBs;
-          document.getElementById('valUsd').innerText = fUsd + " $";
-          document.getElementById('priceDisplay').style.display = "block";
-        }
+                document.getElementById('valBs').innerText = fBs;
+                document.getElementById('valUsd').innerText = fUsd + " $";
+                document.getElementById('priceDisplay').style.display = "block";
+            }
             hablar(texto);
         }
         document.getElementById('userInput').value = "";
