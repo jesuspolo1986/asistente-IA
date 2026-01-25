@@ -4,7 +4,7 @@ import os
 import io
 from pyDolarVenezuela.pages import AlCambio
 from pyDolarVenezuela import Monitor
-from datetime import datetime
+from datetime import datetime, timedelta
 from supabase import create_client, Client
 import time
 from rapidfuzz import process, utils
