@@ -51,19 +51,34 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email', '').lower().strip()
         password = request.form.get('password')
+        
+        # Buscamos al usuario
         res = supabase.table("suscripciones").select("*").eq("email", email).eq("activo", 1).execute()
+        
         if res.data:
             user = res.data[0]
             if user.get('password') == password:
+                # --- VALIDACIÓN DE VENCIMIENTO ---
+                try:
+                    fecha_vence = datetime.strptime(user['fecha_vencimiento'], '%Y-%m-%d').date()
+                    hoy = datetime.now().date()
+                    
+                    # Si hoy es mayor a (vencimiento + 1 día de gracia), bloquear
+                    if hoy > (fecha_vence + timedelta(days=1)):
+                        return render_template('login.html', error="Suscripción expirada. Contacte soporte.")
+                except Exception as e:
+                    print(f"Error fecha: {e}")
+
+                # Si pasó la validación, iniciamos sesión
                 session.permanent = True
                 session['logged_in'] = True 
                 session['usuario'] = email
                 session['fecha_vencimiento'] = user['fecha_vencimiento']
                 return redirect(url_for('index'))
-            else: return render_template('login.html', error="Clave incorrecta")
-        return render_template('login.html', error="Usuario no registrado")
+            else: 
+                return render_template('login.html', error="Clave incorrecta")
+        return render_template('login.html', error="Usuario no registrado o inactivo")
     return render_template('login.html')
-
 @app.route('/logout')
 def logout():
     session.clear()
