@@ -53,31 +53,40 @@ def login():
         password = request.form.get('password')
         
         # Buscamos al usuario
-        res = supabase.table("suscripciones").select("*").eq("email", email).eq("activo", 1).execute()
+        res = supabase.table("suscripciones").select("*").eq("email", email).execute()
         
         if res.data:
             user = res.data[0]
-            if user.get('password') == password:
-                # --- VALIDACIÓN DE VENCIMIENTO ---
+            
+            # 1. Verificamos contraseña y estado básico
+            if user.get('password') == password and user.get('activo') == 1:
+                
+                # --- AQUÍ ESTÁ EL BLOQUEO POR FECHA ---
                 try:
                     fecha_vence = datetime.strptime(user['fecha_vencimiento'], '%Y-%m-%d').date()
                     hoy = datetime.now().date()
                     
-                    # Si hoy es mayor a (vencimiento + 1 día de gracia), bloquear
-                    if hoy > (fecha_vence + timedelta(days=1)):
-                        return render_template('login.html', error="Suscripción expirada. Contacte soporte.")
+                    # Definimos el límite: Fecha de vencimiento + 1 día de gracia
+                    # Si vence el 22, puede entrar el 22 y el 23. El 24 ya NO.
+                    limite_gracia = fecha_vence + timedelta(days=1)
+                    
+                    if hoy > limite_gracia:
+                        return render_template('login.html', error="Suscripción expirada el " + str(fecha_vence) + ". Contacte soporte.")
                 except Exception as e:
-                    print(f"Error fecha: {e}")
+                    print(f"Error validando fecha: {e}")
+                # --------------------------------------
 
-                # Si pasó la validación, iniciamos sesión
+                # Si pasó los filtros anteriores, entra al sistema
                 session.permanent = True
-                session['logged_in'] = True 
+                session['logged_in'] = True
                 session['usuario'] = email
                 session['fecha_vencimiento'] = user['fecha_vencimiento']
                 return redirect(url_for('index'))
-            else: 
-                return render_template('login.html', error="Clave incorrecta")
-        return render_template('login.html', error="Usuario no registrado o inactivo")
+            
+            return render_template('login.html', error="Credenciales incorrectas o cuenta inactiva")
+        
+        return render_template('login.html', error="Usuario no encontrado")
+    
     return render_template('login.html')
 @app.route('/logout')
 def logout():
