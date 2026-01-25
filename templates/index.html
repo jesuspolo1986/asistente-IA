@@ -14,18 +14,16 @@
         
         .card-elena { background: var(--glass); border-radius: 40px; padding: 2.2rem; width: 400px; text-align: center; backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; }
         
-        /* CONTENEDOR DE VIDEO ELENA */
+        /* ROSTRO DE ELENA */
         .aura-container { width: 140px; height: 140px; margin: 0 auto 1.2rem; position: relative; cursor: pointer; }
-        
         .aura-video { 
             width: 140px; height: 140px; border-radius: 50%; border: 3px solid var(--primary); 
             overflow: hidden; position: relative; z-index: 2; background: #000;
             box-shadow: 0 0 20px rgba(0, 210, 255, 0.3); transition: 0.4s;
         }
-
         #elenaVideo { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Efecto de brillo pulsante al hablar */
+        /* Efecto al hablar */
         .listening-active .aura-video { 
             animation: pulse-glow-video 1.2s infinite; 
             border-color: #fff;
@@ -39,19 +37,24 @@
             100% { box-shadow: 0 0 20px var(--primary); } 
         }
 
-        .price-card { background: rgba(255,255,255,0.05); border-radius: 30px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(0, 210, 255, 0.2); display: none; animation: bounceIn 0.6s ease; }
-        
-        .img-wrapper { width: 100%; max-width: 150px; height: 85px; margin: 0 auto 15px; background: white; border-radius: 15px; padding: 10px; display: flex; align-items: center; justify-content: center; }
-        .img-logo-farma { max-width: 100%; max-height: 100%; object-fit: contain; }
+        /* TARJETA DE PRECIOS LIMPIA */
+        .price-card { 
+            background: rgba(255,255,255,0.05); border-radius: 30px; padding: 25px 15px; 
+            margin-bottom: 20px; border: 1px solid rgba(0, 210, 255, 0.2); 
+            display: none; animation: bounceIn 0.6s ease; 
+        }
         
         .val-bs { font-size: 1.8rem; font-weight: 800; color: white; }
         .val-usd { font-size: 1.4rem; font-weight: 600; color: #4ade80; }
         
         .input-group-elena { background: rgba(0,0,0,0.3); border-radius: 50px; border: 1px solid rgba(255,255,255,0.1); padding: 5px; }
         .input-elena { background: transparent; border: none; color: white; padding: 8px 20px; width: 100%; outline: none; text-align: center; }
+        
         #tasaInput { background: transparent; border: none; color: var(--primary); width: 80px; font-weight: 800; text-align: center; outline: none; }
         #tasaInput:not([readonly]) { border-bottom: 2px solid var(--primary); background: rgba(255,255,255,0.1); }
         
+        .hover-logout:hover { opacity: 1 !important; color: #ff4b2b !important; transition: 0.3s; }
+
         @keyframes bounceIn {
             from { opacity: 0; transform: scale(0.8); }
             to { opacity: 1; transform: scale(1); }
@@ -63,7 +66,12 @@
     <div class="card-elena">
         <div class="d-flex justify-content-between mb-3 align-items-center">
             <div class="small opacity-75 fw-bold">TASA: <input type="number" id="tasaInput" value="{{ tasa }}" readonly onchange="sincronizarTasa()"></div>
-            <div id="labelModo" class="badge rounded-pill bg-info text-dark px-3 py-2 fw-bold" onclick="desactivarAdmin()" style="cursor:pointer">VENDEDOR</div>
+            <div class="d-flex gap-3 align-items-center">
+                <div id="labelModo" class="badge rounded-pill bg-info text-dark px-3 py-2 fw-bold" onclick="desactivarAdmin()" style="cursor:pointer">VENDEDOR</div>
+                <a href="/logout" class="text-white opacity-50 hover-logout" title="Cerrar Sesión">
+                    <i class="fas fa-sign-out-alt fa-lg"></i>
+                </a>
+            </div>
         </div>
 
         <div class="aura-container" id="auraCircle" onclick="escuchar()">
@@ -75,14 +83,11 @@
         </div>
 
         <h3 class="fw-800 mb-0">ELENA AI</h3>
-        <p class="opacity-40 mb-3" style="font-size: 0.6rem;">FARMA ASISTENCIA</p>
+        <p class="opacity-40 mb-3" style="font-size: 0.6rem; letter-spacing: 2px;">FARMA ASISTENCIA</p>
 
         <div id="priceDisplay" class="price-card">
-            <div class="img-wrapper">
-                <img src="/static/img/logodesk-blanco.png" class="img-logo-farma" onerror="this.src='https://cdn-icons-png.flaticon.com/512/4320/4320337.png'">
-            </div>
-            <div id="productTitle" class="fw-bold text-info mb-2 text-uppercase" style="font-size: 0.8rem;"></div>
-            <div class="row g-0">
+            <div id="productTitle" class="fw-bold text-info mb-3 text-uppercase" style="font-size: 0.9rem; letter-spacing: 1px;"></div>
+            <div class="row g-0 align-items-center">
                 <div class="col-6 border-end border-white border-opacity-10">
                     <span id="valBs" class="val-bs"></span><br>
                     <span class="small opacity-50" style="font-size: 0.5rem;">BOLÍVARES</span>
@@ -101,7 +106,9 @@
         </div>
 
         <div id="adminTools" style="display: none;" class="mt-3">
-            <button class="btn btn-sm btn-warning w-100 fw-bold" onclick="document.getElementById('fileIn').click()">ACTUALIZAR EXCEL DE PRECIOS</button>
+            <button class="btn btn-sm btn-warning w-100 fw-bold shadow-sm" onclick="document.getElementById('fileIn').click()">
+                <i class="fas fa-file-excel me-2"></i>ACTUALIZAR EXCEL
+            </button>
             <input type="file" id="fileIn" hidden onchange="subirExcel()">
         </div>
     </div>
@@ -113,7 +120,7 @@
     const video = document.getElementById('elenaVideo');
     const aura = document.getElementById('auraCircle');
 
-    // Desbloquear autoplay de video en el primer clic
+    // Desbloqueo de video
     document.body.addEventListener('click', () => { if(video.paused) video.play(); }, {once: true});
 
     function hablar(msj) {
@@ -121,16 +128,14 @@
         synth.cancel();
         const u = new SpeechSynthesisUtterance(msj.replace(/[📊|/]/g, ''));
         u.lang = 'es-MX'; u.rate = 1.1;
-        
         u.onstart = () => {
             aura.classList.add('listening-active');
-            video.playbackRate = 1.2; // Movimiento más activo al hablar
+            video.playbackRate = 1.2;
         };
         u.onend = () => {
             aura.classList.remove('listening-active');
             video.playbackRate = 1.0;
         };
-        
         synth.speak(u);
     }
 
@@ -181,7 +186,6 @@
             const texto = data.respuesta;
             document.getElementById('textoElena').innerText = texto;
 
-            // Lógica de detección de precios para el recuadro visual
             const regexBs = /(\d+[\d.,\s]*con\s*\d+|\d+[\d.,]*)\s*(?=bolívares|bs)/i;
             const regexUsd = /(\d+[\d.,\s]*con\s*\d+|\d+[\d.,]*)\s*(?=dólares|usd|\$)/i;
 
@@ -231,7 +235,7 @@
         const formData = new FormData();
         formData.append('archivo', file);
         
-        document.getElementById('textoElena').innerText = "Actualizando base de datos...";
+        document.getElementById('textoElena').innerText = "Actualizando inventario...";
         const res = await fetch('/upload', { method: 'POST', body: formData });
         const data = await res.json();
         
