@@ -8,85 +8,38 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --primary: #00d2ff; --bg: #0f172a; --card: rgba(30, 41, 59, 0.7); }
-        
-        body { 
-            background: #0f172a; 
-            color: white; 
-            height: 100vh; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-family: 'Segoe UI', sans-serif; 
-            margin: 0;
-            overflow: hidden;
-            position: relative; /* Para que la cápsula flote respecto al body */
+        body { background: #0f172a; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; position: relative; }
+
+        /* CAPSULA DE CRISTAL */
+        .admin-status-capsule { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; width: auto; min-width: 320px; border-radius: 50px; padding: 8px 20px; backdrop-filter: blur(15px); box-shadow: 0 10px 40px rgba(0,0,0,0.6); border: 1px solid rgba(255, 255, 255, 0.15); animation: slideDown 0.5s ease-out; }
+        @keyframes slideDown { from { top: -80px; } to { top: 20px; } }
+
+        .card-elena { background: var(--card); border-radius: 40px; padding: 2rem; width: 440px; text-align: center; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(20px); box-shadow: 0 25px 50px rgba(0,0,0,0.5); position: relative; }
+
+        /* CAJA DE PRECIOS MODERNA (RECUPERADA) */
+        .price-display {
+            background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(0, 210, 255, 0.2);
+            border-radius: 30px; padding: 20px; margin: 15px 0; display: none; /* Se activa al buscar */
         }
+        .price-val { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+        .price-label { font-size: 0.7rem; color: #94a3b8; letter-spacing: 1px; margin-top: 5px; }
+        .divider { width: 1px; background: rgba(255,255,255,0.1); height: 50px; margin: 0 20px; }
 
-        /* CAPSULA DE CRISTAL PROFESIONAL (Solo Gerencia) */
-        /* Eliminamos cualquier banner rojo antiguo y usamos esta cápsula flotante */
-        .admin-status-capsule {
-            display: none; 
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 9999; /* Asegura que esté por encima de todo sin mover nada */
-            width: auto;
-            min-width: 320px;
-            border-radius: 50px;
-            padding: 8px 20px;
-            backdrop-filter: blur(15px);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            animation: slideDown 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        @keyframes slideDown { from { top: -80px; opacity: 0; } to { top: 20px; opacity: 1; } }
-
-        .card-elena { 
-            background: var(--card); border-radius: 40px; padding: 2.5rem; width: 420px; text-align: center; 
-            border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(20px);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5); position: relative;
-        }
-
-        .aura { 
-            width: 160px; height: 160px; margin: 0 auto 1.5rem; border-radius: 50%; 
-            border: 4px solid var(--primary); position: relative; overflow: hidden;
-            box-shadow: 0 0 25px rgba(0, 210, 255, 0.4); cursor: pointer; background: #000;
-        }
-
+        .aura { width: 140px; height: 140px; margin: 0 auto 1rem; border-radius: 50%; border: 4px solid var(--primary); position: relative; overflow: hidden; box-shadow: 0 0 25px rgba(0, 210, 255, 0.4); cursor: pointer; }
         #elenaVideo { width: 100%; height: 100%; object-fit: cover; }
-
         .hablando { animation: pulse-border 1s infinite; border-color: #fff !important; }
+        @keyframes pulse-border { 50% { box-shadow: 0 0 50px var(--primary), 0 0 20px #fff; } }
 
-        @keyframes pulse-border {
-            0% { box-shadow: 0 0 20px var(--primary); }
-            50% { box-shadow: 0 0 50px var(--primary), 0 0 20px #fff; }
-            100% { box-shadow: 0 0 20px var(--primary); }
-        }
+        .res-box { min-height: 60px; margin-bottom: 1rem; color: #cbd5e1; font-size: 0.9rem; }
+        .input-elena { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; color: white; padding: 12px; width: 100%; text-align: center; outline: none; transition: 0.3s; }
+        .input-elena:focus { border-color: var(--primary); background: rgba(255,255,255,0.1); }
 
-        .res-box { min-height: 80px; margin-bottom: 1.5rem; color: #cbd5e1; font-size: 0.95rem; line-height: 1.4; }
+        .btn-admin-action { background: rgba(0, 210, 255, 0.1); color: var(--primary); border: 1px solid var(--primary); border-radius: 15px; padding: 10px; font-weight: bold; margin-top: 15px; display: none; width: 100%; }
+        .btn-whatsapp { background: #25d366; color: white; border-radius: 20px; padding: 4px 15px; text-decoration: none; font-weight: 800; font-size: 0.7rem; }
         
-        .input-elena { 
-            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
-            border-radius: 20px; color: white; padding: 12px; width: 100%; text-align: center; outline: none; 
-        }
-
-        .btn-admin-action { 
-            background: rgba(0, 210, 255, 0.1); color: var(--primary); border: 1px solid var(--primary);
-            border-radius: 15px; padding: 10px; font-weight: bold; margin-top: 15px; display: none; width: 100%; 
-        }
-        
-        .btn-whatsapp {
-            background: #25d366; color: white; border-radius: 20px; padding: 4px 15px;
-            text-decoration: none; font-weight: 800; font-size: 0.7rem; transition: 0.3s;
-            text-transform: uppercase;
-        }
-        .btn-whatsapp:hover { background: #128c7e; transform: scale(1.05); }
-
-        /* Estilo para los textos superiores (Tasa, etc) */
-        .top-info { position: absolute; top: 25px; left: 30px; display: flex; align-items: center; gap: 15px; }
-        .logout-btn { position: absolute; top: 25px; right: 30px; color: #cbd5e1; cursor: pointer; font-size: 1.2rem; }
+        .top-info { position: absolute; top: 25px; left: 30px; display: flex; align-items: center; gap: 10px; }
+        .badge-mode { background: var(--primary); color: #0f172a; padding: 2px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; }
+        .logout-btn { position: absolute; top: 25px; right: 30px; color: #cbd5e1; cursor: pointer; font-size: 1.2rem; border: none; background: none; }
     </style>
 </head>
 <body>
@@ -94,19 +47,18 @@
 <div id="adminCapsule" class="admin-status-capsule">
     <div class="d-flex align-items-center justify-content-between">
         <div id="statusText" class="small fw-bold me-3"></div>
-        <a id="wsLink" href="#" target="_blank" class="btn-whatsapp">
-            <i class="fab fa-whatsapp me-1"></i> RECARGAR
-        </a>
+        <a id="wsLink" href="#" target="_blank" class="btn-whatsapp"><i class="fab fa-whatsapp me-1"></i> RECARGAR</a>
     </div>
 </div>
 
 <div class="card-elena">
     <div class="top-info">
         <span class="small text-muted fw-bold">TASA:</span>
-        <span class="fw-bold" style="color: var(--primary);">{{ tasa }}</span>
+        <span id="displayTasa" class="fw-bold" style="color: var(--primary);">{{ tasa }}</span>
+        <div id="badgeAdmin" class="badge-mode" style="display: none;">GERENCIA</div>
     </div>
     
-    <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i></a>
+    <button onclick="handleLogout()" class="logout-btn"><i class="fas fa-sign-out-alt"></i></button>
 
     <div class="aura" id="auraContainer" onclick="escuchar()">
         <video id="elenaVideo" autoplay loop muted playsinline>
@@ -114,12 +66,26 @@
         </video>
     </div>
     
-    <h3 class="fw-bold mb-0">ELENA AI</h3>
-    <p class="small text-muted mb-3">{{ email.split('@')[0] | upper }}</p>
+    <h3 id="nombreProducto" class="fw-bold mb-0" style="font-size: 1.2rem; color: var(--primary); text-transform: uppercase;">ELENA AI</h3>
+    <p class="small text-muted mb-2">{{ email.split('@')[0] | upper }}</p>
+
+    <div id="priceDisplay" class="price-display">
+        <div class="d-flex align-items-center justify-content-center">
+            <div>
+                <div id="priceBs" class="price-val">0,00</div>
+                <div class="price-label">BOLÍVARES</div>
+            </div>
+            <div class="divider"></div>
+            <div>
+                <div id="priceUsd" class="price-val" style="color: #2ecc71;">0,00 $</div>
+                <div class="price-label">DÓLARES</div>
+            </div>
+        </div>
+    </div>
     
-    <div class="res-box" id="textoElena">Haz clic en mi rostro para consultar un precio.</div>
+    <div class="res-box" id="textoElena">Haz clic en mi rostro para consultar.</div>
     
-    <input type="text" id="userInput" class="input-elena" placeholder="Escribe tu consulta..." onkeypress="if(event.key==='Enter') enviar()">
+    <input type="text" id="userInput" class="input-elena" placeholder="Escribe o actualiza tasa (ej: Tasa 55)" onkeypress="if(event.key==='Enter') enviar()">
     
     <input type="file" id="fileInput" style="display: none;" onchange="subirArchivo()">
     <button id="btnAdmin" class="btn-admin-action" onclick="document.getElementById('fileInput').click()">
@@ -129,64 +95,86 @@
 
 <script>
     const synth = window.speechSynthesis;
-    const video = document.getElementById('elenaVideo');
     const aura = document.getElementById('auraContainer');
-    const MI_NUMERO = "584128598727";
-
-    // Variables de suscripción
-    const diasRestantes = {{ dias_restantes }}; 
-
-    document.body.addEventListener('click', () => { if (video.paused) video.play(); }, { once: true });
+    const diasRestantes = {{ dias_restantes }};
+    let modoGerencia = false;
 
     async function enviar() {
         const input = document.getElementById('userInput');
         const query = input.value.trim();
         if(!query) return;
 
+        // Lógica para actualizar TASA manualmente desde el input
+        if(query.toLowerCase().startsWith("tasa ")) {
+            const nuevaTasa = query.split(" ")[1];
+            const resT = await fetch('/preguntar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ nueva_tasa: nuevaTasa })
+            });
+            const dataT = await resT.json();
+            document.getElementById('displayTasa').innerText = dataT.tasa;
+            document.getElementById('textoElena').innerText = "Tasa actualizada a " + dataT.tasa;
+            input.value = "";
+            return;
+        }
+
         const res = await fetch('/preguntar', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ pregunta: query, modo_admin: document.getElementById('btnAdmin').style.display === 'block' })
+            body: JSON.stringify({ pregunta: query, modo_admin: modoGerencia })
         });
         const data = await res.json();
         
+        // Mostrar precios en la caja si hay éxito
+        if(data.exito) {
+            document.getElementById('priceDisplay').style.display = 'block';
+            document.getElementById('nombreProducto').innerText = data.producto_nombre;
+            document.getElementById('priceBs').innerText = data.p_bs;
+            document.getElementById('priceUsd').innerText = data.p_usd + " $";
+        }
+
         document.getElementById('textoElena').innerText = data.respuesta;
         hablar(data.respuesta);
 
-        if(data.modo_admin === true) {
-            activarModoGerencia();
-        }
+        if(data.modo_admin === true) { activarModoGerencia(); }
         input.value = "";
     }
 
     function activarModoGerencia() {
-    document.getElementById('btnAdmin').style.display = 'block';
-    
-    const capsule = document.getElementById('adminCapsule');
-    const statusText = document.getElementById('statusText');
-    const wsLink = document.getElementById('wsLink');
-
-    if (diasRestantes === 0) {
-        // CASO: Vence hoy (Tu segunda imagen que ya está perfecta)
-        capsule.style.display = "block";
-        capsule.style.background = "rgba(255, 165, 0, 0.15)";
-        capsule.style.border = "1px solid rgba(255, 165, 0, 0.4)";
-        statusText.innerHTML = "LICENCIA: VENCE HOY";
-        statusText.style.color = "#ffb347";
-        wsLink.href = `https://wa.me/${MI_NUMERO}?text=Hola,%20mi%20suscripción%20vence%20hoy%20y%20deseo%20renovarla.`;
-    } 
-    else if (diasRestantes <= -1) {
-        // CASO: Venció ayer (Día de gracia - Primera imagen)
-        // Cambiamos "Mantenimiento" por algo que invite a la acción inmediata
-        capsule.style.display = "block";
-        capsule.style.background = "rgba(231, 76, 60, 0.2)"; 
-        capsule.style.border = "1px solid rgba(231, 76, 60, 0.5)";
-        statusText.innerHTML = "🚫 ACCESO POR VENCER: RENOVAR"; 
-        statusText.style.color = "#ff6b6b";
-        // Mensaje de WhatsApp más directo
-        wsLink.href = `https://wa.me/${MI_NUMERO}?text=Hola,%20mi%20licencia%20ha%20caducado.%20Solicito%20datos%20para%20pago%20inmediato.`;
+        modoGerencia = true;
+        document.getElementById('btnAdmin').style.display = 'block';
+        document.getElementById('badgeAdmin').style.display = 'inline-block';
+        
+        const capsule = document.getElementById('adminCapsule');
+        if (diasRestantes <= 0) {
+            capsule.style.display = "block";
+            const statusText = document.getElementById('statusText');
+            if(diasRestantes === 0) {
+                statusText.innerHTML = "LICENCIA: VENCE HOY";
+                statusText.style.color = "#ffb347";
+            } else {
+                statusText.innerHTML = "🚫 ACCESO POR VENCER: RENOVAR";
+                statusText.style.color = "#ff6b6b";
+            }
+        }
     }
-}
+
+    function handleLogout() {
+        if(modoGerencia) {
+            // Si está en gerencia, primero vuelve a modo vendedor
+            modoGerencia = false;
+            document.getElementById('btnAdmin').style.display = 'none';
+            document.getElementById('badgeAdmin').style.display = 'none';
+            document.getElementById('adminCapsule').style.display = 'none';
+            document.getElementById('nombreProducto').innerText = "ELENA AI";
+            document.getElementById('priceDisplay').style.display = 'none';
+            document.getElementById('textoElena').innerText = "Modo Vendedor activo.";
+        } else {
+            // Si ya era vendedor, sale del sistema
+            window.location.href = "/logout";
+        }
+    }
 
     function hablar(msj) {
         if (!synth) return;
@@ -198,34 +186,27 @@
         synth.speak(u);
     }
 
+    function escuchar() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitRecognition;
+        const rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        rec.lang = 'es-VE';
+        rec.onstart = () => { document.getElementById('textoElena').innerText = "Escuchando..."; aura.classList.add('hablando'); };
+        rec.onresult = (e) => { document.getElementById('userInput').value = e.results[0][0].transcript; enviar(); };
+        rec.onend = () => aura.classList.remove('hablando');
+        rec.start();
+    }
+
     async function subirArchivo() {
         const file = document.getElementById('fileInput').files[0];
         const formData = new FormData();
         formData.append('archivo', file);
-        document.getElementById('textoElena').innerText = "Procesando inventario...";
+        document.getElementById('textoElena').innerText = "Cargando inventario...";
         const res = await fetch('/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if(data.success) {
-            document.getElementById('textoElena').innerText = `Éxito: ${data.productos} productos cargados.`;
-            hablar("Inventario actualizado correctamente");
+            document.getElementById('textoElena').innerText = `Éxito: ${data.productos} productos listos.`;
+            hablar("Inventario actualizado");
         }
-    }
-
-    function escuchar() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if(!SpeechRecognition) return;
-        const rec = new SpeechRecognition();
-        rec.lang = 'es-VE';
-        rec.onstart = () => { 
-            aura.classList.add('hablando');
-            document.getElementById('textoElena').innerText = "Elena te escucha..."; 
-        };
-        rec.onresult = (e) => {
-            document.getElementById('userInput').value = e.results[0][0].transcript;
-            enviar();
-        };
-        rec.onend = () => aura.classList.remove('hablando');
-        rec.start();
     }
 </script>
 </body>
