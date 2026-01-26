@@ -10,36 +10,36 @@
         :root { --primary: #00d2ff; --bg: #0f172a; --card: rgba(30, 41, 59, 0.7); }
         body { background: #0f172a; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; position: relative; }
 
-        /* CAPSULA DE CRISTAL */
         .admin-status-capsule { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; width: auto; min-width: 320px; border-radius: 50px; padding: 8px 20px; backdrop-filter: blur(15px); box-shadow: 0 10px 40px rgba(0,0,0,0.6); border: 1px solid rgba(255, 255, 255, 0.15); animation: slideDown 0.5s ease-out; }
         @keyframes slideDown { from { top: -80px; } to { top: 20px; } }
 
         .card-elena { background: var(--card); border-radius: 40px; padding: 2.5rem; width: 440px; text-align: center; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(20px); box-shadow: 0 25px 50px rgba(0,0,0,0.5); position: relative; }
 
-        /* CAJA DE PRECIOS MODERNA */
         .price-display { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(0, 210, 255, 0.2); border-radius: 30px; padding: 20px; margin: 15px 0; display: none; }
         .price-val { font-size: 2.2rem; font-weight: 800; line-height: 1; }
         .price-label { font-size: 0.7rem; color: #94a3b8; letter-spacing: 1px; margin-top: 5px; }
         .divider { width: 1px; background: rgba(255,255,255,0.1); height: 50px; margin: 0 20px; }
 
-        /* AJUSTE DEL AURA PARA EVITAR QUE SE PEGUE AL TEXTO */
-        .aura { width: 140px; height: 140px; margin: 1.5rem auto; border-radius: 50%; border: 4px solid var(--primary); position: relative; overflow: hidden; box-shadow: 0 0 25px rgba(0, 210, 255, 0.4); cursor: pointer; }
+        .aura { width: 140px; height: 140px; margin: 1.5rem auto; border-radius: 50%; border: 4px solid var(--primary); position: relative; overflow: hidden; box-shadow: 0 0 25px rgba(0, 210, 255, 0.4); cursor: pointer; transition: 0.3s; }
         #elenaVideo { width: 100%; height: 100%; object-fit: cover; }
         .hablando { animation: pulse-border 1s infinite; border-color: #fff !important; }
         @keyframes pulse-border { 50% { box-shadow: 0 0 50px var(--primary), 0 0 20px #fff; } }
 
-        .res-box { min-height: 60px; margin-bottom: 1.5rem; color: #cbd5e1; font-size: 0.9rem; }
+        .res-box { min-height: 60px; margin-bottom: 1.5rem; color: #cbd5e1; font-size: 0.9rem; padding: 0 10px; }
         .input-elena { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; color: white; padding: 12px; width: 100%; text-align: center; outline: none; transition: 0.3s; }
+        .input-elena:focus { border-color: var(--primary); background: rgba(255,255,255,0.1); }
 
-        .btn-admin-action { background: rgba(0, 210, 255, 0.1); color: var(--primary); border: 1px solid var(--primary); border-radius: 15px; padding: 10px; font-weight: bold; margin-top: 15px; display: none; width: 100%; }
-        .btn-whatsapp { background: #25d366; color: white; border-radius: 20px; padding: 4px 15px; text-decoration: none; font-weight: 800; font-size: 0.7rem; }
+        .btn-admin-action { background: rgba(0, 210, 255, 0.1); color: var(--primary); border: 1px solid var(--primary); border-radius: 15px; padding: 10px; font-weight: bold; margin-top: 15px; display: none; width: 100%; transition: 0.3s; }
+        .btn-admin-action:hover { background: var(--primary); color: #0f172a; }
+        
+        .btn-whatsapp { background: #25d366; color: white; border-radius: 20px; padding: 5px 15px; text-decoration: none; font-weight: 800; font-size: 0.7rem; transition: 0.3s; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.2); }
+        .btn-whatsapp:hover { background: #1eb954; transform: translateY(-2px); color: white; }
         
         .top-info { position: absolute; top: 25px; left: 30px; display: flex; align-items: center; gap: 10px; }
         .badge-mode { background: var(--primary); color: #0f172a; padding: 2px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; margin-left: 5px; }
-        .logout-btn { position: absolute; top: 25px; right: 30px; color: #cbd5e1; cursor: pointer; font-size: 1.2rem; border: none; background: none; }
-        
-        /* ESPACIADO PARA EL NOMBRE DE USUARIO */
-        .user-label { font-size: 0.8rem; letter-spacing: 1px; margin-top: 0.5rem; display: block; }
+        .logout-btn { position: absolute; top: 25px; right: 30px; color: #cbd5e1; cursor: pointer; font-size: 1.2rem; border: none; background: none; transition: 0.3s; }
+        .logout-btn:hover { color: #ff6b6b; transform: scale(1.1); }
+        .user-label { font-size: 0.8rem; letter-spacing: 1px; margin-top: 0.5rem; display: block; opacity: 0.7; }
     </style>
 </head>
 <body>
@@ -47,7 +47,9 @@
 <div id="adminCapsule" class="admin-status-capsule">
     <div class="d-flex align-items-center justify-content-between">
         <div id="statusText" class="small fw-bold me-3"></div>
-        <a id="wsLink" href="#" target="_blank" class="btn-whatsapp"><i class="fab fa-whatsapp me-1"></i> RECARGAR</a>
+        <button onclick="contactarSoporte()" class="btn-whatsapp border-0">
+            <i class="fab fa-whatsapp me-1"></i> RENOVAR LICENCIA
+        </button>
     </div>
 </div>
 
@@ -58,7 +60,9 @@
         <div id="badgeAdmin" class="badge-mode" style="display: none;">GERENCIA</div>
     </div>
     
-    <button onclick="handleLogout()" class="logout-btn"><i class="fas fa-sign-out-alt"></i></button>
+    <button onclick="handleLogout()" class="logout-btn" title="Cerrar Sesión / Salir de Gerencia">
+        <i class="fas fa-sign-out-alt"></i>
+    </button>
 
     <div class="aura" id="auraContainer" onclick="escuchar()">
         <video id="elenaVideo" autoplay loop muted playsinline>
@@ -99,28 +103,31 @@
     const diasRestantes = {{ dias_restantes }};
     let modoGerencia = false;
 
+    // Precarga de voces para evitar lag en móviles
+    let voces = [];
+    function cargarVoces() { voces = synth.getVoices(); }
+    if (speechSynthesis.onvoiceschanged !== undefined) { speechSynthesis.onvoiceschanged = cargarVoces; }
+
     async function enviar() {
         const input = document.getElementById('userInput');
         const query = input.value.trim();
         if(!query) return;
 
-        // CORRECCIÓN: Actualización de tasa prioritaria
         if(query.toLowerCase().startsWith("tasa ")) {
             const nuevaTasa = query.split(" ")[1];
-            const resT = await fetch('/preguntar', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ 
-                    nueva_tasa: nuevaTasa,
-                    modo_admin: modoGerencia // Enviamos el estado actual para no perderlo
-                })
-            });
-            const dataT = await resT.json();
-            if(dataT.tasa) {
-                document.getElementById('displayTasa').innerText = dataT.tasa;
-                document.getElementById('textoElena').innerText = "Tasa actualizada a " + dataT.tasa;
-                hablar("Tasa actualizada");
-            }
+            try {
+                const resT = await fetch('/preguntar', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ nueva_tasa: nuevaTasa, modo_admin: modoGerencia })
+                });
+                const dataT = await resT.json();
+                if(dataT.tasa) {
+                    document.getElementById('displayTasa').innerText = dataT.tasa;
+                    document.getElementById('textoElena').innerText = "Tasa actualizada a " + dataT.tasa;
+                    hablar("Tasa actualizada");
+                }
+            } catch(e) { console.error("Error tasa:", e); }
             input.value = "";
             return;
         }
@@ -155,6 +162,7 @@
         document.getElementById('badgeAdmin').style.display = 'inline-block';
         
         const capsule = document.getElementById('adminCapsule');
+        // Grace period logic: on day 0 or less, show banner
         if (diasRestantes <= 0) {
             capsule.style.display = "block";
             const statusText = document.getElementById('statusText');
@@ -185,9 +193,10 @@
 
     function hablar(msj) {
         if (!synth) return;
-        synth.cancel();
+        synth.cancel(); 
         const u = new SpeechSynthesisUtterance(msj);
         u.lang = 'es-MX';
+        u.rate = 0.9; // Un poco más natural
         u.onstart = () => aura.classList.add('hablando');
         u.onend = () => aura.classList.remove('hablando');
         synth.speak(u);
@@ -195,25 +204,44 @@
 
     function escuchar() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitRecognition;
-        const rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        if(!SpeechRecognition) {
+            alert("Tu navegador no soporta reconocimiento de voz.");
+            return;
+        }
+        const rec = new SpeechRecognition();
         rec.lang = 'es-VE';
-        rec.onstart = () => { document.getElementById('textoElena').innerText = "Escuchando..."; aura.classList.add('hablando'); };
-        rec.onresult = (e) => { document.getElementById('userInput').value = e.results[0][0].transcript; enviar(); };
+        rec.onstart = () => { 
+            document.getElementById('textoElena').innerText = "Escuchando..."; 
+            aura.classList.add('hablando'); 
+        };
+        rec.onresult = (e) => { 
+            document.getElementById('userInput').value = e.results[0][0].transcript; 
+            enviar(); 
+        };
         rec.onend = () => aura.classList.remove('hablando');
         rec.start();
     }
 
     async function subirArchivo() {
         const file = document.getElementById('fileInput').files[0];
+        if(!file) return;
         const formData = new FormData();
         formData.append('archivo', file);
         document.getElementById('textoElena').innerText = "Cargando inventario...";
-        const res = await fetch('/upload', { method: 'POST', body: formData });
-        const data = await res.json();
-        if(data.success) {
-            document.getElementById('textoElena').innerText = `Éxito: ${data.productos} productos listos.`;
-            hablar("Inventario actualizado");
-        }
+        try {
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            if(data.success) {
+                document.getElementById('textoElena').innerText = `Éxito: ${data.productos} productos listos.`;
+                hablar("Inventario actualizado con éxito");
+            }
+        } catch(e) { document.getElementById('textoElena').innerText = "Error al subir archivo."; }
+    }
+
+    function contactarSoporte() {
+        const mensaje = encodeURIComponent("Hola, necesito renovar mi licencia de Elena AI para la farmacia: {{ email }}");
+        const telefono = "584120000000"; // Reemplaza con tu número
+        window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank');
     }
 </script>
 </body>
