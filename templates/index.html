@@ -160,29 +160,33 @@
     }
 
     function activarModoGerencia() {
-        document.getElementById('btnAdmin').style.display = 'block';
-        
-        const capsule = document.getElementById('adminCapsule');
-        const statusText = document.getElementById('statusText');
-        const wsLink = document.getElementById('wsLink');
+    document.getElementById('btnAdmin').style.display = 'block';
+    
+    const capsule = document.getElementById('adminCapsule');
+    const statusText = document.getElementById('statusText');
+    const wsLink = document.getElementById('wsLink');
 
-        // Lógica de suscripción elegante
-        if (diasRestantes === 0) {
-            capsule.style.display = "block";
-            capsule.style.background = "rgba(255, 165, 0, 0.15)";
-            capsule.style.border = "1px solid rgba(255, 165, 0, 0.4)";
-            statusText.innerHTML = "LICENCIA: VENCE HOY";
-            statusText.style.color = "#ffb347";
-            wsLink.href = `https://wa.me/${MI_NUMERO}?text=Hola,%20mi%20suscripción%20vence%20hoy%20y%20deseo%20renovarla.`;
-        } else if (diasRestantes === -1) {
-            capsule.style.display = "block";
-            capsule.style.background = "rgba(231, 76, 60, 0.15)";
-            capsule.style.border = "1px solid rgba(231, 76, 60, 0.4)";
-            statusText.innerHTML = "ESTADO: EN MANTENIMIENTO";
-            statusText.style.color = "#ff6b6b";
-            wsLink.href = `https://wa.me/${MI_NUMERO}?text=Hola,%20necesito%20renovación%20de%20soporte%20para%20Elena%20AI.`;
-        }
+    if (diasRestantes === 0) {
+        // CASO: Vence hoy (Tu segunda imagen que ya está perfecta)
+        capsule.style.display = "block";
+        capsule.style.background = "rgba(255, 165, 0, 0.15)";
+        capsule.style.border = "1px solid rgba(255, 165, 0, 0.4)";
+        statusText.innerHTML = "LICENCIA: VENCE HOY";
+        statusText.style.color = "#ffb347";
+        wsLink.href = `https://wa.me/${MI_NUMERO}?text=Hola,%20mi%20suscripción%20vence%20hoy%20y%20deseo%20renovarla.`;
+    } 
+    else if (diasRestantes <= -1) {
+        // CASO: Venció ayer (Día de gracia - Primera imagen)
+        // Cambiamos "Mantenimiento" por algo que invite a la acción inmediata
+        capsule.style.display = "block";
+        capsule.style.background = "rgba(231, 76, 60, 0.2)"; 
+        capsule.style.border = "1px solid rgba(231, 76, 60, 0.5)";
+        statusText.innerHTML = "🚫 ACCESO POR VENCER: RENOVAR"; 
+        statusText.style.color = "#ff6b6b";
+        // Mensaje de WhatsApp más directo
+        wsLink.href = `https://wa.me/${MI_NUMERO}?text=Hola,%20mi%20licencia%20ha%20caducado.%20Solicito%20datos%20para%20pago%20inmediato.`;
     }
+}
 
     function hablar(msj) {
         if (!synth) return;
