@@ -6,94 +6,196 @@
     <title>Gerencia | Elena AI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
     <style>
-        body { background: #0f172a; color: white; font-family: sans-serif; min-height: 100vh; padding: 2rem 1rem; }
-        .admin-container { max-width: 1100px; margin: auto; }
-        .card-stats { background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); padding: 1.5rem; backdrop-filter: blur(10px); height: 100%; }
-        .table-elena { background: rgba(255,255,255,0.03); border-radius: 15px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); margin-top: 1rem; }
-        .table-elena th { background: rgba(0,210,255,0.1); color: #00d2ff; border: none; font-size: 0.8rem; text-transform: uppercase; }
-        .table-elena td { border-color: rgba(255,255,255,0.05); vertical-align: middle; font-size: 0.9rem; }
-        
-        /* ESTILOS NUEVOS PARA TRÁFICO DIARIO */
-        .traffic-chip { 
-            background: rgba(0, 210, 255, 0.1); 
-            border: 1px solid rgba(0, 210, 255, 0.2);
-            border-radius: 10px;
-            padding: 5px 12px;
-            display: inline-block;
-            margin-right: 8px;
-            margin-bottom: 8px;
-            text-align: center;
-            min-width: 90px;
+        :root { 
+            --primary: #00d2ff; 
+            --accent: #a18cd1; 
+            --dark-bg: #0f172a;
+            --glass: rgba(255, 255, 255, 0.03);
         }
-        .traffic-chip .date { font-size: 0.65rem; opacity: 0.6; display: block; }
-        .traffic-chip .count { font-weight: bold; color: #00d2ff; font-size: 1rem; }
-        
-        .input-admin { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 10px; padding: 8px 15px; width: 100%; outline: none; }
-        .badge-active { background: #2ecc71; color: #fff; }
-        .badge-expired { background: #e74c3c; color: #fff; }
-        .btn-add { background: #a18cd1; border: none; font-weight: bold; border-radius: 10px; }
-        .rank-item { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 12px; margin-bottom: 10px; border-left: 4px solid #3b82f6; cursor: pointer; }
+
+        body { 
+            background: var(--dark-bg); 
+            color: white; 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            min-height: 100vh; 
+            padding: 2rem 1rem; 
+        }
+
+        /* Resplandor de fondo */
+        body::before {
+            content: "";
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: var(--primary);
+            filter: blur(180px);
+            opacity: 0.05;
+            z-index: -1;
+            top: 0; left: 0;
+        }
+
+        .admin-container { max-width: 1100px; margin: auto; position: relative; }
+
+        /* Tarjetas estilo Cristal */
+        .card-stats { 
+            background: var(--glass); 
+            border-radius: 25px; 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+            padding: 1.5rem; 
+            backdrop-filter: blur(20px); 
+            height: 100%; 
+            transition: 0.3s;
+        }
+        .card-stats:hover { border-color: rgba(0, 210, 255, 0.2); }
+
+        /* Tablas */
+        .table-elena { 
+            background: rgba(0, 0, 0, 0.2); 
+            border-radius: 20px; 
+            overflow: hidden; 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+            margin-top: 1rem; 
+        }
+        .table-elena th { 
+            background: rgba(0, 210, 255, 0.05); 
+            color: var(--primary); 
+            border: none; 
+            font-size: 0.75rem; 
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 15px;
+        }
+        .table-elena td { border-color: rgba(255, 255, 255, 0.05); vertical-align: middle; padding: 12px 15px; }
+
+        /* Tráfico */
+        .traffic-chip { 
+            background: rgba(0, 210, 255, 0.05); 
+            border: 1px solid rgba(0, 210, 255, 0.1);
+            border-radius: 15px;
+            padding: 10px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+            min-width: 95px;
+        }
+        .traffic-chip .date { font-size: 0.6rem; opacity: 0.5; display: block; text-transform: uppercase; }
+        .traffic-chip .count { font-weight: 800; color: var(--primary); font-size: 1.1rem; }
+
+        /* Inputs */
+        .input-admin { 
+            background: rgba(255, 255, 255, 0.05); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            color: white; 
+            border-radius: 12px; 
+            padding: 10px 15px; 
+            width: 100%; 
+            outline: none; 
+            transition: 0.3s;
+        }
+        .input-admin:focus { border-color: var(--primary); background: rgba(255, 255, 255, 0.08); }
+
+        /* Badges */
+        .badge-active { background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.2); }
+        .badge-expired { background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.2); }
+
+        .btn-add { 
+            background: linear-gradient(45deg, var(--accent), #8e44ad); 
+            border: none; 
+            font-weight: bold; 
+            border-radius: 12px; 
+            transition: 0.3s;
+        }
+        .btn-add:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(161, 140, 209, 0.3); }
+
+        .rank-item { 
+            background: rgba(255, 255, 255, 0.02); 
+            border-radius: 15px; 
+            padding: 15px; 
+            margin-bottom: 12px; 
+            border-left: 4px solid var(--primary); 
+            cursor: pointer; 
+            transition: 0.2s;
+        }
+        .rank-item:hover { background: rgba(255, 255, 255, 0.05); }
         .alert-fail { border-left-color: #ef4444 !important; }
+        
         .animate-pulse { animation: pulse-red 1.5s infinite; color: #ff4d4d; }
-        @keyframes pulse-red { 0% { opacity: 0.6; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0.6; transform: scale(0.9); } }
+        @keyframes pulse-red { 0% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0.6; transform: scale(1); } }
+        
+        .form-select-custom { background: rgba(0,0,0,0.3) !important; color: white !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 10px; }
     </style>
 </head>
 <body>
 
 <div class="admin-container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-user-shield me-2 text-info"></i> PANEL ELENA 2026</h2>
-        <a href="/" class="btn btn-outline-light btn-sm"><i class="fas fa-arrow-left"></i> Volver</a>
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h2 class="fw-800 mb-0"><i class="fas fa-shield-halved me-2 text-info"></i> PANEL GERENCIA</h2>
+            <p class="opacity-40 small mb-0" style="letter-spacing: 2px;">ELENA AI CORPORATIVE</p>
+        </div>
+        <a href="/" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-arrow-left me-2"></i>Escritorio</a>
     </div>
 
-    <div class="row g-3 mb-4 text-center">
-        <div class="col-md-4"><div class="card-stats"><h3 class="text-info">{{ stats.total }}</h3><span class="small opacity-50">CLIENTES REGISTRADOS</span></div></div>
-        <div class="col-md-4"><div class="card-stats text-success"><h3>{{ stats.activos }}</h3><span class="small opacity-50">ACTIVOS</span></div></div>
-        <div class="col-md-4"><div class="card-stats text-danger"><h3>{{ stats.vencidos }}</h3><span class="small opacity-50">VENCIDOS</span></div></div>
+    <div class="row g-4 mb-5 text-center">
+        <div class="col-md-4">
+            <div class="card-stats">
+                <h2 class="fw-800 text-info mb-1">{{ stats.total }}</h2>
+                <span class="small opacity-50 fw-bold">TOTAL CLIENTES</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-stats">
+                <h2 class="fw-800 text-success mb-1">{{ stats.activos }}</h2>
+                <span class="small opacity-50 fw-bold">SUSCRIPCIONES ACTIVAS</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-stats">
+                <h2 class="fw-800 text-danger mb-1">{{ stats.vencidos }}</h2>
+                <span class="small opacity-50 fw-bold">CUENTAS VENCIDAS</span>
+            </div>
+        </div>
     </div>
 
-    <div class="card-stats mb-4">
-        <h5 class="mb-4 text-info"><i class="fas fa-chart-line me-2"></i>Tráfico y Consultas por Día (Última semana)</h5>
+    <div class="card-stats mb-5">
+        <h6 class="mb-4 fw-bold text-info"><i class="fas fa-chart-bar me-2"></i>ACTIVIDAD RECIENTE POR EMPRESA</h6>
         {% for empresa in resumen_uso %}
-        <div class="mb-4 p-3 style="background: rgba(255,255,255,0.02); border-radius: 15px;">
-            <p class="mb-2 fw-bold text-info"><i class="fas fa-pharmacy me-2"></i>{{ empresa.email }}</p>
+        <div class="mb-4 p-3" style="background: rgba(255,255,255,0.01); border-radius: 20px; border: 1px solid rgba(255,255,255,0.03);">
+            <p class="mb-3 fw-bold small"><i class="fas fa-hospital-user me-2 text-primary"></i>{{ empresa.email }}</p>
             <div class="d-flex flex-wrap">
                 {% for dia in empresa.actividad %}
                 <div class="traffic-chip">
-                    <span class="date">{{ dia.fecha }}</span>
-                    <span class="count">{{ dia.cantidad }}</span>
-                    <span style="font-size: 0.6rem; display: block; opacity: 0.5;">CONSULTAS</span>
+                    <span class="date">{{ dia.fecha[5:] }}</span> <span class="count">{{ dia.cantidad }}</span>
                 </div>
                 {% endfor %}
             </div>
         </div>
-        <hr class="opacity-10">
         {% else %}
-        <p class="text-center opacity-50">No hay logs de tráfico suficientes.</p>
+        <p class="text-center opacity-40 py-4">No se registra actividad en los últimos 7 días.</p>
         {% endfor %}
     </div>
 
-    <div class="row mb-4 g-3">
+    <div class="row mb-5 g-4">
         <div class="col-lg-6">
             <div class="card-stats">
-                <h5 class="mb-4 text-info"><i class="fas fa-user-plus me-2"></i>Registrar Nuevo Cliente</h5>
+                <h6 class="mb-4 fw-bold text-info"><i class="fas fa-plus-circle me-2"></i>NUEVA SUSCRIPCIÓN</h6>
                 <form action="/admin/crear" method="POST">
                     <input type="hidden" name="auth_key" value="{{ admin_pass }}">
                     <div class="mb-3">
-                        <label class="small mb-1 opacity-50">Email de la Empresa</label>
-                        <input type="email" name="email" class="input-admin" placeholder="farmacia@ejemplo.com" required>
+                        <input type="email" name="email" class="input-admin" placeholder="Correo Farmacia" required>
                     </div>
                     <div class="mb-3">
-                        <label class="small mb-1 opacity-50">Asignar Clave Maestra</label>
-                        <input type="text" name="password" class="input-admin" placeholder="Ej: Clave2026" required>
+                        <input type="text" name="password" class="input-admin" placeholder="Contraseña de Acceso" required>
                     </div>
                     <div class="row g-2">
                         <div class="col-8">
                             <input type="date" name="vence" class="input-admin" required>
                         </div>
                         <div class="col-4">
-                            <button type="submit" class="btn btn-add w-100 text-white">GUARDAR</button>
+                            <button type="submit" class="btn btn-add w-100 text-white shadow-sm">CREAR</button>
                         </div>
                     </div>
                 </form>
@@ -102,19 +204,15 @@
 
         <div class="col-lg-6">
             <div class="card-stats">
-                <h5 class="mb-3 text-warning"><i class="fas fa-heartbeat me-2"></i>Efectividad B2B</h5>
+                <h6 class="mb-4 fw-bold text-warning"><i class="fas fa-satellite-dish me-2"></i>SALUD DEL SERVICIO</h6>
                 {% for r in ranking %}
                 <div class="rank-item {{ 'alert-fail' if r.alerta }}" onclick="autoFiltrar('{{ r.email }}')">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="small fw-bold">{% if r.alerta %}<i class="fas fa-exclamation-circle animate-pulse me-1"></i>{% endif %}{{ r.email }}</span>
-                        <span class="badge bg-dark">{{ r.count }} movs.</span>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-800">{% if r.alerta %}<i class="fas fa-bolt animate-pulse me-2"></i>{% endif %}{{ r.email }}</span>
+                        <span class="badge rounded-pill bg-dark" style="font-size: 0.6rem;">{{ r.count }} CONSULTAS</span>
                     </div>
-                    <div class="progress" style="height: 5px; background: rgba(255,255,255,0.1);">
-                        <div class="progress-bar {{ 'bg-danger' if r.alerta else 'bg-success' }}" style="width: {{ r.salud }}%"></div>
-                    </div>
-                    <div class="d-flex justify-content-between mt-1" style="font-size: 0.7rem;">
-                        <span class="opacity-50">Éxito en búsquedas</span>
-                        <span class="{{ 'text-danger' if r.alerta else 'text-success' }}">{{ r.salud }}%</span>
+                    <div class="progress" style="height: 4px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                        <div class="progress-bar {{ 'bg-danger' if r.alerta else 'bg-info' }}" style="width: {{ r.salud }}%"></div>
                     </div>
                 </div>
                 {% endfor %}
@@ -122,24 +220,28 @@
         </div>
     </div>
 
-    <div class="card-stats mb-4">
-        <h5 class="mb-3 text-info"><i class="fas fa-users me-2"></i>Gestión de Suscripciones</h5>
+    <div class="card-stats mb-5">
+        <h6 class="mb-4 fw-bold text-info"><i class="fas fa-database me-2"></i>BASE DE DATOS DE CLIENTES</h6>
         <div class="table-responsive table-elena">
             <table class="table table-dark mb-0">
                 <thead>
-                    <tr><th>EMPRESA</th><th>VENCIMIENTO</th><th class="text-center">ESTADO</th><th class="text-end">ACCIÓN</th></tr>
+                    <tr><th>CLIENTE</th><th>VENCE EL</th><th class="text-center">ESTADO</th><th class="text-end">ACCIONES</th></tr>
                 </thead>
                 <tbody>
                     {% for u in usuarios %}
                     <tr>
                         <td class="fw-bold">{{ u.email }}</td>
-                        <td>{{ u.fecha_vencimiento }}</td>
-                        <td class="text-center"><span class="badge {{ 'badge-expired' if u.vencido else 'badge-active' }}">{{ 'VENCIDO' if u.vencido else 'ACTIVO' }}</span></td>
+                        <td class="opacity-75">{{ u.fecha_vencimiento }}</td>
+                        <td class="text-center">
+                            <span class="badge rounded-pill {{ 'badge-expired' if u.vencido else 'badge-active' }} px-3 py-2" style="font-size: 0.65rem;">
+                                {{ 'EXPIRADO' if u.vencido else 'VIGENTE' }}
+                            </span>
+                        </td>
                         <td class="text-end">
-                            <form action="/admin/eliminar" method="POST" onsubmit="return confirm('¿Eliminar?');">
+                            <form action="/admin/eliminar" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta cuenta?');" style="display:inline;">
                                 <input type="hidden" name="auth_key" value="{{ admin_pass }}">
                                 <input type="hidden" name="email" value="{{ u.email }}">
-                                <button type="submit" class="btn btn-link text-danger p-0"><i class="fas fa-trash-alt"></i></button>
+                                <button type="submit" class="btn btn-link text-danger p-0 px-2"><i class="fas fa-user-minus"></i></button>
                             </form>
                         </td>
                     </tr>
@@ -150,23 +252,23 @@
     </div>
 
     <div class="card-stats">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="m-0 text-warning"><i class="fas fa-bolt me-2"></i>Historial Detallado</h5>
-            <select id="filtroEmpresa" class="form-select bg-dark text-white border-0 w-50" onchange="filtrarLogs()">
-                <option value="todos">Todas las empresas</option>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h6 class="m-0 fw-bold text-info"><i class="fas fa-list-ul me-2"></i>HISTORIAL DE ACTIVIDAD</h6>
+            <select id="filtroEmpresa" class="form-select form-select-sm w-auto form-select-custom" onchange="filtrarLogs()">
+                <option value="todos">Todas las farmacias</option>
                 {% for u in usuarios %}<option value="{{ u.email }}">{{ u.email }}</option>{% endfor %}
             </select>
         </div>
         <div class="table-responsive table-elena">
             <table class="table table-dark mb-0">
-                <thead><tr><th>EMPRESA</th><th>CONSULTA</th><th>ESTADO</th><th>FECHA</th></tr></thead>
+                <thead><tr><th>EMPRESA</th><th>ACCIÓN DEL USUARIO</th><th>ESTADO</th><th>FECHA</th></tr></thead>
                 <tbody id="tablaBody">
                     {% for log in logs %}
                     <tr class="log-row" data-email="{{ log.email }}">
-                        <td class="fw-bold text-info small">{{ log.email }}</td>
-                        <td><span class="small opacity-75">"{{ log.detalle }}"</span></td>
-                        <td>{% if log.exito %}<span class="text-success"><i class="fas fa-check"></i></span>{% else %}<span class="text-danger"><i class="fas fa-times"></i></span>{% endif %}</td>
-                        <td class="small opacity-50">{{ log.fecha.split('T')[0] }}</td>
+                        <td class="text-info small fw-bold">{{ log.email }}</td>
+                        <td class="small opacity-75">"{{ log.detalle }}"</td>
+                        <td>{% if log.exito %}<i class="fas fa-circle-check text-success"></i>{% else %}<i class="fas fa-circle-xmark text-danger"></i>{% endif %}</td>
+                        <td class="small opacity-40">{{ log.fecha.split('T')[0] }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
