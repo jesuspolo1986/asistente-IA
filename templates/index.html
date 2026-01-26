@@ -2,313 +2,226 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Elena AI | Farma Asistencia</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elena AI - Farmacia</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
-    
     <style>
-        :root { 
-            --primary: #00d2ff; 
-            --secondary: #3a7bd5; 
-            --accent: #a18cd1;
-            --dark-bg: #0f172a;
-            --glass: rgba(255, 255, 255, 0.03); 
-        }
-
+        :root { --primary: #00d2ff; --bg: #0f172a; --card: rgba(30, 41, 59, 0.7); }
+        
         body { 
-            background: var(--dark-bg); 
+            background: #0f172a; 
             color: white; 
             height: 100vh; 
             display: flex; 
             align-items: center; 
             justify-content: center; 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            transition: 0.5s; 
-            overflow: hidden; 
-            margin: 0; 
-            position: relative;
+            font-family: 'Segoe UI', sans-serif; 
+            margin: 0;
+            overflow: hidden;
+            position: relative; /* Para que la cápsula flote respecto al body */
         }
 
-        /* Resplandor de fondo similar al Login */
-        body::before {
-            content: "";
-            position: absolute;
-            width: 400px;
-            height: 400px;
-            background: var(--primary);
-            filter: blur(150px);
-            opacity: 0.1;
-            z-index: -1;
+        /* CAPSULA DE CRISTAL PROFESIONAL (Solo Gerencia) */
+        /* Eliminamos cualquier banner rojo antiguo y usamos esta cápsula flotante */
+        .admin-status-capsule {
+            display: none; 
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999; /* Asegura que esté por encima de todo sin mover nada */
+            width: auto;
+            min-width: 320px;
+            border-radius: 50px;
+            padding: 8px 20px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            animation: slideDown 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        .admin-mode-bg { background: radial-gradient(circle at top right, #2d1b4e, #0f172a) !important; }
-        
+        @keyframes slideDown { from { top: -80px; opacity: 0; } to { top: 20px; opacity: 1; } }
+
         .card-elena { 
-            background: var(--glass); 
-            border-radius: 40px; 
-            padding: 2.2rem; 
-            width: 400px; 
-            text-align: center; 
-            backdrop-filter: blur(25px); 
-            border: 1px solid rgba(255, 255, 255, 0.05); 
-            box-shadow: 0 25px 50px rgba(0,0,0,0.4); 
-            position: relative; 
+            background: var(--card); border-radius: 40px; padding: 2.5rem; width: 420px; text-align: center; 
+            border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(20px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5); position: relative;
         }
-        
-        /* ROSTRO DE ELENA */
-        .aura-container { width: 140px; height: 140px; margin: 0 auto 1.2rem; position: relative; cursor: pointer; }
-        .aura-video { 
-            width: 140px; height: 140px; border-radius: 50%; border: 2px solid var(--primary); 
-            overflow: hidden; position: relative; z-index: 2; background: #000;
-            box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); transition: 0.4s;
+
+        .aura { 
+            width: 160px; height: 160px; margin: 0 auto 1.5rem; border-radius: 50%; 
+            border: 4px solid var(--primary); position: relative; overflow: hidden;
+            box-shadow: 0 0 25px rgba(0, 210, 255, 0.4); cursor: pointer; background: #000;
         }
+
         #elenaVideo { width: 100%; height: 100%; object-fit: cover; }
 
-        .listening-active .aura-video { 
-            animation: pulse-glow-video 1.2s infinite; 
-            border-color: #fff;
-            box-shadow: 0 0 35px var(--primary), 0 0 10px #fff;
-            transform: scale(1.05);
+        .hablando { animation: pulse-border 1s infinite; border-color: #fff !important; }
+
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 20px var(--primary); }
+            50% { box-shadow: 0 0 50px var(--primary), 0 0 20px #fff; }
+            100% { box-shadow: 0 0 20px var(--primary); }
         }
 
-        @keyframes pulse-glow-video { 
-            0% { box-shadow: 0 0 20px var(--primary); } 
-            50% { box-shadow: 0 0 45px var(--primary), 0 0 20px #fff; } 
-            100% { box-shadow: 0 0 20px var(--primary); } 
+        .res-box { min-height: 80px; margin-bottom: 1.5rem; color: #cbd5e1; font-size: 0.95rem; line-height: 1.4; }
+        
+        .input-elena { 
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
+            border-radius: 20px; color: white; padding: 12px; width: 100%; text-align: center; outline: none; 
         }
 
-        /* TARJETA DE PRECIOS ARMONIZADA */
-        .price-card { 
-            background: rgba(255,255,255,0.03); 
-            border-radius: 25px; 
-            padding: 20px 15px; 
-            margin-bottom: 20px; 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-            display: none; 
-            animation: bounceIn 0.6s ease; 
+        .btn-admin-action { 
+            background: rgba(0, 210, 255, 0.1); color: var(--primary); border: 1px solid var(--primary);
+            border-radius: 15px; padding: 10px; font-weight: bold; margin-top: 15px; display: none; width: 100%; 
         }
         
-        .val-bs { font-size: 1.8rem; font-weight: 800; color: white; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
-        .val-usd { font-size: 1.4rem; font-weight: 600; color: #4ade80; }
-        
-        /* INPUT ARMONIZADO CON EL LOGIN */
-        .input-group-elena { 
-            background: rgba(255,255,255,0.05); 
-            border-radius: 15px; 
-            border: 1px solid rgba(255,255,255,0.1); 
-            padding: 5px; 
-            transition: 0.3s;
+        .btn-whatsapp {
+            background: #25d366; color: white; border-radius: 20px; padding: 4px 15px;
+            text-decoration: none; font-weight: 800; font-size: 0.7rem; transition: 0.3s;
+            text-transform: uppercase;
         }
-        .input-group-elena:focus-within {
-            border-color: var(--primary);
-            background: rgba(255,255,255,0.08);
-        }
-        .input-elena { background: transparent; border: none; color: white; padding: 10px 20px; width: 100%; outline: none; text-align: center; font-size: 0.9rem; }
-        
-        #tasaInput { background: transparent; border: none; color: var(--primary); width: 60px; font-weight: 800; text-align: center; outline: none; }
-        #tasaInput:not([readonly]) { border-bottom: 1px solid var(--primary); }
-        
-        .badge-vendedor { background: rgba(0, 210, 255, 0.1); color: var(--primary); border: 1px solid rgba(0, 210, 255, 0.2); }
-        .hover-logout { opacity: 0.5; transition: 0.3s; color: white; }
-        .hover-logout:hover { opacity: 1; color: #ff4b2b; }
+        .btn-whatsapp:hover { background: #128c7e; transform: scale(1.05); }
 
-        @keyframes bounceIn {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
-        }
+        /* Estilo para los textos superiores (Tasa, etc) */
+        .top-info { position: absolute; top: 25px; left: 30px; display: flex; align-items: center; gap: 15px; }
+        .logout-btn { position: absolute; top: 25px; right: 30px; color: #cbd5e1; cursor: pointer; font-size: 1.2rem; }
     </style>
 </head>
-<body id="body">
+<body>
 
-{% if dias_restantes == 0 %}
-    <div class="alert alert-warning text-center fw-bold m-0 border-0 rounded-0 w-100 position-absolute top-0" style="z-index: 1000; background: #f1c40f; color: #000;">
-        ⚠️ TU SUSCRIPCIÓN VENCE HOY.
+<div id="adminCapsule" class="admin-status-capsule">
+    <div class="d-flex align-items-center justify-content-between">
+        <div id="statusText" class="small fw-bold me-3"></div>
+        <a id="wsLink" href="#" target="_blank" class="btn-whatsapp">
+            <i class="fab fa-whatsapp me-1"></i> RECARGAR
+        </a>
     </div>
-{% elif dias_restantes == -1 %}
-    <div class="alert alert-danger text-center fw-bold m-0 border-0 rounded-0 w-100 position-absolute top-0" style="z-index: 1000; background: #e74c3c; color: #fff;">
-        🚫 ÚLTIMO DÍA DE GRACIA (Venció ayer).
+</div>
+
+<div class="card-elena">
+    <div class="top-info">
+        <span class="small text-muted fw-bold">TASA:</span>
+        <span class="fw-bold" style="color: var(--primary);">{{ tasa }}</span>
     </div>
-{% endif %}
+    
+    <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i></a>
 
-    <div class="card-elena">
-        <div class="d-flex justify-content-between mb-4 align-items-center">
-            <div class="small opacity-75 fw-bold">TASA: <input type="number" id="tasaInput" value="{{ tasa }}" readonly onchange="sincronizarTasa()"></div>
-            <div class="d-flex gap-3 align-items-center">
-                <div id="labelModo" class="badge rounded-pill badge-vendedor px-3 py-2 fw-bold" onclick="desactivarAdmin()" style="cursor:pointer">VENDEDOR</div>
-                <a href="/logout" class="hover-logout" title="Cerrar Sesión">
-                    <i class="fas fa-power-off"></i>
-                </a>
-            </div>
-        </div>
-
-        <div class="aura-container" id="auraCircle" onclick="escuchar()">
-            <div class="aura-video">
-                <video id="elenaVideo" preload="auto" loop muted playsinline autoplay>
-                    <source src="/static/img/Una mujer estadounidense profe.mp4" type="video/mp4">
-                </video>
-            </div>
-        </div>
-
-        <h3 class="fw-800 mb-0" style="letter-spacing: 1px;">ELENA AI</h3>
-        <p class="opacity-40 mb-3" style="font-size: 0.6rem; letter-spacing: 3px; text-transform: uppercase;">Farma Asistencia</p>
-
-        <div id="priceDisplay" class="price-card">
-            <div id="productTitle" class="fw-bold text-info mb-3 text-uppercase" style="font-size: 0.8rem; letter-spacing: 1px;"></div>
-            <div class="row g-0 align-items-center">
-                <div class="col-6 border-end border-white border-opacity-10">
-                    <span id="valBs" class="val-bs"></span><br>
-                    <span class="small opacity-50" style="font-size: 0.5rem; letter-spacing: 1px;">BS.D</span>
-                </div>
-                <div class="col-6">
-                    <span id="valUsd" class="val-usd"></span><br>
-                    <span class="small opacity-50" style="font-size: 0.5rem; letter-spacing: 1px;">USD $</span>
-                </div>
-            </div>
-        </div>
-
-        <div id="textoElena" class="mb-3 opacity-50 small" style="min-height: 40px; font-weight: 300;">Elena a su servicio...</div>
-        
-        <div class="input-group-elena">
-            <input type="text" id="userInput" class="input-elena" placeholder="Escribe tu consulta..." onkeypress="if(event.key==='Enter') enviar()">
-        </div>
-
-        <div id="adminTools" style="display: none;" class="mt-3">
-            <button class="btn btn-sm btn-outline-warning w-100 fw-bold border-0" style="background: rgba(255, 193, 7, 0.1);" onclick="document.getElementById('fileIn').click()">
-                <i class="fas fa-upload me-2"></i>ACTUALIZAR INVENTARIO
-            </button>
-            <input type="file" id="fileIn" hidden onchange="subirExcel()">
-        </div>
+    <div class="aura" id="auraContainer" onclick="escuchar()">
+        <video id="elenaVideo" autoplay loop muted playsinline>
+            <source src="/static/img/Una mujer estadounidense profe.mp4" type="video/mp4">
+        </video>
     </div>
+    
+    <h3 class="fw-bold mb-0">ELENA AI</h3>
+    <p class="small text-muted mb-3">{{ email.split('@')[0] | upper }}</p>
+    
+    <div class="res-box" id="textoElena">Haz clic en mi rostro para consultar un precio.</div>
+    
+    <input type="text" id="userInput" class="input-elena" placeholder="Escribe tu consulta..." onkeypress="if(event.key==='Enter') enviar()">
+    
+    <input type="file" id="fileInput" style="display: none;" onchange="subirArchivo()">
+    <button id="btnAdmin" class="btn-admin-action" onclick="document.getElementById('fileInput').click()">
+        <i class="fas fa-upload me-2"></i> ACTUALIZAR INVENTARIO
+    </button>
+</div>
 
 <script>
-    // Se mantiene toda tu lógica de script intacta
-    let modoAdmin = false;
     const synth = window.speechSynthesis;
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const video = document.getElementById('elenaVideo');
-    const aura = document.getElementById('auraCircle');
+    const aura = document.getElementById('auraContainer');
+    const MI_NUMERO = "584128598727";
 
-    document.body.addEventListener('click', () => { if(video.paused) video.play(); }, {once: true});
+    // Variables de suscripción
+    const diasRestantes = {{ dias_restantes }}; 
+
+    document.body.addEventListener('click', () => { if (video.paused) video.play(); }, { once: true });
+
+    async function enviar() {
+        const input = document.getElementById('userInput');
+        const query = input.value.trim();
+        if(!query) return;
+
+        const res = await fetch('/preguntar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ pregunta: query, modo_admin: document.getElementById('btnAdmin').style.display === 'block' })
+        });
+        const data = await res.json();
+        
+        document.getElementById('textoElena').innerText = data.respuesta;
+        hablar(data.respuesta);
+
+        if(data.modo_admin === true) {
+            activarModoGerencia();
+        }
+        input.value = "";
+    }
+
+    function activarModoGerencia() {
+        document.getElementById('btnAdmin').style.display = 'block';
+        
+        const capsule = document.getElementById('adminCapsule');
+        const statusText = document.getElementById('statusText');
+        const wsLink = document.getElementById('wsLink');
+
+        // Lógica de suscripción elegante
+        if (diasRestantes === 0) {
+            capsule.style.display = "block";
+            capsule.style.background = "rgba(255, 165, 0, 0.15)";
+            capsule.style.border = "1px solid rgba(255, 165, 0, 0.4)";
+            statusText.innerHTML = "LICENCIA: VENCE HOY";
+            statusText.style.color = "#ffb347";
+            wsLink.href = `https://wa.me/${MI_NUMERO}?text=Hola,%20mi%20suscripción%20vence%20hoy%20y%20deseo%20renovarla.`;
+        } else if (diasRestantes === -1) {
+            capsule.style.display = "block";
+            capsule.style.background = "rgba(231, 76, 60, 0.15)";
+            capsule.style.border = "1px solid rgba(231, 76, 60, 0.4)";
+            statusText.innerHTML = "ESTADO: EN MANTENIMIENTO";
+            statusText.style.color = "#ff6b6b";
+            wsLink.href = `https://wa.me/${MI_NUMERO}?text=Hola,%20necesito%20renovación%20de%20soporte%20para%20Elena%20AI.`;
+        }
+    }
 
     function hablar(msj) {
-        if(!synth) return;
+        if (!synth) return;
         synth.cancel();
-        const u = new SpeechSynthesisUtterance(msj.replace(/[📊|/]/g, ''));
-        u.lang = 'es-MX'; u.rate = 1.1;
-        u.onstart = () => {
-            aura.classList.add('listening-active');
-            video.playbackRate = 1.2;
-        };
-        u.onend = () => {
-            aura.classList.remove('listening-active');
-            video.playbackRate = 1.0;
-        };
+        const u = new SpeechSynthesisUtterance(msj);
+        u.lang = 'es-MX';
+        u.onstart = () => aura.classList.add('hablando');
+        u.onend = () => aura.classList.remove('hablando');
         synth.speak(u);
     }
 
-    async function sincronizarTasa() {
-        const nuevaTasa = document.getElementById('tasaInput').value;
-        const res = await fetch('/preguntar', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ nueva_tasa: nuevaTasa })
-        });
+    async function subirArchivo() {
+        const file = document.getElementById('fileInput').files[0];
+        const formData = new FormData();
+        formData.append('archivo', file);
+        document.getElementById('textoElena').innerText = "Procesando inventario...";
+        const res = await fetch('/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if(data.success) {
-            hablar("Tasa actualizada");
-            document.getElementById('textoElena').innerText = "Tasa: " + nuevaTasa;
+            document.getElementById('textoElena').innerText = `Éxito: ${data.productos} productos cargados.`;
+            hablar("Inventario actualizado correctamente");
         }
     }
 
     function escuchar() {
-        if(!SpeechRecognition) return alert("Navegador no soportado");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if(!SpeechRecognition) return;
         const rec = new SpeechRecognition();
         rec.lang = 'es-VE';
-        rec.onstart = () => {
-            aura.classList.add('listening-active');
-            document.getElementById('textoElena').innerText = "Escuchando...";
+        rec.onstart = () => { 
+            aura.classList.add('hablando');
+            document.getElementById('textoElena').innerText = "Elena te escucha..."; 
         };
-        rec.onresult = (e) => { 
-            document.getElementById('userInput').value = e.results[0][0].transcript; 
-            enviar(); 
+        rec.onresult = (e) => {
+            document.getElementById('userInput').value = e.results[0][0].transcript;
+            enviar();
         };
-        rec.onend = () => aura.classList.remove('listening-active');
+        rec.onend = () => aura.classList.remove('hablando');
         rec.start();
-    }
-
-    async function enviar() {
-        const queryInput = document.getElementById('userInput');
-        const query = queryInput.value.toLowerCase().trim();
-        if(!query) return;
-
-        const res = await fetch('/preguntar', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ pregunta: query, modo_admin: modoAdmin })
-        });
-        const data = await res.json();
-        
-        if(data.modo_admin) {
-            activarAdmin();
-            hablar("Modo gerencia activado");
-        } else {
-            const texto = data.respuesta;
-            document.getElementById('textoElena').innerText = texto;
-
-            const regexBs = /(\d+[\d.,\s]*con\s*\d+|\d+[\d.,]*)\s*(?=bolívares|bs)/i;
-            const regexUsd = /(\d+[\d.,\s]*con\s*\d+|\d+[\d.,]*)\s*(?=dólares|usd|\$)/i;
-
-            const mBs = texto.match(regexBs);
-            const mUsd = texto.match(regexUsd);
-
-            if(mBs && mUsd) {
-                let nombre = texto.split(/cuesta|vale|son/i)[0].replace(/^(el|la|un|una)\s+/i, "").trim();
-                document.getElementById('productTitle').innerText = nombre;
-                
-                const fBs = mBs[0].replace(/\s*con\s*/g, ",").replace(".", ",").trim();
-                const fUsd = mUsd[0].replace(/\s*con\s*/g, ",").replace(".", ",").trim();
-
-                document.getElementById('valBs').innerText = fBs;
-                document.getElementById('valUsd').innerText = fUsd + " $";
-                document.getElementById('priceDisplay').style.display = "block";
-            } else {
-                document.getElementById('priceDisplay').style.display = "none";
-            }
-            hablar(texto);
-        }
-        queryInput.value = "";
-    }
-
-    function activarAdmin() {
-        modoAdmin = true;
-        document.getElementById('body').classList.add('admin-mode-bg');
-        document.getElementById('labelModo').innerText = "MODO GERENCIA";
-        document.getElementById('labelModo').className = "badge rounded-pill bg-warning text-dark px-3 py-2 fw-bold";
-        document.getElementById('adminTools').style.display = "block";
-        document.getElementById('tasaInput').readOnly = false;
-    }
-
-    function desactivarAdmin() {
-        if(!modoAdmin) return;
-        modoAdmin = false;
-        document.getElementById('body').classList.remove('admin-mode-bg');
-        document.getElementById('labelModo').innerText = "VENDEDOR";
-        document.getElementById('labelModo').className = "badge rounded-pill badge-vendedor px-3 py-2 fw-bold";
-        document.getElementById('adminTools').style.display = "none";
-        document.getElementById('tasaInput').readOnly = true;
-        hablar("Modo vendedor activado");
-    }
-
-    async function subirExcel() {
-        const file = document.getElementById('fileIn').files[0];
-        const formData = new FormData();
-        formData.append('archivo', file);
-        document.getElementById('textoElena').innerText = "Actualizando...";
-        const res = await fetch('/upload', { method: 'POST', body: formData });
-        const data = await res.json();
-        if(data.success) {
-            hablar(data.mensaje);
-            document.getElementById('textoElena').innerText = data.mensaje;
-        }
     }
 </script>
 </body>
