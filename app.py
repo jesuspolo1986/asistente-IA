@@ -116,22 +116,32 @@ def preguntar():
     t_inicio = time.time()
     data = request.get_json()
     usuario_email = session.get('usuario')
-    if not usuario_email: return jsonify({"respuesta": "Sesión expirada"}), 401
+    if not usuario_email: 
+        return jsonify({"respuesta": "Sesión expirada"}), 401
     
     ip_cliente = request.headers.get('X-Forwarded-For', request.remote_addr)
     es_modo_admin = data.get('modo_admin', False)
 
     # 1. Manejo de tasa por empresa
     datos_tasa = get_tasa_usuario(usuario_email)
+    
+    # Lógica para actualización manual de tasa (vía input o voz)
     if data.get('nueva_tasa'):
         try:
-            datos_tasa["tasa"] = float(data.get('nueva_tasa'))
+            nueva_tasa_val = float(str(data.get('nueva_tasa')).replace(",", "."))
+            datos_tasa["tasa"] = nueva_tasa_val
             datos_tasa["manual"] = True
-            return jsonify({"respuesta": "Tasa actualizada", "tasa": datos_tasa["tasa"]})
-        except: return jsonify({"respuesta": "Error en tasa"})
+            return jsonify({
+                "respuesta": f"Tasa actualizada a {nueva_tasa_val}", 
+                "tasa": nueva_tasa_val,
+                "exito_tasa": True
+            })
+        except: 
+            return jsonify({"respuesta": "Error: El formato de tasa no es válido."})
 
     pregunta_raw = data.get('pregunta', '').lower().strip()
     
+    # Comandos especiales
     if "activar modo gerencia" in pregunta_raw:
         return jsonify({"respuesta": "Modo gerencia activo.", "modo_admin": True})
 
@@ -154,7 +164,7 @@ def preguntar():
 
     busqueda_exitosa = False
     try:
-        # 4. Búsqueda Difusa
+        # 4. Búsqueda Difusa (Fuzzy Match)
         match = process.extractOne(
             pregunta_limpia, 
             df['producto'].astype(str).tolist(), 
@@ -168,35 +178,48 @@ def preguntar():
             p_usd = float(fila['precio_usd'])
             p_bs = p_usd * datos_tasa["tasa"]
             
-            # --- AJUSTE DE PRONUNCIACIÓN MEJORADO ---
-            
-            # Para Bolívares: Quitamos puntos de mil y usamos "con" para decimales
-            # Ejemplo: 1345.56 -> "1345 con 56"
-            texto_bs = f"{p_bs:.2f}".replace(".", " con ")
-            
-            # Para Dólares: Igual, usamos "con"
-            texto_usd = f"{p_usd:.2f}".replace(".00", "").replace(".", " con ")
+            # --- FORMATEO PARA LAS CAJAS VISUALES (Ej: 1.250,50) ---
+            val_bs_visual = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            val_usd_visual = f"{p_usd:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-            # Limpiamos el nombre del producto para que diga "miligramos" o "mililitros"
+            # --- AJUSTE DE PRONUNCIACIÓN PARA EL AUDIO (Ej: 1250 con 50) ---
+            texto_bs_audio = f"{p_bs:.2f}".replace(".", " con ")
+            texto_usd_audio = f"{p_usd:.2f}".replace(".00", "").replace(".", " con ")
+
+            # Limpiamos términos técnicos para que Elena los pronuncie bien
             nombre_audio = nombre_p.lower()
-            nombre_audio = nombre_audio.replace(" mg", " miligramos").replace("mg", " miligramos")
-            nombre_audio = nombre_audio.replace(" ml", " mililitros").replace("ml", " mililitros")
-            nombre_audio = nombre_audio.replace(" g ", " gramos ").replace(" gr ", " gramos ")
+            reemplazos = {" mg": " miligramos", "mg": " miligramos", " ml": " mililitros", "ml": " mililitros", " g ": " gramos ", " gr ": " gramos "}
+            for k, v in reemplazos.items():
+                nombre_audio = nombre_audio.replace(k, v)
 
-            respuesta_final = f"El {nombre_audio} cuesta {texto_bs} Bolívares, que son {texto_usd} Dólares."
+            respuesta_voz = f"El {nombre_audio} cuesta {texto_bs_audio} Bolívares."
             
-            # El stock SOLO se muestra si el modo_admin está activo en la sesión
+            # El stock SOLO se muestra y se dice si es modo_admin
+            stock_val = "0"
             if es_modo_admin:
-                stock = fila.get('stock', '0')
-                respuesta_final += f" El stock actual es de {stock} unidades."
+                stock_val = str(fila.get('stock', '0'))
+                respuesta_voz += f" El stock actual es de {stock_val} unidades."
             
             busqueda_exitosa = True
-        else:
-            respuesta_final = f"Lo siento, no encontré '{pregunta_limpia}' en tu inventario."
-    except Exception as e:
-        respuesta_final = f"Elena: Error en búsqueda ({str(e)})"
+            
+            # RETORNO COMPLETO PARA EL FRONT-END
+            return jsonify({
+                "exito": True,
+                "producto_nombre": nombre_p,
+                "p_bs": val_bs_visual,
+                "p_usd": val_usd_visual,
+                "respuesta": respuesta_voz,
+                "modo_admin": es_modo_admin
+            })
 
-    # 5. LOGS EN SUPABASE
+        else:
+            respuesta_final = f"Lo siento, no encontré '{pregunta_limpia}' en el inventario."
+            return jsonify({"exito": False, "respuesta": respuesta_final})
+
+    except Exception as e:
+        return jsonify({"exito": False, "respuesta": f"Elena: Error en búsqueda ({str(e)})"})
+
+    # 5. LOGS (Se ejecutan si no hubo retorno previo)
     try:
         supabase.table("logs_actividad").insert({
             "email": usuario_email,
@@ -206,8 +229,6 @@ def preguntar():
             "exito": busqueda_exitosa
         }).execute()
     except: pass
-
-    return jsonify({"respuesta": respuesta_final})
 @app.route('/upload', methods=['POST'])
 def upload_file():
     usuario_email = session.get('usuario')
