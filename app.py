@@ -119,6 +119,8 @@ def preguntar():
     if not usuario_email: 
         return jsonify({"respuesta": "Sesión expirada"}), 401
     
+    # --- CAPTURA DE IDENTIFICADOR DE EQUIPO ---
+    equipo_id = data.get('equipo_id', 'DESCONOCIDO')
     ip_cliente = request.headers.get('X-Forwarded-For', request.remote_addr)
     es_modo_admin = data.get('modo_admin', False)
 
@@ -131,6 +133,19 @@ def preguntar():
             nueva_tasa_val = float(str(data.get('nueva_tasa')).replace(",", "."))
             datos_tasa["tasa"] = nueva_tasa_val
             datos_tasa["manual"] = True
+            
+            # Registro de log para cambio de tasa con equipo_id
+            try:
+                supabase.table("logs_actividad").insert({
+                    "email": usuario_email,
+                    "accion": "CAMBIO_TASA",
+                    "detalle": f"Nueva tasa: {nueva_tasa_val}",
+                    "ip_address": ip_cliente,
+                    "equipo_id": equipo_id, # <--- INTEGRADO
+                    "exito": True
+                }).execute()
+            except: pass
+
             return jsonify({
                 "respuesta": f"Tasa actualizada a {nueva_tasa_val}", 
                 "tasa": nueva_tasa_val,
@@ -178,15 +193,12 @@ def preguntar():
             p_usd = float(fila['precio_usd'])
             p_bs = p_usd * datos_tasa["tasa"]
             
-            # --- FORMATEO PARA LAS CAJAS VISUALES (Ej: 1.250,50) ---
             val_bs_visual = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             val_usd_visual = f"{p_usd:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-            # --- AJUSTE DE PRONUNCIACIÓN PARA EL AUDIO (Ej: 1250 con 50) ---
             texto_bs_audio = f"{p_bs:.2f}".replace(".", " con ")
             texto_usd_audio = f"{p_usd:.2f}".replace(".00", "").replace(".", " con ")
 
-            # Limpiamos términos técnicos para que Elena los pronuncie bien
             nombre_audio = nombre_p.lower()
             reemplazos = {" mg": " miligramos", "mg": " miligramos", " ml": " mililitros", "ml": " mililitros", " g ": " gramos ", " gr ": " gramos "}
             for k, v in reemplazos.items():
@@ -194,7 +206,6 @@ def preguntar():
 
             respuesta_voz = f"El {nombre_audio} cuesta {texto_bs_audio} Bolívares."
             
-            # El stock SOLO se muestra y se dice si es modo_admin
             stock_val = "0"
             if es_modo_admin:
                 stock_val = str(fila.get('stock', '0'))
@@ -202,7 +213,18 @@ def preguntar():
             
             busqueda_exitosa = True
             
-            # RETORNO COMPLETO PARA EL FRONT-END
+            # Registro de log antes del retorno exitoso
+            try:
+                supabase.table("logs_actividad").insert({
+                    "email": usuario_email,
+                    "accion": "CONSULTA_PRECIO",
+                    "detalle": pregunta_raw,
+                    "ip_address": ip_cliente,
+                    "equipo_id": equipo_id, # <--- INTEGRADO
+                    "exito": True
+                }).execute()
+            except: pass
+
             return jsonify({
                 "exito": True,
                 "producto_nombre": nombre_p,
@@ -214,21 +236,23 @@ def preguntar():
 
         else:
             respuesta_final = f"Lo siento, no encontré '{pregunta_limpia}' en el inventario."
+            
+            # Log de búsqueda fallida
+            try:
+                supabase.table("logs_actividad").insert({
+                    "email": usuario_email,
+                    "accion": "CONSULTA_PRECIO",
+                    "detalle": pregunta_raw,
+                    "ip_address": ip_cliente,
+                    "equipo_id": equipo_id, # <--- INTEGRADO
+                    "exito": False
+                }).execute()
+            except: pass
+
             return jsonify({"exito": False, "respuesta": respuesta_final})
 
     except Exception as e:
         return jsonify({"exito": False, "respuesta": f"Elena: Error en búsqueda ({str(e)})"})
-
-    # 5. LOGS (Se ejecutan si no hubo retorno previo)
-    try:
-        supabase.table("logs_actividad").insert({
-            "email": usuario_email,
-            "accion": "CONSULTA_PRECIO",
-            "detalle": pregunta_raw,
-            "ip_address": ip_cliente,
-            "exito": busqueda_exitosa
-        }).execute()
-    except: pass
 @app.route('/upload', methods=['POST'])
 def upload_file():
     usuario_email = session.get('usuario')

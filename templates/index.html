@@ -103,7 +103,15 @@
     const diasRestantes = {{ dias_restantes }};
     let modoGerencia = false;
 
-    // Precarga de voces para evitar lag en móviles
+    // --- NUEVO: Identificación de Equipo Único ---
+    let equipoID = localStorage.getItem('elena_equipo_id');
+    if (!equipoID) {
+        equipoID = 'EQ-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+        localStorage.setItem('elena_equipo_id', equipoID);
+    }
+    console.log("Identificador de este equipo:", equipoID);
+    // ---------------------------------------------
+
     let voces = [];
     function cargarVoces() { voces = synth.getVoices(); }
     if (speechSynthesis.onvoiceschanged !== undefined) { speechSynthesis.onvoiceschanged = cargarVoces; }
@@ -113,13 +121,18 @@
         const query = input.value.trim();
         if(!query) return;
 
+        // Lógica de actualización de tasa
         if(query.toLowerCase().startsWith("tasa ")) {
             const nuevaTasa = query.split(" ")[1];
             try {
                 const resT = await fetch('/preguntar', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ nueva_tasa: nuevaTasa, modo_admin: modoGerencia })
+                    body: JSON.stringify({ 
+                        nueva_tasa: nuevaTasa, 
+                        modo_admin: modoGerencia,
+                        equipo_id: equipoID // Identificador en cambio de tasa
+                    })
                 });
                 const dataT = await resT.json();
                 if(dataT.tasa) {
@@ -132,10 +145,15 @@
             return;
         }
 
+        // Lógica de consulta normal (con identificación de equipo)
         const res = await fetch('/preguntar', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ pregunta: query, modo_admin: modoGerencia })
+            body: JSON.stringify({ 
+                pregunta: query, 
+                modo_admin: modoGerencia,
+                equipo_id: equipoID // Identificador en consulta normal
+            })
         });
         const data = await res.json();
         
@@ -162,7 +180,6 @@
         document.getElementById('badgeAdmin').style.display = 'inline-block';
         
         const capsule = document.getElementById('adminCapsule');
-        // Grace period logic: on day 0 or less, show banner
         if (diasRestantes <= 0) {
             capsule.style.display = "block";
             const statusText = document.getElementById('statusText');
@@ -196,7 +213,7 @@
         synth.cancel(); 
         const u = new SpeechSynthesisUtterance(msj);
         u.lang = 'es-MX';
-        u.rate = 0.9; // Un poco más natural
+        u.rate = 0.9;
         u.onstart = () => aura.classList.add('hablando');
         u.onend = () => aura.classList.remove('hablando');
         synth.speak(u);
@@ -240,7 +257,7 @@
 
     function contactarSoporte() {
         const mensaje = encodeURIComponent("Hola, necesito renovar mi licencia de Elena AI para la farmacia: {{ email }}");
-        const telefono = "584128598727"; // Reemplaza con tu número
+        const telefono = "584128598727"; 
         window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank');
     }
 </script>
