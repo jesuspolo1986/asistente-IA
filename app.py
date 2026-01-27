@@ -342,78 +342,80 @@ def admin_panel():
         return "No autorizado", 403
     
     try:
-        # 1. Obtener usuarios y calcular estado de vencimiento
-        # 1. Obtener usuarios y calcular estado de vencimiento (CON DÍA DE GRACIA)
+        # 1. Obtener usuarios y estado de vencimiento
         usuarios_res = supabase.table("suscripciones").select("*").execute()
         usuarios = usuarios_res.data if usuarios_res.data else []
         hoy = datetime.now().date()
         
-        from datetime import timedelta # Asegúrate de tener esta importación arriba
-
         for u in usuarios:
             try:
                 vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
-                
-                # REGLA: Solo está vencido si HOY es mayor que (Fecha Vencimiento + 1 día)
                 limite_gracia = vence + timedelta(days=1)
                 u['vencido'] = hoy > limite_gracia
-                
-                # Opcional: Agregar una marca para saber si está en periodo de gracia
                 u['en_gracia'] = (hoy > vence and hoy <= limite_gracia)
             except:
                 u['vencido'] = True
 
-        # 2. Obtener Logs con mapeo de fecha para el HTML
-        try:
-            # Intentamos por created_at (estándar Supabase)
-            logs_res = supabase.table("logs_actividad").select("*").order("created_at", desc=True).limit(100).execute()
-        except:
-            logs_res = supabase.table("logs_actividad").select("*").limit(100).execute()
-        
+        # 2. Obtener Logs (Máximo 200 para tener buena data de resumen)
+        logs_res = supabase.table("logs_actividad").select("*").order("created_at", desc=True).limit(200).execute()
         logs_raw = logs_res.data if logs_res.data else []
+        
+        # --- NUEVO: CÁLCULO DE RESUMEN DE ACTIVIDAD (CHIPS) ---
+        from collections import Counter
+        resumen_dict = {}
         logs = []
+        
         for l in logs_raw:
-            # Mapeamos 'created_at' a 'fecha' para que el HTML lo reconozca
+            # Limpiamos la fecha para el historial y para el resumen
             l['fecha'] = l.get('created_at', '2026-01-01T00:00:00')
+            fecha_dia = l['fecha'].split('T')[0]
+            email = l.get('email')
+            
+            if email:
+                if email not in resumen_dict: 
+                    resumen_dict[email] = Counter()
+                resumen_dict[email][fecha_dia] += 1
             logs.append(l)
 
-        # 3. Estadísticas para los cuadros superiores
+        resumen_uso = []
+        for email, conteos in resumen_dict.items():
+            # Ordenamos por fecha descendente y tomamos los últimos 7 días
+            actividad = [{"fecha": f, "cantidad": c} for f, c in sorted(conteos.items(), reverse=True)[:7]]
+            resumen_uso.append({"email": email, "actividad": actividad})
+        # --- FIN CÁLCULO RESUMEN ---
+
+        # 3. Estadísticas superiores
         stats = {
             "total": len(usuarios),
             "activos": len([u for u in usuarios if not u['vencido']]),
             "vencidos": len([u for u in usuarios if u['vencido']])
         }
 
-        # 4. Ranking de Salud (Búsquedas exitosas vs fallidas)
-        from collections import Counter
+        # 4. Ranking de Salud
         emails_actividad = [l['email'] for l in logs if l.get('email')]
-        conteo = Counter(emails_actividad)
+        conteo_total = Counter(emails_actividad)
         
         ranking = []
-        for email, count in conteo.most_common(5):
+        for email, count in conteo_total.most_common(5):
             logs_cliente = [l for l in logs if l['email'] == email]
             exitos = len([l for l in logs_cliente if l.get('exito') == True])
-            total = len(logs_cliente)
-            salud = int((exitos / total) * 100) if total > 0 else 0
-            
+            salud = int((exitos / len(logs_cliente)) * 100) if logs_cliente else 0
             ranking.append({
-                "email": email,
-                "count": count,
-                "salud": salud,
-                "alerta": salud < 70  # Alerta visual si el éxito es bajo
+                "email": email, "count": count, "salud": salud, "alerta": salud < 70
             })
         
+        # Enviamos resumen_uso al template
         return render_template('admin.html', 
                                usuarios=usuarios, 
                                stats=stats, 
                                logs=logs, 
                                ranking=ranking, 
+                               resumen_uso=resumen_uso, # <--- IMPORTANTE
                                admin_pass=ADMIN_PASS)
                                
     except Exception as e:
         print(f"ERROR EN PANEL ADMIN: {str(e)}")
         return f"Error interno: {str(e)}", 500
-
 @app.route('/admin/crear', methods=['POST'])
 def crear_usuario():
     auth = request.form.get('auth_key')
