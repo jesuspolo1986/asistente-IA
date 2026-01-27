@@ -419,22 +419,45 @@ def admin_panel():
 @app.route('/admin/crear', methods=['POST'])
 def crear_usuario():
     auth = request.form.get('auth_key')
-    if auth != ADMIN_PASS: return "Error de autenticación", 403
+    if auth != ADMIN_PASS: 
+        return "Error de autenticación", 403
     
     email = request.form.get('email').lower().strip()
-    data = {
-        "email": email,
-        "password": request.form.get('password'),
-        "fecha_vencimiento": request.form.get('vence'),
-        "activo": 1
-    }
+    password_nueva = request.form.get('password')
+    fecha_vence = request.form.get('vence')
     
     try:
-        supabase.table("suscripciones").insert(data).execute()
-        # Redirigir de vuelta al panel con la llave
+        # 1. Verificar si el usuario ya existe para no perder la contraseña
+        res = supabase.table("suscripciones").select("*").eq("email", email).execute()
+        usuario_existente = res.data[0] if res.data else None
+        
+        # 2. Preparar los datos
+        data = {
+            "email": email,
+            "fecha_vencimiento": fecha_vence,
+            "activo": 1
+        }
+        
+        # Lógica de contraseña:
+        if password_nueva and password_nueva.strip() != "":
+            # Si escribiste una contraseña, se usa la nueva
+            data["password"] = password_nueva
+        elif usuario_existente:
+            # Si no escribiste nada pero el usuario ya existe, mantenemos la vieja
+            data["password"] = usuario_existente["password"]
+        else:
+            # Si es un usuario nuevo y no pusiste contraseña, le ponemos una por defecto
+            data["password"] = "123456"
+
+        # 3. UPSERT: Inserta si no existe, actualiza si ya existe
+        supabase.table("suscripciones").upsert(data).execute()
+        
+        # Redirigir con éxito
         return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+
     except Exception as e:
-        return f"Error al crear usuario: {str(e)}"
+        print(f"Error en crear/actualizar: {e}")
+        return f"Error al procesar usuario: {str(e)}"
 
 @app.route('/admin/eliminar', methods=['POST'])
 def eliminar_usuario():
