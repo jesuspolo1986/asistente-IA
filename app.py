@@ -342,75 +342,72 @@ def admin_panel():
         return "No autorizado", 403
     
     try:
-        # 1. Obtener usuarios y estado de vencimiento
+        # 1. Obtener usuarios
         usuarios_res = supabase.table("suscripciones").select("*").execute()
         usuarios = usuarios_res.data if usuarios_res.data else []
         hoy = datetime.now().date()
         
+        # 2. Obtener TODOS los logs necesarios para cálculos (una sola llamada)
+        logs_res = supabase.table("logs_actividad").select("*").order("created_at", desc=True).limit(500).execute()
+        logs_raw = logs_res.data if logs_res.data else []
+
+        # 3. Procesar Equipos Únicos y Resumen de Actividad
+        from collections import Counter
+        equipos_por_usuario = {}
+        resumen_dict = {}
+        logs_para_tabla = []
+
+        for l in logs_raw:
+            email = l.get('email')
+            eid = l.get('equipo_id', 'D-000')
+            l['fecha'] = l.get('created_at', '2026-01-01T00:00:00')
+            fecha_dia = l['fecha'].split('T')[0]
+            
+            if email:
+                # Conteo de equipos
+                if email not in equipos_por_usuario: equipos_por_usuario[email] = set()
+                equipos_por_usuario[email].add(eid)
+                
+                # Resumen para los chips de colores
+                if email not in resumen_dict: resumen_dict[email] = Counter()
+                resumen_dict[email][fecha_dia] += 1
+            
+            logs_para_tabla.append(l)
+
+        # 4. Enriquecer objeto usuarios para la tabla principal
         for u in usuarios:
             try:
                 vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
-                limite_gracia = vence + timedelta(days=1)
-                u['vencido'] = hoy > limite_gracia
-                u['en_gracia'] = (hoy > vence and hoy <= limite_gracia)
+                u['vencido'] = hoy > (vence + timedelta(days=1))
+                u['total_equipos'] = len(equipos_por_usuario.get(u['email'], []))
             except:
-                u['vencido'] = True
+                u['vencido'], u['total_equipos'] = True, 0
 
-        # 2. Obtener Logs (Máximo 200 para tener buena data de resumen)
-        logs_res = supabase.table("logs_actividad").select("*").order("created_at", desc=True).limit(200).execute()
-        logs_raw = logs_res.data if logs_res.data else []
+        # 5. Formatear resumen_uso y Ranking
+        resumen_uso = [{"email": k, "actividad": [{"fecha": f, "cantidad": c} for f, c in sorted(v.items(), reverse=True)[:7]]} for k, v in resumen_dict.items()]
         
-        # --- NUEVO: CÁLCULO DE RESUMEN DE ACTIVIDAD (CHIPS) ---
-        from collections import Counter
-        resumen_dict = {}
-        logs = []
-        
-        for l in logs_raw:
-            # Limpiamos la fecha para el historial y para el resumen
-            l['fecha'] = l.get('created_at', '2026-01-01T00:00:00')
-            fecha_dia = l['fecha'].split('T')[0]
-            email = l.get('email')
-            
-            if email:
-                if email not in resumen_dict: 
-                    resumen_dict[email] = Counter()
-                resumen_dict[email][fecha_dia] += 1
-            logs.append(l)
+        emails_actividad = [l['email'] for l in logs_para_tabla if l.get('email')]
+        conteo_ranking = Counter(emails_actividad)
+        ranking = []
+        for email, count in conteo_ranking.most_common(5):
+            logs_cliente = [l for l in logs_para_tabla if l['email'] == email]
+            exitos = len([l for l in logs_cliente if l.get('exito')])
+            salud = int((exitos / len(logs_cliente)) * 100) if logs_cliente else 0
+            ranking.append({"email": email, "count": count, "salud": salud, "alerta": salud < 70})
 
-        resumen_uso = []
-        for email, conteos in resumen_dict.items():
-            # Ordenamos por fecha descendente y tomamos los últimos 7 días
-            actividad = [{"fecha": f, "cantidad": c} for f, c in sorted(conteos.items(), reverse=True)[:7]]
-            resumen_uso.append({"email": email, "actividad": actividad})
-        # --- FIN CÁLCULO RESUMEN ---
-
-        # 3. Estadísticas superiores
         stats = {
             "total": len(usuarios),
             "activos": len([u for u in usuarios if not u['vencido']]),
             "vencidos": len([u for u in usuarios if u['vencido']])
         }
 
-        # 4. Ranking de Salud
-        emails_actividad = [l['email'] for l in logs if l.get('email')]
-        conteo_total = Counter(emails_actividad)
-        
-        ranking = []
-        for email, count in conteo_total.most_common(5):
-            logs_cliente = [l for l in logs if l['email'] == email]
-            exitos = len([l for l in logs_cliente if l.get('exito') == True])
-            salud = int((exitos / len(logs_cliente)) * 100) if logs_cliente else 0
-            ranking.append({
-                "email": email, "count": count, "salud": salud, "alerta": salud < 70
-            })
-        
-        # Enviamos resumen_uso al template
+        # RETORNO COMPLETO
         return render_template('admin.html', 
                                usuarios=usuarios, 
                                stats=stats, 
-                               logs=logs, 
+                               logs=logs_para_tabla, # <--- Corregido
                                ranking=ranking, 
-                               resumen_uso=resumen_uso, # <--- IMPORTANTE
+                               resumen_uso=resumen_uso, 
                                admin_pass=ADMIN_PASS)
                                
     except Exception as e:
@@ -458,7 +455,24 @@ def crear_usuario():
     except Exception as e:
         print(f"Error en crear/actualizar: {e}")
         return f"Error al procesar usuario: {str(e)}"
-
+@app.route('/admin/impersonar', methods=['POST'])
+def impersonar_usuario():
+    auth = request.form.get('auth_key')
+    if auth != ADMIN_PASS: 
+        return "No autorizado", 403
+    
+    cliente_email = request.form.get('email')
+    
+    # Verificamos que el cliente exista antes de entrar
+    res = supabase.table("suscripciones").select("*").eq("email", cliente_email).execute()
+    
+    if res.data:
+        # Aquí ocurre la magia: cambiamos tu sesión por la del cliente
+        session['usuario'] = cliente_email
+        # Redirigimos al escritorio principal (index.html)
+        return redirect('/')
+    else:
+        return "Cliente no encontrado", 404
 @app.route('/admin/eliminar', methods=['POST'])
 def eliminar_usuario():
     auth = request.form.get('auth_key')
@@ -476,57 +490,7 @@ def eliminar_usuario():
     except Exception as e:
         return f"Error al eliminar: {str(e)}"
 # --- PANEL ADMINISTRATIVO (ADMIN) ---
-@app.route('/admin')
-def admin():
-    # 1. Seguridad básica: solo tú entras con la clave en la URL (ej: /admin?pass=1234)
-    if request.args.get('pass') != ADMIN_PASS:
-        return "Acceso denegado", 403
 
-    # 2. Obtener datos de Supabase
-    res_usuarios = supabase.table("suscripciones").select("*").execute()
-    res_logs = supabase.table("logs_actividad").select("*").order("fecha", desc=True).execute()
-    
-    logs_data = res_logs.data
-    usuarios_data = res_usuarios.data
-
-    # --- INICIO DEL SÚPER RESUMEN DE TRÁFICO ---
-    from collections import Counter
-    
-    conteo_diario = {}
-    for log in logs_data:
-        # Extraemos solo la fecha (YYYY-MM-DD) del timestamp de Supabase
-        fecha = log['fecha'].split('T')[0]
-        email = log['email']
-        
-        if email not in conteo_diario:
-            conteo_diario[email] = Counter()
-        conteo_diario[email][fecha] += 1
-
-    # Estructura limpia para el HTML
-    resumen_uso = []
-    for email, conteos in conteo_diario.items():
-        # Tomamos los últimos 7 días con actividad
-        dias = [{"fecha": f, "cantidad": c} for f, c in sorted(conteos.items(), reverse=True)[:7]]
-        resumen_uso.append({"email": email, "actividad": dias})
-    # --- FIN DEL RESUMEN ---
-
-    # 3. Calcular estadísticas rápidas para los cuadritos superiores
-    hoy = datetime.now().date()
-    stats = {
-        "total": len(usuarios_data),
-        "activos": sum(1 for u in usuarios_data if datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date() >= hoy),
-        "vencidos": sum(1 for u in usuarios_data if datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date() < hoy)
-    }
-
-    # 4. Enviar todo al HTML
-    return render_template(
-        'admin.html', 
-        usuarios=usuarios_data, 
-        logs=logs_data, 
-        stats=stats, 
-        resumen_uso=resumen_uso, # <--- Esta es la variable que alimenta los chips de tráfico
-        admin_pass=ADMIN_PASS
-    )
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
