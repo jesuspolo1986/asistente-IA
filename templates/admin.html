@@ -24,7 +24,6 @@
             padding: 2rem 1rem; 
         }
 
-        /* Resplandor de fondo */
         body::before {
             content: "";
             position: absolute;
@@ -176,7 +175,7 @@
     <div class="row mb-5 g-4">
         <div class="col-lg-6">
             <div class="card-stats">
-                <h6 class="mb-4 fw-bold text-info"><i class="fas fa-plus-circle me-2"></i>NUEVA SUSCRIPCIÓN</h6>
+                <h6 class="mb-4 fw-bold text-info"><i class="fas fa-plus-circle me-2"></i>NUEVA SUSCRIPCIÓN / RECARGA</h6>
                 <form action="/admin/crear" method="POST">
                     <input type="hidden" name="auth_key" value="{{ admin_pass }}">
                     <div class="mb-3">
@@ -185,14 +184,17 @@
                     <div class="mb-3">
                         <input type="text" name="password" class="input-admin" placeholder="Contraseña (dejar vacío para mantener)">
                     </div>
-                    <div class="row g-2">
-                        <div class="col-8">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="small opacity-50 ms-1 mb-1">Vencimiento</label>
                             <input type="date" name="vence" class="input-admin" required>
                         </div>
-                        <div class="col-4">
-                            <button type="submit" class="btn btn-add w-100 text-white shadow-sm">CREAR</button>
+                        <div class="col-6">
+                            <label class="small opacity-50 ms-1 mb-1">Límite Equipos</label>
+                            <input type="number" name="limite_equipos" class="input-admin" placeholder="Ejem: 1" value="1" min="1" required>
                         </div>
                     </div>
+                    <button type="submit" class="btn btn-add w-100 text-white shadow-sm">GUARDAR CAMBIOS</button>
                 </form>
             </div>
         </div>
@@ -216,56 +218,65 @@
     </div>
 
     <div class="card-stats mb-5">
-    <h6 class="mb-4 fw-bold text-info"><i class="fas fa-database me-2"></i>BASE DE DATOS DE CLIENTES</h6>
-    <div class="table-responsive table-elena">
-        <table class="table table-dark mb-0">
-            <thead>
-                <tr>
-                    <th>CLIENTE</th>
-                    <th>VENCE EL</th>
-                    <th class="text-center">EQUIPOS</th>
-                    <th class="text-center">ESTADO</th>
-                    <th class="text-end">ACCIONES</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for u in usuarios %}
-                <tr>
-                    <td class="fw-bold">{{ u.email }}</td>
-                    <td class="opacity-75">{{ u.fecha_vencimiento }}</td>
-                    <td class="text-center">
-                        <span class="badge bg-info rounded-pill" style="font-size: 0.7rem;">{{ u.total_equipos or 0 }}</span>
-                    </td>
-                    <td class="text-center">
-                        <span class="badge rounded-pill {{ 'badge-expired' if u.vencido else 'badge-active' }} px-3 py-2" style="font-size: 0.65rem;">
-                            {{ 'EXPIRADO' if u.vencido else 'VIGENTE' }}
-                        </span>
-                    </td>
-                    <td class="text-end">
-                        <div class="d-flex justify-content-end align-items-center">
-                            <form action="/admin/impersonar" method="POST" target="_blank" class="me-2">
-                                <input type="hidden" name="auth_key" value="{{ admin_pass }}">
-                                <input type="hidden" name="email" value="{{ u.email }}">
-                                <button type="submit" class="btn btn-link text-info p-0 px-2" title="Entrar como este usuario">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </form>
+        <h6 class="mb-4 fw-bold text-info"><i class="fas fa-database me-2"></i>BASE DE DATOS DE CLIENTES</h6>
+        <div class="table-responsive table-elena">
+            <table class="table table-dark mb-0">
+                <thead>
+                    <tr>
+                        <th>CLIENTE</th>
+                        <th>VENCE EL</th>
+                        <th class="text-center">EQUIPOS</th>
+                        <th class="text-center">ESTADO</th>
+                        <th class="text-end">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in usuarios %}
+                    <tr>
+                        <td class="fw-bold">{{ u.email }}</td>
+                        <td class="opacity-75">{{ u.fecha_vencimiento }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-info rounded-pill" style="font-size: 0.7rem;">{{ u.total_equipos or 0 }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge rounded-pill {{ 'badge-expired' if u.vencido else 'badge-active' }} px-3 py-2" style="font-size: 0.65rem;">
+                                {{ 'EXPIRADO' if u.vencido else 'VIGENTE' }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end align-items-center">
+                                <form action="/admin/reset_equipos" method="POST" class="me-1" onsubmit="return confirm('¿Deseas limpiar la lista de equipos de esta farmacia? Esto les permitirá registrar equipos nuevos.');">
+                                    <input type="hidden" name="auth_key" value="{{ admin_pass }}">
+                                    <input type="hidden" name="email" value="{{ u.email }}">
+                                    <button type="submit" class="btn btn-link text-warning p-0 px-2" title="Resetear Equipos">
+                                        <i class="fas fa-undo-alt"></i>
+                                    </button>
+                                </form>
 
-                            <form action="/admin/eliminar" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta cuenta?');">
-                                <input type="hidden" name="auth_key" value="{{ admin_pass }}">
-                                <input type="hidden" name="email" value="{{ u.email }}">
-                                <button type="submit" class="btn btn-link text-danger p-0 px-2">
-                                    <i class="fas fa-user-minus"></i>
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                                <form action="/admin/impersonar" method="POST" target="_blank" class="me-1">
+                                    <input type="hidden" name="auth_key" value="{{ admin_pass }}">
+                                    <input type="hidden" name="email" value="{{ u.email }}">
+                                    <button type="submit" class="btn btn-link text-info p-0 px-2" title="Entrar como este usuario">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </form>
+
+                                <form action="/admin/eliminar" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta cuenta?');">
+                                    <input type="hidden" name="auth_key" value="{{ admin_pass }}">
+                                    <input type="hidden" name="email" value="{{ u.email }}">
+                                    <button type="submit" class="btn btn-link text-danger p-0 px-2" title="Eliminar Cliente">
+                                        <i class="fas fa-user-minus"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
+
     <div class="card-stats">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h6 class="m-0 fw-bold text-info"><i class="fas fa-list-ul me-2"></i>HISTORIAL DE ACTIVIDAD</h6>
@@ -279,7 +290,8 @@
                 <thead>
                     <tr>
                         <th>EMPRESA</th>
-                        <th>EQUIPO</th> <th>ACCIÓN DEL USUARIO</th>
+                        <th>EQUIPO</th> 
+                        <th>ACCIÓN</th>
                         <th>ESTADO</th>
                         <th>FECHA</th>
                     </tr>

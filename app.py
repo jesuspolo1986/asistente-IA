@@ -124,7 +124,33 @@ def preguntar():
     ip_cliente = request.headers.get('X-Forwarded-For', request.remote_addr)
     es_modo_admin = data.get('modo_admin', False)
 
-    # 1. Manejo de tasa por empresa
+    # ========================================================
+    # NUEVA LÓGICA DE BLOQUEO POR LÍMITE DE EQUIPOS
+    # ========================================================
+    try:
+        # 1. Obtenemos el límite permitido para este usuario
+        res_sub = supabase.table("suscripciones").select("limite_equipos").eq("email", usuario_email).execute()
+        # Si no hay dato, por defecto es 1
+        limite_permitido = res_sub.data[0].get('limite_equipos', 1) if res_sub.data else 1
+
+        # 2. Consultamos qué equipos han usado este servicio antes (Logs exitosos)
+        res_logs = supabase.table("logs_actividad").select("equipo_id").eq("email", usuario_email).execute()
+        # Extraemos IDs únicos ignorando 'DESCONOCIDO'
+        equipos_registrados = {l['equipo_id'] for l in res_logs.data if l.get('equipo_id') and l['equipo_id'] != 'DESCONOCIDO'}
+
+        # 3. Verificamos si este equipo es nuevo y si ya superó el límite
+        if equipo_id != 'DESCONOCIDO' and equipo_id not in equipos_registrados:
+            if len(equipos_registrados) >= limite_permitido:
+                return jsonify({
+                    "exito": False,
+                    "respuesta": f"🚫 ACCESO RESTRINGIDO: Tu plan permite máximo {limite_permitido} equipo(s) y ya los has ocupado. Contacta a soporte para ampliar tu plan."
+                })
+    except Exception as e:
+        print(f"Error validando límites: {e}")
+        # En caso de error técnico de validación, dejamos pasar para no afectar la experiencia del cliente
+    # ========================================================
+
+    # 1. Manejo de tasa por empresa (Continúa el código normal...)
     datos_tasa = get_tasa_usuario(usuario_email)
     
     # Lógica para actualización manual de tasa (vía input o voz)
@@ -134,14 +160,14 @@ def preguntar():
             datos_tasa["tasa"] = nueva_tasa_val
             datos_tasa["manual"] = True
             
-            # Registro de log para cambio de tasa con equipo_id
+            # Registro de log para cambio de tasa
             try:
                 supabase.table("logs_actividad").insert({
                     "email": usuario_email,
                     "accion": "CAMBIO_TASA",
                     "detalle": f"Nueva tasa: {nueva_tasa_val}",
                     "ip_address": ip_cliente,
-                    "equipo_id": equipo_id, # <--- INTEGRADO
+                    "equipo_id": equipo_id,
                     "exito": True
                 }).execute()
             except: pass
@@ -213,14 +239,14 @@ def preguntar():
             
             busqueda_exitosa = True
             
-            # Registro de log antes del retorno exitoso
+            # Registro de log exitoso
             try:
                 supabase.table("logs_actividad").insert({
                     "email": usuario_email,
                     "accion": "CONSULTA_PRECIO",
                     "detalle": pregunta_raw,
                     "ip_address": ip_cliente,
-                    "equipo_id": equipo_id, # <--- INTEGRADO
+                    "equipo_id": equipo_id,
                     "exito": True
                 }).execute()
             except: pass
@@ -244,7 +270,7 @@ def preguntar():
                     "accion": "CONSULTA_PRECIO",
                     "detalle": pregunta_raw,
                     "ip_address": ip_cliente,
-                    "equipo_id": equipo_id, # <--- INTEGRADO
+                    "equipo_id": equipo_id,
                     "exito": False
                 }).execute()
             except: pass
@@ -422,6 +448,8 @@ def crear_usuario():
     email = request.form.get('email').lower().strip()
     password_nueva = request.form.get('password')
     fecha_vence = request.form.get('vence')
+    # NUEVO: Capturamos el límite de equipos del formulario (por defecto 1 si viene vacío)
+    limite_equipos = request.form.get('limite_equipos', '1')
     
     try:
         # 1. Verificar si el usuario ya existe para no perder la contraseña
@@ -432,7 +460,8 @@ def crear_usuario():
         data = {
             "email": email,
             "fecha_vencimiento": fecha_vence,
-            "activo": 1
+            "activo": 1,
+            "limite_equipos": int(limite_equipos) # <--- NUEVO: Se guarda como entero
         }
         
         # Lógica de contraseña:
@@ -449,7 +478,7 @@ def crear_usuario():
         # 3. UPSERT: Inserta si no existe, actualiza si ya existe
         supabase.table("suscripciones").upsert(data).execute()
         
-        # Redirigir con éxito
+        # Redirigir con éxito al panel admin
         return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
 
     except Exception as e:
@@ -490,7 +519,32 @@ def eliminar_usuario():
     except Exception as e:
         return f"Error al eliminar: {str(e)}"
 # --- PANEL ADMINISTRATIVO (ADMIN) ---
+@app.route('/admin/reset_equipos', methods=['POST'])
+def reset_equipos():
+    auth = request.form.get('auth_key')
+    if auth != ADMIN_PASS: 
+        return "Error de autenticación", 403
+    
+    email_cliente = request.form.get('email')
+    
+    try:
+        # Borramos los logs de actividad de ese cliente.
+        # Al borrar los logs, la cuenta de equipos únicos vuelve a cero.
+        supabase.table("logs_actividad").delete().eq("email", email_cliente).execute()
+        
+        # Opcional: Podrías insertar un log administrativo de que se hizo el reset
+        supabase.table("logs_actividad").insert({
+            "email": email_cliente,
+            "accion": "RESET_EQUIPOS",
+            "detalle": "Administrador reseteó la lista de equipos autorizados",
+            "exito": True
+        }).execute()
 
+        return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+    
+    except Exception as e:
+        print(f"Error al resetear equipos: {e}")
+        return f"Error: {str(e)}"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
