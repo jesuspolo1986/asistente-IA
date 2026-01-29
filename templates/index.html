@@ -260,37 +260,42 @@
         const telefono = "584128598727"; 
         window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank');
     }
+   // --- FUNCIÓN DE SINCRONIZACIÓN ---
     function sincronizarTasa() {
-    fetch('/obtener_tasa_actual')
-        .then(response => response.json())
-        .then(data => {
-            if (data.tasa) {
-                // Buscamos el elemento donde muestras la tasa en pantalla
-                // Supongamos que tu elemento tiene el id="tasa-display"
-                const tasaDisplay = document.getElementById('tasa-val'); 
-                
-                if (tasaDisplay) {
-                    const tasaAnterior = tasaDisplay.innerText;
-                    const nuevaTasa = data.tasa.toFixed(2).replace('.', ',');
-                    
-                    if (tasaAnterior !== nuevaTasa) {
-                        tasaDisplay.innerText = nuevaTasa;
-                        console.log("¡Tasa sincronizada automáticamente!");
+        fetch('/obtener_tasa_actual')
+            .then(response => response.json())
+            .then(data => {
+                if (data.tasa) {
+                    const tasaDisplay = document.getElementById('displayTasa'); 
+                    if (tasaDisplay) {
+                        const tasaAnterior = tasaDisplay.innerText.trim();
+                        const nuevaTasa = data.tasa.toString();
                         
-                        // Opcional: Un pequeño destello visual para avisar al cliente
-                        tasaDisplay.style.color = '#00ff00'; 
-                        setTimeout(() => { tasaDisplay.style.color = 'white'; }, 2000);
+                        if (tasaAnterior !== nuevaTasa) {
+                            tasaDisplay.innerText = nuevaTasa;
+                            console.log("¡Tasa sincronizada!");
+                            
+                            // Efecto visual
+                            tasaDisplay.style.transition = "0.5s";
+                            tasaDisplay.style.color = '#00ff00'; 
+                            setTimeout(() => { 
+                                tasaDisplay.style.color = 'var(--primary)'; 
+                            }, 2000);
+                        }
                     }
                 }
-            }
-        });
-}
+            })
+            .catch(err => console.error("Error sincronizando tasa:", err));
+    }
 
-// Ejecutar cada 30 segundos
-setInterval(sincronizarTasa, 30000); 
+    // --- ACTIVADORES (FUERA DE LA FUNCIÓN) ---
+    
+    // 1. Ejecutar inmediatamente al cargar
+    sincronizarTasa();
 
-// También ejecutarla inmediatamente al cargar
-sincronizarTasa();
+    // 2. Ejecutar cada 10 segundos
+    setInterval(sincronizarTasa, 10000);
+
 </script>
 </body>
 </html>
