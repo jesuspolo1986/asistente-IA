@@ -39,13 +39,32 @@ def obtener_tasa_real():
                 if 10 < val < 150: return val
         return 54.20
     except: return 54.20
+@app.route('/obtener_tasa_actual', methods=['GET'])
+def obtener_tasa_actual():
+    usuario_email = session.get('usuario')
+    if not usuario_email:
+        return jsonify({"error": "No session"}), 401
+    
+    datos_tasa = get_tasa_usuario(usuario_email)
+    return jsonify({"tasa": datos_tasa["tasa"]})
 
 def get_tasa_usuario(email):
-    # Si ya existe en memoria (porque tú o el cliente la cambiaron hoy), se usa esa.
+    # 1. Intentar obtener de la RAM (Súper rápido para el uso diario)
     if email in memoria_tasa:
         return memoria_tasa[email]
     
-    # Si no está en memoria, buscamos la oficial del BCV
+    # 2. Si no está en RAM (ej: se reinició el server), buscar en Supabase
+    try:
+        res = supabase.table("suscripciones").select("tasa_personalizada").eq("email", email).execute()
+        if res.data and res.data[0].get('tasa_personalizada'):
+            tasa_db = float(res.data[0]['tasa_personalizada'])
+            datos = {"tasa": tasa_db, "manual": True, "fecha": "DB_PERSISTENTE"}
+            memoria_tasa[email] = datos  # Guardar en RAM para la próxima consulta
+            return datos
+    except Exception as e:
+        print(f"Error recuperando tasa persistente: {e}")
+
+    # 3. Fallback: Si no hay tasa manual guardada, usar BCV
     tasa_oficial = obtener_tasa_real()
     datos = {"tasa": tasa_oficial, "manual": False, "fecha": datetime.now().strftime("%Y-%m-%d")}
     memoria_tasa[email] = datos
@@ -159,25 +178,26 @@ def preguntar():
         try:
             nueva_tasa_val = float(str(data.get('nueva_tasa')).replace(",", "."))
             
-            # Actualizar RAM
+            # A. Persistencia en Supabase (PRIMERO LA DB para asegurar permanencia)
+            supabase.table("suscripciones").update({
+                "tasa_personalizada": nueva_tasa_val
+            }).eq("email", usuario_email).execute()
+
+            # B. Actualizar RAM (Para respuesta inmediata en otros equipos)
             memoria_tasa[usuario_email] = {
                 "tasa": nueva_tasa_val,
                 "manual": True,
                 "fecha": datetime.now().strftime("%Y-%m-%d")
             }
 
-            # Persistencia en Supabase
+            # C. Log del cambio
             try:
-                supabase.table("suscripciones").update({"tasa_personalizada": nueva_tasa_val}).eq("email", usuario_email).execute()
-            except Exception as db_e:
-                print(f"Error persistiendo tasa: {db_e}")
-
-            # Log del cambio
-            supabase.table("logs_actividad").insert({
-                "email": usuario_email, "accion": "CAMBIO_TASA", 
-                "detalle": f"Nueva tasa: {nueva_tasa_val}", "ip_address": ip_cliente,
-                "equipo_id": equipo_id, "exito": True
-            }).execute()
+                supabase.table("logs_actividad").insert({
+                    "email": usuario_email, "accion": "CAMBIO_TASA", 
+                    "detalle": f"Nueva tasa: {nueva_tasa_val}", "ip_address": ip_cliente,
+                    "equipo_id": equipo_id, "exito": True
+                }).execute()
+            except: pass
 
             return jsonify({
                 "respuesta": f"Tasa actualizada correctamente a {nueva_tasa_val} Bs.", 
@@ -187,7 +207,7 @@ def preguntar():
         except Exception as e: 
             return jsonify({"respuesta": "Formato de tasa no válido."})
 
-    # Si no es cambio de tasa, obtenemos la tasa vigente para procesar la pregunta
+    # Obtener tasa usando la función persistente
     datos_tasa = get_tasa_usuario(usuario_email)
     
     pregunta_raw = data.get('pregunta', '').lower().strip()
