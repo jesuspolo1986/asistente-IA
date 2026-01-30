@@ -52,21 +52,17 @@ def obtener_tasa_actual():
     return jsonify({"tasa": tasa_valor})
 
 def get_tasa_usuario(email):
-    # 1. ¿Está en la memoria RAM?
-    if email in memoria_tasa:
-        return memoria_tasa[email]
+    # Usamos una sola llave 'global' para todos
+    if 'global' in memoria_tasa:
+        return memoria_tasa['global']
     
     try:
-        # 2. Ir DIRECTO a la Tasa Maestra Global
         res_global = supabase.table("ajustes_sistema").select("valor").eq("clave", "tasa_maestra").execute()
         if res_global.data:
             t_maestra = float(res_global.data[0]['valor'])
-            memoria_tasa[email] = t_maestra
+            memoria_tasa['global'] = t_maestra # <--- AHORA ES GLOBAL
             return t_maestra
-    except Exception as e:
-        print(f"Error consultando tasa global: {e}")
-
-    # 3. Fallback: BCV si la base de datos falla
+    except: pass
     return obtener_tasa_real()
 # --- RUTAS DE AUTENTICACIÓN ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -144,156 +140,106 @@ def index():
 # --- LÓGICA DE ELENA (BÚSQUEDA EN BASE DE DATOS) ---
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
-    t_inicio = time.time()
+    import gc  # Garbage Collector para liberar RAM
     data = request.get_json()
     usuario_email = session.get('usuario')
     
     if not usuario_email: 
         return jsonify({"respuesta": "Sesión expirada. Por favor, inicia sesión de nuevo."}), 401
     
-    # --- CAPTURA DE IDENTIFICADOR DE EQUIPO ---
     equipo_id = data.get('equipo_id', 'DESCONOCIDO')
     ip_cliente = request.headers.get('X-Forwarded-For', request.remote_addr)
     es_modo_admin = data.get('modo_admin', False)
 
-    # ========================================================
-    # 1. SEGURIDAD: LÓGICA DE BLOQUEO POR LÍMITE DE EQUIPOS
-    # ========================================================
+    # 1. SEGURIDAD DE EQUIPOS (Optimizado)
     try:
-        res_sub = supabase.table("suscripciones").select("limite_equipos").eq("email", usuario_email).execute()
-        limite_permitido = res_sub.data[0].get('limite_equipos', 1) if res_sub.data else 1
+        res_sub = supabase.table("suscripciones").select("limite_equipos").eq("email", usuario_email).single().execute()
+        limite_permitido = res_sub.data.get('limite_equipos', 1) if res_sub.data else 1
 
         res_logs = supabase.table("logs_actividad").select("equipo_id").eq("email", usuario_email).eq("exito", True).execute()
-        # Obtenemos IDs únicos ya registrados para este usuario
         equipos_registrados = {l['equipo_id'] for l in res_logs.data if l.get('equipo_id') and l['equipo_id'] != 'DESCONOCIDO'}
 
         if equipo_id != 'DESCONOCIDO' and equipo_id not in equipos_registrados:
             if len(equipos_registrados) >= limite_permitido:
                 return jsonify({
                     "exito": False,
-                    "respuesta": f"🚫 ACCESO RESTRINGIDO: Tu plan permite {limite_permitido} equipo(s). Contacta a soporte para ampliarlo."
+                    "respuesta": f"🚫 ACCESO RESTRINGIDO: Tu plan permite {limite_permitido} equipo(s)."
                 })
-    except Exception as e:
-        print(f"⚠️ Error validando límites (bypass por seguridad): {e}")
+    except: pass
 
-    # ========================================================
-    # 2. GESTIÓN DE TASA (CONSULTA Y ACTUALIZACIÓN)
-    # ========================================================
-    # Si viene una nueva tasa en la petición, la actualizamos primero
+    # 2. GESTIÓN DE TASA
     if data.get('nueva_tasa'):
         try:
             nueva_tasa_val = float(str(data.get('nueva_tasa')).replace(",", "."))
-            
-            # A. Persistencia en Supabase (PRIMERO LA DB para asegurar permanencia)
-            supabase.table("suscripciones").update({
-                "tasa_personalizada": nueva_tasa_val
-            }).eq("email", usuario_email).execute()
-
-            # B. Actualizar RAM (Para respuesta inmediata en otros equipos)
-            memoria_tasa[usuario_email] = {
-                "tasa": nueva_tasa_val,
-                "manual": True,
-                "fecha": datetime.now().strftime("%Y-%m-%d")
-            }
-
-            # C. Log del cambio
-            try:
-                supabase.table("logs_actividad").insert({
-                    "email": usuario_email, "accion": "CAMBIO_TASA", 
-                    "detalle": f"Nueva tasa: {nueva_tasa_val}", "ip_address": ip_cliente,
-                    "equipo_id": equipo_id, "exito": True
-                }).execute()
-            except: pass
-
-            return jsonify({
-                "respuesta": f"Tasa actualizada correctamente a {nueva_tasa_val} Bs.", 
-                "tasa": nueva_tasa_val,
-                "exito_tasa": True
-            })
-        except Exception as e: 
+            supabase.table("suscripciones").update({"tasa_personalizada": nueva_tasa_val}).eq("email", usuario_email).execute()
+            memoria_tasa[usuario_email] = nueva_tasa_val
+            return jsonify({"respuesta": f"Tasa actualizada a {nueva_tasa_val} Bs.", "tasa": nueva_tasa_val, "exito_tasa": True})
+        except: 
             return jsonify({"respuesta": "Formato de tasa no válido."})
 
-    # Obtener tasa usando la función persistente
-    datos_tasa = get_tasa_usuario(usuario_email)
+    # Obtener tasa (ahora devuelve un float directo)
+    tasa_actual = get_tasa_usuario(usuario_email)
     
     pregunta_raw = data.get('pregunta', '').lower().strip()
     if "activar modo gerencia" in pregunta_raw:
         return jsonify({"respuesta": "Modo gerencia activo.", "modo_admin": True})
 
-    # ========================================================
-    # 3. PROCESAMIENTO DE INVENTARIO Y BÚSQUEDA
-    # ========================================================
+    # 3. PROCESAMIENTO DE INVENTARIO (OPTIMIZADO PARA RAM)
     try:
-        res_inv = supabase.table("inventarios").select("*").eq("empresa_email", usuario_email).execute()
+        # SOLO seleccionamos las columnas que vamos a usar
+        res_inv = supabase.table("inventarios").select("producto, precio_usd, stock").eq("empresa_email", usuario_email).execute()
         if not res_inv.data:
-            return jsonify({"respuesta": "Elena: No hay productos en tu inventario. Sube un Excel primero."})
+            return jsonify({"respuesta": "Elena: No hay productos en tu inventario."})
         
         df = pd.DataFrame(res_inv.data)
+        del res_inv # Borramos la respuesta cruda de la RAM
     except Exception as e:
-        return jsonify({"respuesta": f"Error de conexión con la base de datos."})
+        return jsonify({"respuesta": "Error de conexión con la base de datos."})
 
     # Limpieza de pregunta
-    palabras_ruido = ["cuanto cuesta", "cuanto vale", "que precio tiene", "precio de", "dame el precio de", "precio"]
     pregunta_limpia = pregunta_raw
-    for frase in palabras_ruido:
+    for frase in ["cuanto cuesta", "cuanto vale", "que precio tiene", "precio de", "precio"]:
         pregunta_limpia = pregunta_limpia.replace(frase, "")
     pregunta_limpia = pregunta_limpia.strip()
 
     try:
-        # Búsqueda difusa optimizada
-        match = process.extractOne(
-            pregunta_limpia, 
-            df['producto'].astype(str).tolist(), 
-            processor=utils.default_process
-        )
+        # Búsqueda difusa
+        match = process.extractOne(pregunta_limpia, df['producto'].astype(str).tolist(), processor=utils.default_process)
 
-        if match and match[1] > 65: # Umbral de confianza del 65%
+        if match and match[1] > 65:
             nombre_p = match[0]
             fila = df[df['producto'] == nombre_p].iloc[0]
             
             p_usd = float(fila['precio_usd'])
-            p_bs = p_usd * datos_tasa["tasa"]
+            p_bs = p_usd * tasa_actual # Multiplicación directa
             
-            # Formateo visual (Punto para miles, coma para decimales)
             val_bs_visual = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             val_usd_visual = f"{p_usd:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-            # Formateo para voz
             texto_bs_audio = f"{p_bs:.2f}".replace(".", " con ")
-            nombre_audio = nombre_p.lower().replace("mg", " miligramos").replace("ml", " mililitros")
 
-            respuesta_voz = f"El {nombre_audio} cuesta {texto_bs_audio} Bolívares."
-            
+            respuesta_voz = f"El {nombre_p.lower()} cuesta {texto_bs_audio} Bolívares."
             if es_modo_admin:
-                stock_val = str(fila.get('stock', '0'))
-                respuesta_voz += f" Tienes {stock_val} en existencia."
+                respuesta_voz += f" Tienes {fila.get('stock', '0')} en existencia."
             
-            # Log de éxito
-            supabase.table("logs_actividad").insert({
-                "email": usuario_email, "accion": "CONSULTA_PRECIO", 
-                "detalle": pregunta_raw, "ip_address": ip_cliente,
-                "equipo_id": equipo_id, "exito": True
-            }).execute()
+            # Log de éxito (async-like)
+            supabase.table("logs_actividad").insert({"email": usuario_email, "accion": "CONSULTA_PRECIO", "detalle": pregunta_raw, "equipo_id": equipo_id, "exito": True}).execute()
+
+            # LIBERACIÓN FINAL DE MEMORIA ANTES DE ENVIAR
+            del df
+            gc.collect()
 
             return jsonify({
-                "exito": True,
-                "producto_nombre": nombre_p,
-                "p_bs": val_bs_visual,
-                "p_usd": val_usd_visual,
-                "respuesta": respuesta_voz,
-                "modo_admin": es_modo_admin
+                "exito": True, "producto_nombre": nombre_p, "p_bs": val_bs_visual,
+                "p_usd": val_usd_visual, "respuesta": respuesta_voz, "modo_admin": es_modo_admin
             })
-
         else:
-            # Log de fallo (Producto no encontrado)
-            supabase.table("logs_actividad").insert({
-                "email": usuario_email, "accion": "CONSULTA_PRECIO", 
-                "detalle": pregunta_raw, "ip_address": ip_cliente,
-                "equipo_id": equipo_id, "exito": False
-            }).execute()
+            del df
+            gc.collect()
             return jsonify({"exito": False, "respuesta": f"Lo siento, no encontré '{pregunta_limpia}'."})
 
     except Exception as e:
+        if 'df' in locals(): del df
+        gc.collect()
         return jsonify({"exito": False, "respuesta": "Error procesando la búsqueda."})
 @app.route('/upload', methods=['POST'])
 def upload_file():
