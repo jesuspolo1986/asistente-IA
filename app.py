@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from supabase import create_client, Client
 import time
 from rapidfuzz import process, utils
-
+import gc # Recolector de basura
 app = Flask(__name__)
 app.secret_key = 'elena_farmacia_2026_key'
 
@@ -140,107 +140,85 @@ def index():
 # --- LÓGICA DE ELENA (BÚSQUEDA EN BASE DE DATOS) ---
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
-    import gc  # Garbage Collector para liberar RAM
     data = request.get_json()
     usuario_email = session.get('usuario')
     
     if not usuario_email: 
-        return jsonify({"respuesta": "Sesión expirada. Por favor, inicia sesión de nuevo."}), 401
+        return jsonify({"respuesta": "Sesión expirada."}), 401
     
+    # --- DATOS RÁPIDOS ---
     equipo_id = data.get('equipo_id', 'DESCONOCIDO')
-    ip_cliente = request.headers.get('X-Forwarded-For', request.remote_addr)
     es_modo_admin = data.get('modo_admin', False)
+    tasa_actual = get_tasa_usuario(usuario_email)
+    pregunta_raw = data.get('pregunta', '').lower().strip()
 
-    # 1. SEGURIDAD DE EQUIPOS (Optimizado)
-    try:
-        res_sub = supabase.table("suscripciones").select("limite_equipos").eq("email", usuario_email).single().execute()
-        limite_permitido = res_sub.data.get('limite_equipos', 1) if res_sub.data else 1
-
-        res_logs = supabase.table("logs_actividad").select("equipo_id").eq("email", usuario_email).eq("exito", True).execute()
-        equipos_registrados = {l['equipo_id'] for l in res_logs.data if l.get('equipo_id') and l['equipo_id'] != 'DESCONOCIDO'}
-
-        if equipo_id != 'DESCONOCIDO' and equipo_id not in equipos_registrados:
-            if len(equipos_registrados) >= limite_permitido:
-                return jsonify({
-                    "exito": False,
-                    "respuesta": f"🚫 ACCESO RESTRINGIDO: Tu plan permite {limite_permitido} equipo(s)."
-                })
-    except: pass
-
-    # 2. GESTIÓN DE TASA
+    # 1. GESTIÓN DE TASA (Si el usuario envía una nueva)
     if data.get('nueva_tasa'):
         try:
-            nueva_tasa_val = float(str(data.get('nueva_tasa')).replace(",", "."))
-            supabase.table("suscripciones").update({"tasa_personalizada": nueva_tasa_val}).eq("email", usuario_email).execute()
-            memoria_tasa[usuario_email] = nueva_tasa_val
-            return jsonify({"respuesta": f"Tasa actualizada a {nueva_tasa_val} Bs.", "tasa": nueva_tasa_val, "exito_tasa": True})
-        except: 
-            return jsonify({"respuesta": "Formato de tasa no válido."})
+            val = float(str(data.get('nueva_tasa')).replace(",", "."))
+            supabase.table("suscripciones").update({"tasa_personalizada": val}).eq("email", usuario_email).execute()
+            memoria_tasa['global'] = val 
+            return jsonify({"respuesta": f"Tasa: {val} Bs.", "exito_tasa": True})
+        except: return jsonify({"respuesta": "Tasa inválida."})
 
-    # Obtener tasa (ahora devuelve un float directo)
-    tasa_actual = get_tasa_usuario(usuario_email)
-    
-    pregunta_raw = data.get('pregunta', '').lower().strip()
-    if "activar modo gerencia" in pregunta_raw:
-        return jsonify({"respuesta": "Modo gerencia activo.", "modo_admin": True})
-
-    # 3. PROCESAMIENTO DE INVENTARIO (OPTIMIZADO PARA RAM)
+    # 2. PROCESAMIENTO SIN PANDAS (Ahorro máximo de RAM)
     try:
-        # SOLO seleccionamos las columnas que vamos a usar
-        res_inv = supabase.table("inventarios").select("producto, precio_usd, stock").eq("empresa_email", usuario_email).execute()
-        if not res_inv.data:
-            return jsonify({"respuesta": "Elena: No hay productos en tu inventario."})
+        # Traemos solo lo necesario
+        res = supabase.table("inventarios").select("producto, precio_usd, stock").eq("empresa_email", usuario_email).execute()
+        inventario = res.data
+        del res # Liberar respuesta cruda
         
-        df = pd.DataFrame(res_inv.data)
-        del res_inv # Borramos la respuesta cruda de la RAM
-    except Exception as e:
-        return jsonify({"respuesta": "Error de conexión con la base de datos."})
+        if not inventario:
+            return jsonify({"respuesta": "Inventario vacío."})
 
-    # Limpieza de pregunta
-    pregunta_limpia = pregunta_raw
-    for frase in ["cuanto cuesta", "cuanto vale", "que precio tiene", "precio de", "precio"]:
-        pregunta_limpia = pregunta_limpia.replace(frase, "")
-    pregunta_limpia = pregunta_limpia.strip()
+        # Limpiar pregunta
+        pregunta_limpia = pregunta_raw
+        for f in ["cuanto cuesta", "cuanto vale", "precio de", "precio"]:
+            pregunta_limpia = pregunta_limpia.replace(f, "")
+        pregunta_limpia = pregunta_limpia.strip()
 
-    try:
-        # Búsqueda difusa
-        match = process.extractOne(pregunta_limpia, df['producto'].astype(str).tolist(), processor=utils.default_process)
+        # Búsqueda difusa sobre lista simple (Más ligero que DataFrame)
+        nombres_productos = [str(i['producto']) for i in inventario]
+        match = process.extractOne(pregunta_limpia, nombres_productos, processor=utils.default_process)
 
         if match and match[1] > 65:
             nombre_p = match[0]
-            fila = df[df['producto'] == nombre_p].iloc[0]
+            # Buscar el item en la lista
+            item = next((i for i in inventario if i['producto'] == nombre_p), None)
             
-            p_usd = float(fila['precio_usd'])
-            p_bs = p_usd * tasa_actual # Multiplicación directa
-            
-            val_bs_visual = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            val_usd_visual = f"{p_usd:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            texto_bs_audio = f"{p_bs:.2f}".replace(".", " con ")
+            if item:
+                p_usd = float(item['precio_usd'])
+                p_bs = p_usd * tasa_actual
+                
+                # Formateo rápido
+                val_bs_v = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                txt_audio = f"{p_bs:.2f}".replace(".", " con ")
+                
+                resp_voz = f"El {nombre_p.lower()} cuesta {txt_audio} Bolívares."
+                if es_modo_admin:
+                    resp_voz += f" Stock: {item.get('stock', 0)}."
 
-            respuesta_voz = f"El {nombre_p.lower()} cuesta {texto_bs_audio} Bolívares."
-            if es_modo_admin:
-                respuesta_voz += f" Tienes {fila.get('stock', '0')} en existencia."
-            
-            # Log de éxito (async-like)
-            supabase.table("logs_actividad").insert({"email": usuario_email, "accion": "CONSULTA_PRECIO", "detalle": pregunta_raw, "equipo_id": equipo_id, "exito": True}).execute()
+                # Log (Opcional: puedes quitarlo para más velocidad)
+                supabase.table("logs_actividad").insert({"email": usuario_email, "accion": "CONSULTA", "equipo_id": equipo_id, "exito": True}).execute()
 
-            # LIBERACIÓN FINAL DE MEMORIA ANTES DE ENVIAR
-            del df
-            gc.collect()
+                # LIMPIEZA TOTAL
+                del inventario
+                del nombres_productos
+                gc.collect()
 
-            return jsonify({
-                "exito": True, "producto_nombre": nombre_p, "p_bs": val_bs_visual,
-                "p_usd": val_usd_visual, "respuesta": respuesta_voz, "modo_admin": es_modo_admin
-            })
-        else:
-            del df
-            gc.collect()
-            return jsonify({"exito": False, "respuesta": f"Lo siento, no encontré '{pregunta_limpia}'."})
+                return jsonify({
+                    "exito": True, "producto_nombre": nombre_p, "p_bs": val_bs_v,
+                    "respuesta": resp_voz, "modo_admin": es_modo_admin
+                })
+
+        # Si no hay match
+        del inventario
+        gc.collect()
+        return jsonify({"exito": False, "respuesta": f"No encontré '{pregunta_limpia}'."})
 
     except Exception as e:
-        if 'df' in locals(): del df
         gc.collect()
-        return jsonify({"exito": False, "respuesta": "Error procesando la búsqueda."})
+        return jsonify({"exito": False, "respuesta": "Error en búsqueda."})
 @app.route('/upload', methods=['POST'])
 def upload_file():
     usuario_email = session.get('usuario')
