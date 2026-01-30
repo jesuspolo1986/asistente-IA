@@ -203,39 +203,47 @@ def preguntar():
         nombres = [str(i['producto']) for i in inventario]
         match = process.extractOne(pregunta_limpia, nombres, processor=utils.default_process)
 
+        # --- BUSCA ESTE BLOQUE DENTRO DE @app.route('/preguntar') ---
         if match and match[1] > 65:
             nombre_p = match[0]
             item = next((i for i in inventario if i['producto'] == nombre_p), None)
             
             if item:
                 p_usd = float(item['precio_usd'])
-                p_bs = p_usd * datos_tasa
                 
-                # Formateo visual y de voz
+                # CORRECCIÓN AQUÍ: Cambiamos 'datos_tasa' por 'tasa_actual'
+                # Añadimos round(..., 2) para evitar decimales infinitos
+                p_bs = round(p_usd * tasa_actual, 2) 
+                
+                # Formateo visual (Puntos para miles, Comas para decimales)
                 v_bs_vis = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                
+                # Formateo para la voz de Elena (Ej: "55 con 20")
                 txt_audio = f"{p_bs:.2f}".replace(".", " con ")
                 
                 respuesta_texto = f"El {nombre_p.lower()} cuesta {txt_audio} Bolívares."
                 
-                # Si es modo admin, añade el stock
                 if es_modo_admin:
                     stock_actual = item.get('stock', 0)
                     respuesta_texto += f" Hay {stock_actual} unidades en existencia."
 
-                # Log de actividad
+                # Registro en logs de Supabase
                 supabase.table("logs_actividad").insert({
-                    "email": usuario_email, "accion": "CONSULTA", "equipo_id": equipo_id, "exito": True
+                    "email": usuario_email, 
+                    "accion": "CONSULTA", 
+                    "equipo_id": equipo_id, 
+                    "exito": True
                 }).execute()
 
-                # LIMPIEZA DE RAM
+                # Limpieza de memoria
                 del inventario
-                del nombres
                 gc.collect()
 
                 return jsonify({
                     "exito": True, 
                     "producto_nombre": nombre_p, 
                     "p_bs": v_bs_vis,
+                    "p_usd": f"{p_usd:,.2f}",
                     "respuesta": respuesta_texto, 
                     "modo_admin": es_modo_admin
                 })
