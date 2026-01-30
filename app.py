@@ -148,7 +148,7 @@ def index():
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
     import gc
-    import random  # Importante para los saludos aleatorios
+    import random
     data = request.get_json()
     usuario_email = session.get('usuario')
     
@@ -191,11 +191,27 @@ def preguntar():
         if not inventario:
             return jsonify({"respuesta": "Elena: Tu inventario está vacío."})
 
+        # --- LIMPIEZA DE RUIDO MEJORADA ---
         pregunta_limpia = pregunta_raw
-        for f in ["cuanto cuesta", "cuanto vale", "precio de", "precio", "dame el precio de"]:
+        frases_ruido = [
+            "cuanto cuesta el", "cuanto cuesta la", "cuanto cuesta",
+            "cuanto vale el", "cuanto vale la", "cuanto vale",
+            "que precio tiene el", "que precio tiene la", "que precio tiene",
+            "dame el precio de", "dame el precio del", "dame el precio",
+            "precio del", "precio de la", "precio de", "precio",
+            "en cuanto sale el", "en cuanto sale la", "en cuanto sale",
+            "tendras", "tienes", "busco", "necesito"
+        ]
+        
+        for f in frases_ruido:
             pregunta_limpia = pregunta_limpia.replace(f, "")
-        pregunta_limpia = pregunta_limpia.strip()
+        
+        pregunta_limpia = pregunta_limpia.replace("?", "").replace("¿", "").strip()
 
+        if not pregunta_limpia:
+            return jsonify({"exito": False, "respuesta": "¿Qué producto deseas consultar?"})
+
+        # --- EJECUCIÓN DE BÚSQUEDA (CORREGIDO) ---
         nombres = [str(i['producto']) for i in inventario]
         match = process.extractOne(pregunta_limpia, nombres, processor=utils.default_process)
 
@@ -210,47 +226,36 @@ def preguntar():
                 v_bs_vis = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                 txt_audio = f"{p_bs:.2f}".replace(".", " con ")
 
-                # --- NUEVO: TOQUE HUMANO (Saludos Aleatorios) ---
-                # --- COLECCIÓN DE 20 FRASES PARA UNA EXPERIENCIA PREMIUM ---
                 saludos = [
-                    # Estilo Cortés y Servicial
                     f"¡Hola! Con mucho gusto te informo que el {nombre_p.lower()} tiene un costo de",
                     f"Un placer atenderte. El {nombre_p.lower()} que buscas está en",
                     f"Para servirte, te indico que el precio del {nombre_p.lower()} es de",
                     f"¡Buen día! El valor actual para el {nombre_p.lower()} es de",
                     f"Es un gusto saludarte. Te confirmo que el {nombre_p.lower()} cuesta",
-                    
-                    # Estilo Directo y Eficiente
                     f"Te informo que el {nombre_p.lower()} tiene un precio de",
                     f"El {nombre_p.lower()} se encuentra disponible por",
                     f"Actualmente el costo del {nombre_p.lower()} es de",
                     f"Sí, el precio registrado para el {nombre_p.lower()} es",
                     f"El valor de mercado para el {nombre_p.lower()} hoy es",
-                    
-                    # Estilo Positivo y Dinámico
                     f"¡Buenas noticias! Contamos con {nombre_p.lower()} y su precio es",
                     f"Claro que sí, el {nombre_p.lower()} lo tenemos en",
                     f"Por supuesto, el precio actualizado del {nombre_p.lower()} es de",
                     f"Contamos con existencia de {nombre_p.lower()} a un valor de",
                     f"¡Confirmado! El {nombre_p.lower()} tiene un costo de",
-                    
-                    # Estilo Informativo
                     f"Según nuestro inventario, el {nombre_p.lower()} cuesta",
                     f"Te indico que el precio actualizado para el {nombre_p.lower()} es",
                     f"El {nombre_p.lower()} está disponible actualmente por",
                     f"He verificado y el {nombre_p.lower()} tiene un precio de",
                     f"Para tu referencia, el costo del {nombre_p.lower()} es de"
                 ]
-                inicio_frase = random.choice(saludos)
+                
                 inicio_frase = random.choice(saludos)
                 respuesta_texto = f"{inicio_frase} {txt_audio} Bolívares."
                 
-                # --- Lógica de Stock ---
                 if es_modo_admin:
                     stock_actual = item.get('stock', 0)
                     respuesta_texto += f" Hay {stock_actual} unidades en existencia."
 
-                # Registro y limpieza
                 supabase.table("logs_actividad").insert({
                     "email": usuario_email, "accion": "CONSULTA", 
                     "equipo_id": equipo_id, "exito": True
