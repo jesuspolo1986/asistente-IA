@@ -362,19 +362,37 @@ def limpiar_precio(valor):
     except:
         return 0.0
 @app.route('/admin/actualizar_tasa_maestra', methods=['POST'])
-def actualizar_maestra():
+def actualizar_tasa_maestra():
+    # Buscamos auth_key que viene del formulario
     auth = request.form.get('auth_key')
-    if auth != ADMIN_PASS: return "No autorizado", 403
     
+    # IMPORTANTE: Verifica que coincida con tu ADMIN_PASS
+    if auth != ADMIN_PASS:
+        return f"Error de autenticación: recibiste {auth}", 403
+
     nueva_tasa = request.form.get('tasa')
-    # Actualizamos la tabla global en Supabase
-    supabase.table("config_global").update({"valor": nueva_tasa}).eq("clave", "tasa_maestra").execute()
-    
-    # OPCIONAL: Limpiamos la memoria RAM para que todos los usuarios 
-    # sientan el cambio en su próximo polling de 30 seg.
-    memoria_tasa.clear() 
-    
-    return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+    if not nueva_tasa:
+        return "Error: No se recibió ninguna tasa", 400
+
+    try:
+        tasa_val = float(str(nueva_tasa).replace(",", "."))
+        
+        # Usamos UPSERT para evitar errores de llave duplicada o inexistente
+        supabase.table("ajustes_sistema").upsert({
+            "clave": "tasa_maestra", 
+            "valor": tasa_val
+        }).execute()
+
+        # Limpiamos la RAM para que todos los usuarios se actualicen
+        memoria_tasa.clear()
+        
+        flash(f"Tasa global actualizada a {tasa_val} Bs.")
+        return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+
+    except Exception as e:
+        # Esto te dirá exactamente qué pasó en los logs de Koyeb si vuelve a fallar
+        print(f"DEBUG ERROR TASA: {str(e)}")
+        return f"Error interno: {str(e)}", 500
 @app.route('/admin/actualizar_tasa_maestra', methods=['POST'])
 def actualizar_tasa_maestra():
     # 1. Verificación de seguridad básica
@@ -389,21 +407,26 @@ def actualizar_tasa_maestra():
 
     try:
         # 2. Limpiar el formato del número (por si usan coma en vez de punto)
-        tasa_val = float(str(nueva_tasa).replace(",", "."))
+           tasa_val = float(str(nueva_tasa).replace(",", "."))
 
         # 3. Guardar en la tabla maestra de Supabase
         # Nota: Asegúrate de haber creado la tabla 'ajustes_sistema' con la clave 'tasa_maestra'
-        supabase.table("ajustes_sistema").update({"valor": tasa_val}).eq("clave", "tasa_maestra").execute()
+        # Cambia esto en la línea 327 aprox de tu app.py:
+           supabase.table("ajustes_sistema").upsert({
+           "clave": "tasa_maestra", 
+           "valor": tasa_val,
+           "actualizado_en": datetime.now().isoformat() # Útil para auditoría
+           }).execute()
 
         # 4. LIMPIEZA ESTRATÉGICA DE RAM
         # Al vaciar el diccionario, obligamos a get_tasa_usuario a buscar en la DB 
         # la nueva tasa global para todos los clientes activos.
-        memoria_tasa.clear()
+           memoria_tasa.clear()
 
-        print(f"✅ Tasa Global actualizada a {tasa_val} por el administrador.")
-        flash(f"Éxito: Tasa global actualizada a {tasa_val} Bs.")
+           print(f"✅ Tasa Global actualizada a {tasa_val} por el administrador.")
+           flash(f"Éxito: Tasa global actualizada a {tasa_val} Bs.")
         
-        return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+           return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
 
     except Exception as e:
         print(f"❌ Error actualizando tasa global: {e}")
@@ -429,12 +452,17 @@ def admin_panel():
         return "No autorizado", 403
     
     try:
-        # 1. Obtener usuarios
+        # 1. Obtener usuarios y tasa actual de Supabase
         usuarios_res = supabase.table("suscripciones").select("*").execute()
         usuarios = usuarios_res.data if usuarios_res.data else []
         hoy = datetime.now().date()
         
-        # 2. Obtener TODOS los logs necesarios para cálculos (una sola llamada)
+        # --- NUEVO: Obtener la Tasa Maestra actual para el panel ---
+        tasa_res = supabase.table("ajustes_sistema").select("valor").eq("clave", "tasa_maestra").execute()
+        tasa_val = tasa_res.data[0]['valor'] if tasa_res.data else 0.0
+        # -----------------------------------------------------------
+
+        # 2. Obtener logs (limitamos a 500 para no saturar memoria)
         logs_res = supabase.table("logs_actividad").select("*").order("created_at", desc=True).limit(500).execute()
         logs_raw = logs_res.data if logs_res.data else []
 
@@ -451,30 +479,26 @@ def admin_panel():
             fecha_dia = l['fecha'].split('T')[0]
             
             if email:
-                # Conteo de equipos
                 if email not in equipos_por_usuario: equipos_por_usuario[email] = set()
                 equipos_por_usuario[email].add(eid)
                 
-                # Resumen para los chips de colores
                 if email not in resumen_dict: resumen_dict[email] = Counter()
                 resumen_dict[email][fecha_dia] += 1
             
             logs_para_tabla.append(l)
 
-        # 4. Enriquecer objeto usuarios para la tabla principal
+        # 4. Enriquecer objeto usuarios
         for u in usuarios:
             try:
+                # Usamos la lógica de 1 día de gracia mencionada en tus instrucciones
                 vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
                 u['vencido'] = hoy > (vence + timedelta(days=1))
                 u['total_equipos'] = len(equipos_por_usuario.get(u['email'], []))
             except:
                 u['vencido'], u['total_equipos'] = True, 0
 
-        # 5. Formatear resumen_uso y Ranking
-        resumen_uso = [{"email": k, "actividad": [{"fecha": f, "cantidad": c} for f, c in sorted(v.items(), reverse=True)[:7]]} for k, v in resumen_dict.items()]
-        
-        emails_actividad = [l['email'] for l in logs_para_tabla if l.get('email')]
-        conteo_ranking = Counter(emails_actividad)
+        # 5. Ranking de Salud del Servicio
+        conteo_ranking = Counter([l['email'] for l in logs_para_tabla if l.get('email')])
         ranking = []
         for email, count in conteo_ranking.most_common(5):
             logs_cliente = [l for l in logs_para_tabla if l['email'] == email]
@@ -482,20 +506,24 @@ def admin_panel():
             salud = int((exitos / len(logs_cliente)) * 100) if logs_cliente else 0
             ranking.append({"email": email, "count": count, "salud": salud, "alerta": salud < 70})
 
+        # 6. Resumen de uso (chips)
+        resumen_uso = [{"email": k, "actividad": [{"fecha": f, "cantidad": c} for f, c in sorted(v.items(), reverse=True)[:7]]} for k, v in resumen_dict.items()]
+
         stats = {
             "total": len(usuarios),
             "activos": len([u for u in usuarios if not u['vencido']]),
             "vencidos": len([u for u in usuarios if u['vencido']])
         }
 
-        # RETORNO COMPLETO
+        # RETORNO INTEGRADO CON admin.html
         return render_template('admin.html', 
                                usuarios=usuarios, 
                                stats=stats, 
-                               logs=logs_para_tabla, # <--- Corregido
+                               logs=logs_para_tabla, 
                                ranking=ranking, 
                                resumen_uso=resumen_uso, 
-                               admin_pass=ADMIN_PASS)
+                               admin_pass=ADMIN_PASS,
+                               tasa_actual=tasa_val) # <--- Crucial para el value="{{ tasa_actual }}"
                                
     except Exception as e:
         print(f"ERROR EN PANEL ADMIN: {str(e)}")
