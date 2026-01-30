@@ -361,38 +361,7 @@ def limpiar_precio(valor):
         return float(s)
     except:
         return 0.0
-@app.route('/admin/actualizar_tasa_maestra', methods=['POST'])
-def actualizar_tasa_maestra():
-    # Buscamos auth_key que viene del formulario
-    auth = request.form.get('auth_key')
-    
-    # IMPORTANTE: Verifica que coincida con tu ADMIN_PASS
-    if auth != ADMIN_PASS:
-        return f"Error de autenticación: recibiste {auth}", 403
 
-    nueva_tasa = request.form.get('tasa')
-    if not nueva_tasa:
-        return "Error: No se recibió ninguna tasa", 400
-
-    try:
-        tasa_val = float(str(nueva_tasa).replace(",", "."))
-        
-        # Usamos UPSERT para evitar errores de llave duplicada o inexistente
-        supabase.table("ajustes_sistema").upsert({
-            "clave": "tasa_maestra", 
-            "valor": tasa_val
-        }).execute()
-
-        # Limpiamos la RAM para que todos los usuarios se actualicen
-        memoria_tasa.clear()
-        
-        flash(f"Tasa global actualizada a {tasa_val} Bs.")
-        return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
-
-    except Exception as e:
-        # Esto te dirá exactamente qué pasó en los logs de Koyeb si vuelve a fallar
-        print(f"DEBUG ERROR TASA: {str(e)}")
-        return f"Error interno: {str(e)}", 500
 @app.route('/admin/actualizar_tasa_maestra', methods=['POST'])
 def actualizar_tasa_maestra():
     # 1. Verificación de seguridad básica
