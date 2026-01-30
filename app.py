@@ -49,32 +49,34 @@ def obtener_tasa_actual():
     return jsonify({"tasa": datos_tasa["tasa"]})
 
 def get_tasa_usuario(email):
-    # PRIORIDAD 1: ¿Está en la memoria RAM? (Rapidez)
+    # PRIORIDAD 1: Memoria RAM (Solo el número)
     if email in memoria_tasa:
         return memoria_tasa[email]
     
-    # PRIORIDAD 2: ¿El usuario tiene una tasa fija en su suscripción?
+    # PRIORIDAD 2: Tasa personalizada por cliente
     try:
         res_sub = supabase.table("suscripciones").select("tasa_personalizada").eq("email", email).execute()
         if res_sub.data and res_sub.data[0].get('tasa_personalizada'):
             t_val = float(res_sub.data[0]['tasa_personalizada'])
-            memoria_tasa[email] = {"tasa": t_val, "manual": True, "fecha": "PERFIL"}
-            return memoria_tasa[email]
-    except: pass
+            memoria_tasa[email] = t_val # Guardamos solo el número
+            return t_val
+    except: 
+        pass
 
-    # PRIORIDAD 3: LA TASA MAESTRA DEL ADMINISTRADOR
+    # PRIORIDAD 3: TASA MAESTRA GLOBAL (El 555 que pusiste)
     try:
         res_global = supabase.table("ajustes_sistema").select("valor").eq("clave", "tasa_maestra").execute()
         if res_global.data:
             t_maestra = float(res_global.data[0]['valor'])
-            # Guardamos en RAM para este usuario específico
-            memoria_tasa[email] = {"tasa": t_maestra, "manual": True, "fecha": "GLOBAL"}
-            return memoria_tasa[email]
-    except: pass
+            memoria_tasa[email] = t_maestra # Guardamos solo el número
+            return t_maestra
+    except: 
+        pass
 
     # PRIORIDAD 4: BCV (Fallback final)
     tasa_bcv = obtener_tasa_real()
-    return {"tasa": tasa_bcv, "manual": False, "fecha": "BCV"}
+    # No lo guardamos en RAM permanentemente para que intente refrescarse
+    return tasa_bcv
 # --- RUTAS DE AUTENTICACIÓN ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
