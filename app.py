@@ -148,26 +148,24 @@ def index():
 @app.route('/preguntar', methods=['POST'])
 def preguntar():
     import gc
+    import random  # Importante para los saludos aleatorios
     data = request.get_json()
     usuario_email = session.get('usuario')
     
     if not usuario_email: 
         return jsonify({"respuesta": "Sesión expirada."}), 401
     
-    # --- 1. PRIORIDAD: MODO GERENCIA (Antes de procesar nada más) ---
     pregunta_raw = data.get('pregunta', '').lower().strip()
     
     # --- 1. PRIORIDAD: MODO GERENCIA ---
-    pregunta_raw = data.get('pregunta', '').lower().strip()
-    
     if "activar modo gerencia" in pregunta_raw or "modo gerencia" in pregunta_raw:
         return jsonify({
             "exito": True,
             "respuesta": "Modo gerencia activado. Ahora puedes ver el stock y cambiar la tasa.",
             "modo_admin": True,
-            "producto_nombre": "GERENCIA", # Evita el undefined en el nombre
-            "p_bs": "---",                 # Evita el undefined en Bolívares
-            "p_usd": "---"                 # Evita el undefined en Dólares
+            "producto_nombre": "GERENCIA",
+            "p_bs": "---",
+            "p_usd": "---"
         })
 
     # --- 2. DATOS DE CONTEXTO ---
@@ -175,7 +173,7 @@ def preguntar():
     es_modo_admin = data.get('modo_admin', False)
     tasa_actual = get_tasa_usuario(usuario_email)
 
-    # --- 3. CAMBIO DE TASA (Si el usuario lo solicita) ---
+    # --- 3. CAMBIO DE TASA ---
     if data.get('nueva_tasa'):
         try:
             val = float(str(data.get('nueva_tasa')).replace(",", "."))
@@ -184,7 +182,7 @@ def preguntar():
             return jsonify({"respuesta": f"Tasa actualizada a {val} Bs.", "exito_tasa": True, "tasa": val})
         except: return jsonify({"respuesta": "Formato de tasa no válido."})
 
-    # --- 4. BÚSQUEDA EN INVENTARIO (Ultra-Light sin Pandas) ---
+    # --- 4. BÚSQUEDA EN INVENTARIO ---
     try:
         res = supabase.table("inventarios").select("producto, precio_usd, stock").eq("empresa_email", usuario_email).execute()
         inventario = res.data
@@ -193,49 +191,47 @@ def preguntar():
         if not inventario:
             return jsonify({"respuesta": "Elena: Tu inventario está vacío."})
 
-        # Limpiar palabras de ruido
         pregunta_limpia = pregunta_raw
         for f in ["cuanto cuesta", "cuanto vale", "precio de", "precio", "dame el precio de"]:
             pregunta_limpia = pregunta_limpia.replace(f, "")
         pregunta_limpia = pregunta_limpia.strip()
 
-        # Búsqueda difusa ligera
         nombres = [str(i['producto']) for i in inventario]
         match = process.extractOne(pregunta_limpia, nombres, processor=utils.default_process)
 
-        # --- BUSCA ESTE BLOQUE DENTRO DE @app.route('/preguntar') ---
         if match and match[1] > 65:
             nombre_p = match[0]
             item = next((i for i in inventario if i['producto'] == nombre_p), None)
             
             if item:
                 p_usd = float(item['precio_usd'])
-                
-                # CORRECCIÓN AQUÍ: Cambiamos 'datos_tasa' por 'tasa_actual'
-                # Añadimos round(..., 2) para evitar decimales infinitos
                 p_bs = round(p_usd * tasa_actual, 2) 
                 
-                # Formateo visual (Puntos para miles, Comas para decimales)
                 v_bs_vis = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                
-                # Formateo para la voz de Elena (Ej: "55 con 20")
                 txt_audio = f"{p_bs:.2f}".replace(".", " con ")
+
+                # --- NUEVO: TOQUE HUMANO (Saludos Aleatorios) ---
+                saludos = [
+                    f"Claro, con gusto te informo que el {nombre_p.lower()}",
+                    f"Por supuesto, el {nombre_p.lower()}",
+                    f"Actualmente tenemos el {nombre_p.lower()} en",
+                    f"El {nombre_p.lower()} tiene un costo de",
+                    f"Sí, el precio del {nombre_p.lower()} es de"
+                ]
+                inicio_frase = random.choice(saludos)
+                respuesta_texto = f"{inicio_frase} {txt_audio} Bolívares."
                 
-                respuesta_texto = f"El {nombre_p.lower()} cuesta {txt_audio} Bolívares."
-                
+                # --- Lógica de Stock ---
                 if es_modo_admin:
                     stock_actual = item.get('stock', 0)
                     respuesta_texto += f" Hay {stock_actual} unidades en existencia."
 
-                # Registro en logs de Supabase
+                # Registro y limpieza
                 supabase.table("logs_actividad").insert({
-                    "email": usuario_email, 
-                    "accion": "CONSULTA", 
-                    "equipo_id": equipo_id, 
-                    "exito": True
+                    "email": usuario_email, "accion": "CONSULTA", 
+                    "equipo_id": equipo_id, "exito": True
                 }).execute()
 
-                # Limpieza de memoria
                 del inventario
                 gc.collect()
 
