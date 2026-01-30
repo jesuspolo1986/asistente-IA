@@ -52,18 +52,25 @@ def obtener_tasa_actual():
     return jsonify({"tasa": tasa_valor})
 
 def get_tasa_usuario(email):
-    # Usamos una sola llave 'global' para todos
-    if 'global' in memoria_tasa:
-        return memoria_tasa['global']
+    # Intentamos obtener la tasa 'global' de la memoria para ser rápidos
+    # Pero añadimos un control de tiempo para que se refresque cada poco
+    ahora = time.time()
     
-    try:
-        res_global = supabase.table("ajustes_sistema").select("valor").eq("clave", "tasa_maestra").execute()
-        if res_global.data:
-            t_maestra = float(res_global.data[0]['valor'])
-            memoria_tasa['global'] = t_maestra # <--- AHORA ES GLOBAL
-            return t_maestra
-    except: pass
-    return obtener_tasa_real()
+    # Si la tasa no existe en RAM o pasaron más de 60 segundos, forzamos lectura de DB
+    if 'global' not in memoria_tasa or (ahora - memoria_tasa.get('last_update', 0)) > 60:
+        try:
+            # 1. Prioridad: Tasa Maestra Global del Panel
+            res = supabase.table("ajustes_sistema").select("valor").eq("clave", "tasa_maestra").execute()
+            if res.data:
+                nueva_tasa = float(res.data[0]['valor'])
+                memoria_tasa['global'] = nueva_tasa
+                memoria_tasa['last_update'] = ahora
+                return nueva_tasa
+        except Exception as e:
+            print(f"Error consultando DB: {e}")
+    
+    # Si la DB falla o ya tenemos una tasa fresca en RAM, la usamos
+    return memoria_tasa.get('global', obtener_tasa_real())
 # --- RUTAS DE AUTENTICACIÓN ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
