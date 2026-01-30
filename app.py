@@ -52,34 +52,22 @@ def obtener_tasa_actual():
     return jsonify({"tasa": tasa_valor})
 
 def get_tasa_usuario(email):
-    # PRIORIDAD 1: Memoria RAM (Solo el número)
+    # 1. ¿Está en la memoria RAM?
     if email in memoria_tasa:
         return memoria_tasa[email]
     
-    # PRIORIDAD 2: Tasa personalizada por cliente
     try:
-        res_sub = supabase.table("suscripciones").select("tasa_personalizada").eq("email", email).execute()
-        if res_sub.data and res_sub.data[0].get('tasa_personalizada'):
-            t_val = float(res_sub.data[0]['tasa_personalizada'])
-            memoria_tasa[email] = t_val # Guardamos solo el número
-            return t_val
-    except: 
-        pass
-
-    # PRIORIDAD 3: TASA MAESTRA GLOBAL (El 555 que pusiste)
-    try:
+        # 2. Ir DIRECTO a la Tasa Maestra Global
         res_global = supabase.table("ajustes_sistema").select("valor").eq("clave", "tasa_maestra").execute()
         if res_global.data:
             t_maestra = float(res_global.data[0]['valor'])
-            memoria_tasa[email] = t_maestra # Guardamos solo el número
+            memoria_tasa[email] = t_maestra
             return t_maestra
-    except: 
-        pass
+    except Exception as e:
+        print(f"Error consultando tasa global: {e}")
 
-    # PRIORIDAD 4: BCV (Fallback final)
-    tasa_bcv = obtener_tasa_real()
-    # No lo guardamos en RAM permanentemente para que intente refrescarse
-    return tasa_bcv
+    # 3. Fallback: BCV si la base de datos falla
+    return obtener_tasa_real()
 # --- RUTAS DE AUTENTICACIÓN ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
