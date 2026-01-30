@@ -131,7 +131,7 @@
                     body: JSON.stringify({ 
                         nueva_tasa: nuevaTasa, 
                         modo_admin: modoGerencia,
-                        equipo_id: equipoID // Identificador en cambio de tasa
+                        equipo_id: equipoID 
                     })
                 });
                 const dataT = await resT.json();
@@ -145,26 +145,31 @@
             return;
         }
 
-        // Lógica de consulta normal (con identificación de equipo)
+        // Lógica de consulta normal
         const res = await fetch('/preguntar', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ 
                 pregunta: query, 
                 modo_admin: modoGerencia,
-                equipo_id: equipoID // Identificador en consulta normal
+                equipo_id: equipoID 
             })
         });
         const data = await res.json();
         
-        if(data.exito) {
+        // --- CORRECCIÓN AQUÍ ---
+        // --- BUSCA ESTA PARTE EN TU FUNCIÓN enviar() ---
+        if(data.exito && data.producto_nombre !== "GERENCIA" && data.p_bs !== undefined) {
             document.getElementById('priceDisplay').style.display = 'block';
             document.getElementById('nombreProducto').innerText = data.producto_nombre;
             document.getElementById('priceBs').innerText = data.p_bs;
             document.getElementById('priceUsd').innerText = data.p_usd + " $";
         } else {
+            // Si no hay éxito, ocultamos y reseteamos a valores base
             document.getElementById('priceDisplay').style.display = 'none';
-            document.getElementById('nombreProducto').innerText = "ELENA AI";
+            document.getElementById('nombreProducto').innerText = data.producto_nombre || "ELENA AI";
+            document.getElementById('priceBs').innerText = "0,00"; // Limpieza
+            document.getElementById('priceUsd').innerText = "0,00 $"; // Limpieza
         }
 
         document.getElementById('textoElena').innerText = data.respuesta;
@@ -174,8 +179,10 @@
         input.value = "";
     }
 
-    function activarModoGerencia() {
+   function activarModoGerencia() {
+        if(modoGerencia) return; 
         modoGerencia = true;
+        
         document.getElementById('btnAdmin').style.display = 'block';
         document.getElementById('badgeAdmin').style.display = 'inline-block';
         
@@ -191,7 +198,7 @@
                 statusText.style.color = "#ff6b6b";
             }
         }
-    }
+    } // Asegúrate de que termine aquí antes de handleLogout
 
     function handleLogout() {
         if(modoGerencia) {

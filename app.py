@@ -157,11 +157,17 @@ def preguntar():
     # --- 1. PRIORIDAD: MODO GERENCIA (Antes de procesar nada más) ---
     pregunta_raw = data.get('pregunta', '').lower().strip()
     
+    # --- 1. PRIORIDAD: MODO GERENCIA ---
+    pregunta_raw = data.get('pregunta', '').lower().strip()
+    
     if "activar modo gerencia" in pregunta_raw or "modo gerencia" in pregunta_raw:
         return jsonify({
             "exito": True,
             "respuesta": "Modo gerencia activado. Ahora puedes ver el stock y cambiar la tasa.",
-            "modo_admin": True
+            "modo_admin": True,
+            "producto_nombre": "GERENCIA", # Evita el undefined en el nombre
+            "p_bs": "---",                 # Evita el undefined en Bolívares
+            "p_usd": "---"                 # Evita el undefined en Dólares
         })
 
     # --- 2. DATOS DE CONTEXTO ---
@@ -203,7 +209,7 @@ def preguntar():
             
             if item:
                 p_usd = float(item['precio_usd'])
-                p_bs = p_usd * tasa_actual
+                p_bs = p_usd * datos_tasa
                 
                 # Formateo visual y de voz
                 v_bs_vis = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
