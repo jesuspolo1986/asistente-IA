@@ -211,13 +211,37 @@ def preguntar():
                 txt_audio = f"{p_bs:.2f}".replace(".", " con ")
 
                 # --- NUEVO: TOQUE HUMANO (Saludos Aleatorios) ---
+                # --- COLECCIÓN DE 20 FRASES PARA UNA EXPERIENCIA PREMIUM ---
                 saludos = [
-                    f"Claro, con gusto te informo que el {nombre_p.lower()}",
-                    f"Por supuesto, el {nombre_p.lower()}",
-                    f"Actualmente tenemos el {nombre_p.lower()} en",
-                    f"El {nombre_p.lower()} tiene un costo de",
-                    f"Sí, el precio del {nombre_p.lower()} es de"
+                    # Estilo Cortés y Servicial
+                    f"¡Hola! Con mucho gusto te informo que el {nombre_p.lower()} tiene un costo de",
+                    f"Un placer atenderte. El {nombre_p.lower()} que buscas está en",
+                    f"Para servirte, te indico que el precio del {nombre_p.lower()} es de",
+                    f"¡Buen día! El valor actual para el {nombre_p.lower()} es de",
+                    f"Es un gusto saludarte. Te confirmo que el {nombre_p.lower()} cuesta",
+                    
+                    # Estilo Directo y Eficiente
+                    f"Te informo que el {nombre_p.lower()} tiene un precio de",
+                    f"El {nombre_p.lower()} se encuentra disponible por",
+                    f"Actualmente el costo del {nombre_p.lower()} es de",
+                    f"Sí, el precio registrado para el {nombre_p.lower()} es",
+                    f"El valor de mercado para el {nombre_p.lower()} hoy es",
+                    
+                    # Estilo Positivo y Dinámico
+                    f"¡Buenas noticias! Contamos con {nombre_p.lower()} y su precio es",
+                    f"Claro que sí, el {nombre_p.lower()} lo tenemos en",
+                    f"Por supuesto, el precio actualizado del {nombre_p.lower()} es de",
+                    f"Contamos con existencia de {nombre_p.lower()} a un valor de",
+                    f"¡Confirmado! El {nombre_p.lower()} tiene un costo de",
+                    
+                    # Estilo Informativo
+                    f"Según nuestro inventario, el {nombre_p.lower()} cuesta",
+                    f"Te indico que el precio actualizado para el {nombre_p.lower()} es",
+                    f"El {nombre_p.lower()} está disponible actualmente por",
+                    f"He verificado y el {nombre_p.lower()} tiene un precio de",
+                    f"Para tu referencia, el costo del {nombre_p.lower()} es de"
                 ]
+                inicio_frase = random.choice(saludos)
                 inicio_frase = random.choice(saludos)
                 respuesta_texto = f"{inicio_frase} {txt_audio} Bolívares."
                 
