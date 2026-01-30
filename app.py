@@ -41,12 +41,15 @@ def obtener_tasa_real():
     except: return 54.20
 @app.route('/obtener_tasa_actual', methods=['GET'])
 def obtener_tasa_actual():
-    usuario_email = session.get('usuario')
+    usuario_email = session.get('usuario') # Asegúrate de que usas 'usuario' o 'user_email' según tu login
     if not usuario_email:
         return jsonify({"error": "No session"}), 401
     
-    datos_tasa = get_tasa_usuario(usuario_email)
-    return jsonify({"tasa": datos_tasa["tasa"]})
+    # Ahora get_tasa_usuario devuelve directamente el número (float)
+    tasa_valor = get_tasa_usuario(usuario_email)
+    
+    # Devolvemos el número envuelto en el JSON que el frontend espera
+    return jsonify({"tasa": tasa_valor})
 
 def get_tasa_usuario(email):
     # PRIORIDAD 1: Memoria RAM (Solo el número)
@@ -128,19 +131,27 @@ def logout():
 # --- RUTA PRINCIPAL ---
 @app.route('/')
 def index():
-    if not session.get('logged_in'): return redirect(url_for('login'))
+    if not session.get('logged_in'): 
+        return redirect(url_for('login'))
     
     email = session.get('usuario')
-    datos_tasa = get_tasa_usuario(email)
+    
+    # 1. Obtenemos el valor numérico (ej: 555.0)
+    tasa_valor = get_tasa_usuario(email)
     
     dias_restantes = 0
     if session.get('fecha_vencimiento'):
         try:
             vence = datetime.strptime(session['fecha_vencimiento'], '%Y-%m-%d').date()
             dias_restantes = (vence - datetime.now().date()).days
-        except: pass
-        
-    return render_template('index.html', tasa=datos_tasa['tasa'], dias_restantes=dias_restantes, email=email)
+        except: 
+            pass
+    
+    # CORRECCIÓN AQUÍ: Pasamos 'tasa_valor' directamente sin ['tasa']
+    return render_template('index.html', 
+                           tasa=tasa_valor, 
+                           dias_restantes=dias_restantes, 
+                           email=email)
 
 # --- LÓGICA DE ELENA (BÚSQUEDA EN BASE DE DATOS) ---
 @app.route('/preguntar', methods=['POST'])
