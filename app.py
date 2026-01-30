@@ -49,27 +49,32 @@ def obtener_tasa_actual():
     return jsonify({"tasa": datos_tasa["tasa"]})
 
 def get_tasa_usuario(email):
-    # 1. Intentar obtener de la RAM (Súper rápido para el uso diario)
+    # PRIORIDAD 1: ¿Está en la memoria RAM? (Rapidez)
     if email in memoria_tasa:
         return memoria_tasa[email]
     
-    # 2. Si no está en RAM (ej: se reinició el server), buscar en Supabase
+    # PRIORIDAD 2: ¿El usuario tiene una tasa fija en su suscripción?
     try:
-        res = supabase.table("suscripciones").select("tasa_personalizada").eq("email", email).execute()
-        if res.data and res.data[0].get('tasa_personalizada'):
-            tasa_db = float(res.data[0]['tasa_personalizada'])
-            datos = {"tasa": tasa_db, "manual": True, "fecha": "DB_PERSISTENTE"}
-            memoria_tasa[email] = datos  # Guardar en RAM para la próxima consulta
-            return datos
-    except Exception as e:
-        print(f"Error recuperando tasa persistente: {e}")
+        res_sub = supabase.table("suscripciones").select("tasa_personalizada").eq("email", email).execute()
+        if res_sub.data and res_sub.data[0].get('tasa_personalizada'):
+            t_val = float(res_sub.data[0]['tasa_personalizada'])
+            memoria_tasa[email] = {"tasa": t_val, "manual": True, "fecha": "PERFIL"}
+            return memoria_tasa[email]
+    except: pass
 
-    # 3. Fallback: Si no hay tasa manual guardada, usar BCV
-    tasa_oficial = obtener_tasa_real()
-    datos = {"tasa": tasa_oficial, "manual": False, "fecha": datetime.now().strftime("%Y-%m-%d")}
-    memoria_tasa[email] = datos
-    return datos
+    # PRIORIDAD 3: LA TASA MAESTRA DEL ADMINISTRADOR
+    try:
+        res_global = supabase.table("ajustes_sistema").select("valor").eq("clave", "tasa_maestra").execute()
+        if res_global.data:
+            t_maestra = float(res_global.data[0]['valor'])
+            # Guardamos en RAM para este usuario específico
+            memoria_tasa[email] = {"tasa": t_maestra, "manual": True, "fecha": "GLOBAL"}
+            return memoria_tasa[email]
+    except: pass
 
+    # PRIORIDAD 4: BCV (Fallback final)
+    tasa_bcv = obtener_tasa_real()
+    return {"tasa": tasa_bcv, "manual": False, "fecha": "BCV"}
 # --- RUTAS DE AUTENTICACIÓN ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -356,7 +361,53 @@ def limpiar_precio(valor):
         return float(s)
     except:
         return 0.0
+@app.route('/admin/actualizar_tasa_maestra', methods=['POST'])
+def actualizar_maestra():
+    auth = request.form.get('auth_key')
+    if auth != ADMIN_PASS: return "No autorizado", 403
+    
+    nueva_tasa = request.form.get('tasa')
+    # Actualizamos la tabla global en Supabase
+    supabase.table("config_global").update({"valor": nueva_tasa}).eq("clave", "tasa_maestra").execute()
+    
+    # OPCIONAL: Limpiamos la memoria RAM para que todos los usuarios 
+    # sientan el cambio en su próximo polling de 30 seg.
+    memoria_tasa.clear() 
+    
+    return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+@app.route('/admin/actualizar_tasa_maestra', methods=['POST'])
+def actualizar_tasa_maestra():
+    # 1. Verificación de seguridad básica
+    auth = request.form.get('auth_key')
+    if auth != ADMIN_PASS:
+        return "Acceso denegado: Clave administrativa incorrecta", 403
 
+    nueva_tasa = request.form.get('tasa')
+    
+    if not nueva_tasa:
+        return "Error: Debes ingresar un valor de tasa", 400
+
+    try:
+        # 2. Limpiar el formato del número (por si usan coma en vez de punto)
+        tasa_val = float(str(nueva_tasa).replace(",", "."))
+
+        # 3. Guardar en la tabla maestra de Supabase
+        # Nota: Asegúrate de haber creado la tabla 'ajustes_sistema' con la clave 'tasa_maestra'
+        supabase.table("ajustes_sistema").update({"valor": tasa_val}).eq("clave", "tasa_maestra").execute()
+
+        # 4. LIMPIEZA ESTRATÉGICA DE RAM
+        # Al vaciar el diccionario, obligamos a get_tasa_usuario a buscar en la DB 
+        # la nueva tasa global para todos los clientes activos.
+        memoria_tasa.clear()
+
+        print(f"✅ Tasa Global actualizada a {tasa_val} por el administrador.")
+        flash(f"Éxito: Tasa global actualizada a {tasa_val} Bs.")
+        
+        return redirect(url_for('admin_panel', auth_key=ADMIN_PASS))
+
+    except Exception as e:
+        print(f"❌ Error actualizando tasa global: {e}")
+        return f"Error interno: {str(e)}", 500
 def encontrar_columnas_maestras(columnas):
     """Identifica Producto, Precio y Stock entre nombres caóticos"""
     mapeo = {
