@@ -241,19 +241,34 @@ def preguntar():
                 v_bs_vis = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                 txt_audio = f"{p_bs:.2f}".replace(".", " con ")
 
-                saludos = [
-                    f"¡Hola! El {nombre_p.lower()} tiene un costo de",
-                    f"Un placer atenderte. El {nombre_p.lower()} está en",
-                    f"Para servirte, el precio del {nombre_p.lower()} es de",
-                    f"¡Buen día! El valor actual para el {nombre_p.lower()} es de",
-                    f"Te informo que el {nombre_p.lower()} cuesta",
-                    f"Actualmente el costo del {nombre_p.lower()} es de",
-                    f"Por supuesto, el precio actualizado del {nombre_p.lower()} es de",
-                    f"¡Confirmado! El {nombre_p.lower()} tiene un costo de"
+                # --- GENERADOR DE SALUDOS DINÁMICOS (Más de 50 combinaciones) ---
+                saludos_inicio = [
+                    "¡Hola!", "¡Buen día!", "¡Saludos!", "Es un gusto saludarte.", "Un placer atenderte.", 
+                    "Hola, ¿cómo estás?", "¡Feliz día!", "Qué bueno que nos consultas.", "Bienvenido.",
+                    "Es un placer servirte.", "Estamos para ayudarte.", "Gracias por preguntar.",
+                    "¡Hola! Qué gusto.", "Buen día, gracias por consultarnos.", "Hola, un placer."
                 ]
                 
-                inicio_frase = random.choice(saludos)
+                acciones = [
+                    f"te informo que el {nombre_p.lower()}", f"el precio del {nombre_p.lower()}", 
+                    f"el {nombre_p.lower()} que buscas", f"te confirmo que el {nombre_p.lower()}",
+                    f"actualmente el {nombre_p.lower()}", f"el valor del {nombre_p.lower()}",
+                    f"el costo de el {nombre_p.lower()}", f"la cotización para el {nombre_p.lower()}",
+                    f"según nuestro sistema el {nombre_p.lower()}", f"te indico que el {nombre_p.lower()}"
+                ]
+                
+                conectores = [
+                    "tiene un costo de", "está en", "se encuentra en", "cuesta", "sale en", 
+                    "lo tenemos por el valor de", "está disponible por", "tiene un precio de",
+                    "está marcado en", "está cotizado en", "se ubica en"
+                ]
+
+                # Esta línea genera la magia mezclando las 3 listas
+                inicio_frase = f"{random.choice(saludos_inicio)} {random.choice(acciones)} {random.choice(conectores)}"
+                
                 respuesta_texto = f"{inicio_frase} {txt_audio} Bolívares."
+                
+                
                 
                 if es_modo_admin:
                     stock_actual = item.get('stock', 0)
