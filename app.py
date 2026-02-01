@@ -284,18 +284,21 @@ def preguntar():
 @app.route('/upload', methods=['POST'])
 def upload_file():
     usuario_email = session.get('usuario')
-    if not usuario_email: return jsonify({"success": False, "error": "No login"}), 401
+    if not usuario_email: 
+        return jsonify({"success": False, "error": "No login"}), 401
     
     file = request.files.get('archivo')
-    if not file: return jsonify({"success": False, "error": "No file"})
+    if not file: 
+        return jsonify({"success": False, "error": "No file"})
 
     try:
-        # 1. Leer Excel (Intentamos detectar dónde empiezan los datos reales)
+        # 1. Leer Excel
         df = pd.read_excel(file)
         
-        # SI el Excel tiene filas vacías o basura arriba, buscamos la fila de títulos
+        # Búsqueda inteligente de cabeceras si hay basura arriba
         if not any(x in str(df.columns).lower() for x in ['producto', 'precio', 'articulo']):
-            for i in range(10): # Buscamos en las primeras 10 filas
+            file.seek(0) # Resetear puntero del archivo para volver a leer
+            for i in range(10):
                 df = pd.read_excel(file, skiprows=i+1)
                 if any(x in str(df.columns).lower() for x in ['producto', 'precio', 'articulo']):
                     break
@@ -306,33 +309,53 @@ def upload_file():
         if 'producto' not in cols_encontradas or 'precio' not in cols_encontradas:
             return jsonify({"success": False, "error": "No detecto columnas de Producto o Precio"})
 
-        # 3. Limpiar y Estandarizar Datos
+        # 3. Limpiar y Estandarizar Datos (Protección contra errores de escritura)
         df_limpio = pd.DataFrame()
+        
+        # Limpiar Nombres: Quitar filas vacías de productos
         df_limpio['producto'] = df[cols_encontradas['producto']].astype(str).str.upper().str.strip()
+        df_limpio = df_limpio[df_limpio['producto'] != 'NAN'] # Eliminar filas vacías
+
+        # Limpiar Precios: Usar la función limpiar_precio que ya tienes
         df_limpio['precio_usd'] = df[cols_encontradas['precio']].apply(limpiar_precio)
         
+        # --- CORRECCIÓN CRÍTICA PARA EL STOCK ---
+        def limpiar_stock(val):
+            try:
+                if pd.isna(val) or str(val).strip() in ['...', '', 'None']:
+                    return 0
+                # Convertir a float primero (por si viene 10.0) y luego a int
+                return int(float(str(val).replace(',', '.')))
+            except:
+                return 0
+
         if 'stock' in cols_encontradas:
-            df_limpio['stock'] = df[cols_encontradas['stock']].fillna(0).astype(int)
+            df_limpio['stock'] = df[cols_encontradas['stock']].apply(limpiar_stock)
         else:
             df_limpio['stock'] = 0
 
         df_limpio['empresa_email'] = usuario_email
 
-        # 4. Guardar en Supabase (Borrar anterior y subir nuevo)
+        # 4. Guardar en Supabase
+        # Borramos lo anterior del usuario
         supabase.table("inventarios").delete().eq("empresa_email", usuario_email).execute()
         
-        # Subir por bloques para no saturar la conexión
+        # Subida por bloques (Chunks) para estabilidad
         datos_finales = df_limpio.to_dict(orient='records')
         for i in range(0, len(datos_finales), 100):
             supabase.table("inventarios").insert(datos_finales[i:i+100]).execute()
+
+        # Limpieza manual de memoria
+        import gc
+        del df
+        del df_limpio
+        gc.collect()
 
         return jsonify({"success": True, "productos": len(datos_finales)})
 
     except Exception as e:
         print(f"Error en carga: {str(e)}")
         return jsonify({"success": False, "error": str(e)})
-# --- PANEL ADMIN (Se mantiene igual pero conectado a suscripciones) ---
-# --- RUTAS ADMINISTRATIVAS COMPLETAS ---
 def limpiar_precio(valor):
     """Convierte 'Ref 1.50$', '1,50' o ' 2.00 ' en float 1.50"""
     if pd.isna(valor) or valor == '': return 0.0
