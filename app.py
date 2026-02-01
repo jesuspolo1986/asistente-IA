@@ -149,6 +149,10 @@ def index():
 def preguntar():
     import gc
     import random
+    import re
+    import unicodedata
+    from rapidfuzz import process, utils
+
     data = request.get_json()
     usuario_email = session.get('usuario')
     
@@ -156,9 +160,15 @@ def preguntar():
         return jsonify({"respuesta": "Sesión expirada."}), 401
     
     pregunta_raw = data.get('pregunta', '').lower().strip()
-    
+
+    # --- FUNCIÓN INTERNA PARA QUITAR TILDES ---
+    def eliminar_tildes(texto):
+        return ''.join(c for c in unicodedata.normalize('NFD', texto)
+                      if unicodedata.category(c) != 'Mn')
+
     # --- 1. PRIORIDAD: MODO GERENCIA ---
-    if "activar modo gerencia" in pregunta_raw or "modo gerencia" in pregunta_raw:
+    pregunta_sin_tildes = eliminar_tildes(pregunta_raw)
+    if "activar modo gerencia" in pregunta_sin_tildes or "modo gerencia" in pregunta_sin_tildes:
         return jsonify({
             "exito": True,
             "respuesta": "Modo gerencia activado. Ahora puedes ver el stock y cambiar la tasa.",
@@ -186,67 +196,60 @@ def preguntar():
     try:
         res = supabase.table("inventarios").select("producto, precio_usd, stock").eq("empresa_email", usuario_email).execute()
         inventario = res.data
-        del res
         
         if not inventario:
             return jsonify({"respuesta": "Elena: Tu inventario está vacío."})
 
-        # --- LIMPIEZA DE RUIDO MEJORADA ---
-        pregunta_limpia = pregunta_raw
+        # --- LIMPIEZA DE RUIDO PROFESIONAL (REGEX) ---
+        # 1. Quitamos tildes para que "cuánto" sea "cuanto"
+        limpia = eliminar_tildes(pregunta_raw)
+        
+        # 2. Lista de frases de ruido que Elena debe ignorar
+        # Usamos \b para asegurar que borre palabras completas y no partes de nombres
         frases_ruido = [
-            "cuanto cuesta el", "cuanto cuesta la", "cuanto cuesta",
-            "cuanto vale el", "cuanto vale la", "cuanto vale",
-            "que precio tiene el", "que precio tiene la", "que precio tiene",
-            "dame el precio de", "dame el precio del", "dame el precio",
-            "precio del", "precio de la", "precio de", "precio",
-            "en cuanto sale el", "en cuanto sale la", "en cuanto sale",
-            "tendras", "tienes", "busco", "necesito"
+            r"cuanto cuesta el", r"cuanto cuesta la", r"cuanto cuesta",
+            r"cuanto vale el", r"cuanto vale la", r"cuanto vale",
+            r"que precio tiene el", r"que precio tiene la", r"que precio tiene",
+            r"dame el precio de", r"dame el precio del", r"dame el precio",
+            r"precio del", r"precio de la", r"precio de", r"precio",
+            r"en cuanto sale el", r"en cuanto sale la", r"en cuanto sale",
+            r"que tiene", r"tienes", r"tendras", r"busco", r"necesito",
+            r"\bla\b", r"\bel\b", r"\bdame\b"
         ]
         
         for f in frases_ruido:
-            pregunta_limpia = pregunta_limpia.replace(f, "")
+            limpia = re.sub(f, "", limpia).strip()
         
-        pregunta_limpia = pregunta_limpia.replace("?", "").replace("¿", "").strip()
+        # 3. Quitamos signos y espacios extra
+        limpia = limpia.replace("?", "").replace("¿", "").strip()
 
-        if not pregunta_limpia:
-            return jsonify({"exito": False, "respuesta": "¿Qué producto deseas consultar?"})
+        # Si queda vacía por error, volvemos a la original para no fallar
+        if not limpia:
+            limpia = pregunta_raw
 
-        # --- EJECUCIÓN DE BÚSQUEDA (CORREGIDO) ---
+        # --- EJECUCIÓN DE BÚSQUEDA ---
         nombres = [str(i['producto']) for i in inventario]
-        match = process.extractOne(pregunta_limpia, nombres, processor=utils.default_process)
+        match = process.extractOne(limpia, nombres, processor=utils.default_process)
 
-        if match and match[1] > 65:
+        if match and match[1] > 60: # Bajamos a 60 para mayor flexibilidad
             nombre_p = match[0]
             item = next((i for i in inventario if i['producto'] == nombre_p), None)
             
             if item:
                 p_usd = float(item['precio_usd'])
                 p_bs = round(p_usd * tasa_actual, 2) 
-                
                 v_bs_vis = f"{p_bs:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                 txt_audio = f"{p_bs:.2f}".replace(".", " con ")
 
                 saludos = [
-                    f"¡Hola! Con mucho gusto te informo que el {nombre_p.lower()} tiene un costo de",
-                    f"Un placer atenderte. El {nombre_p.lower()} que buscas está en",
-                    f"Para servirte, te indico que el precio del {nombre_p.lower()} es de",
+                    f"¡Hola! El {nombre_p.lower()} tiene un costo de",
+                    f"Un placer atenderte. El {nombre_p.lower()} está en",
+                    f"Para servirte, el precio del {nombre_p.lower()} es de",
                     f"¡Buen día! El valor actual para el {nombre_p.lower()} es de",
-                    f"Es un gusto saludarte. Te confirmo que el {nombre_p.lower()} cuesta",
-                    f"Te informo que el {nombre_p.lower()} tiene un precio de",
-                    f"El {nombre_p.lower()} se encuentra disponible por",
+                    f"Te informo que el {nombre_p.lower()} cuesta",
                     f"Actualmente el costo del {nombre_p.lower()} es de",
-                    f"Sí, el precio registrado para el {nombre_p.lower()} es",
-                    f"El valor de mercado para el {nombre_p.lower()} hoy es",
-                    f"¡Buenas noticias! Contamos con {nombre_p.lower()} y su precio es",
-                    f"Claro que sí, el {nombre_p.lower()} lo tenemos en",
                     f"Por supuesto, el precio actualizado del {nombre_p.lower()} es de",
-                    f"Contamos con existencia de {nombre_p.lower()} a un valor de",
-                    f"¡Confirmado! El {nombre_p.lower()} tiene un costo de",
-                    f"Según nuestro inventario, el {nombre_p.lower()} cuesta",
-                    f"Te indico que el precio actualizado para el {nombre_p.lower()} es",
-                    f"El {nombre_p.lower()} está disponible actualmente por",
-                    f"He verificado y el {nombre_p.lower()} tiene un precio de",
-                    f"Para tu referencia, el costo del {nombre_p.lower()} es de"
+                    f"¡Confirmado! El {nombre_p.lower()} tiene un costo de"
                 ]
                 
                 inicio_frase = random.choice(saludos)
@@ -256,6 +259,7 @@ def preguntar():
                     stock_actual = item.get('stock', 0)
                     respuesta_texto += f" Hay {stock_actual} unidades en existencia."
 
+                # Registro y limpieza
                 supabase.table("logs_actividad").insert({
                     "email": usuario_email, "accion": "CONSULTA", 
                     "equipo_id": equipo_id, "exito": True
@@ -276,11 +280,11 @@ def preguntar():
         # Si no hubo coincidencia
         del inventario
         gc.collect()
-        return jsonify({"exito": False, "respuesta": f"Lo siento, no encontré el producto '{pregunta_limpia}'."})
+        return jsonify({"exito": False, "respuesta": f"Lo siento, no encontré el producto '{limpia}'."})
 
     except Exception as e:
         gc.collect()
-        return jsonify({"exito": False, "respuesta": "Error procesando la búsqueda."})
+        return jsonify({"exito": False, "respuesta": f"Error: {str(e)}"})
 @app.route('/upload', methods=['POST'])
 def upload_file():
     usuario_email = session.get('usuario')
