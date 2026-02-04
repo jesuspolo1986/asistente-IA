@@ -458,17 +458,15 @@ def admin_panel():
         usuarios = usuarios_res.data if usuarios_res.data else []
         hoy = datetime.now().date()
         
-        # --- NUEVO: Obtener la Tasa Maestra actual para el panel ---
+        # Obtener la Tasa Maestra actual
         tasa_res = supabase.table("ajustes_sistema").select("valor").eq("clave", "tasa_maestra").execute()
         tasa_val = tasa_res.data[0]['valor'] if tasa_res.data else 0.0
-        # -----------------------------------------------------------
 
-        # 2. Obtener logs (limitamos a 500 para no saturar memoria)
+        # 2. Obtener logs (limitamos a 500 para proteger la RAM de 1GB)
         logs_res = supabase.table("logs_actividad").select("*").order("created_at", desc=True).limit(500).execute()
         logs_raw = logs_res.data if logs_res.data else []
 
-        # 3. Procesar Equipos Únicos y Resumen de Actividad
-        # 3. Procesar Equipos Únicos y Resumen de Actividad
+        # 3. Procesar datos
         from collections import Counter
         equipos_por_usuario = {}
         resumen_dict = {}
@@ -478,10 +476,9 @@ def admin_panel():
             email = l.get('email')
             eid = l.get('equipo_id', 'D-000')
             
-            # Formateo de fecha para humanos
+            # Formateo de fecha
             raw_fecha = l.get('fecha') or l.get('created_at')
             try:
-                # Si viene con T (ISO format) o espacio
                 dt = datetime.fromisoformat(str(raw_fecha).replace('Z', '+00:00'))
                 l['fecha_bonita'] = dt.strftime('%d %b, %I:%M %p')
                 fecha_dia = dt.strftime('%Y-%m-%d')
@@ -490,18 +487,20 @@ def admin_panel():
                 fecha_dia = str(raw_fecha).split('T')[0]
             
             if email:
+                # Contar equipos únicos
                 if email not in equipos_por_usuario: equipos_por_usuario[email] = set()
                 equipos_por_usuario[email].add(eid)
                 
+                # Agrupar para el gráfico de barras
                 if email not in resumen_dict: resumen_dict[email] = Counter()
                 resumen_dict[email][fecha_dia] += 1
             
             logs_para_tabla.append(l)
 
-        # 6. Resumen de uso optimizado para diseño visual
+        # 4. Generar Resumen de Uso (PARA LAS TARJETAS VISUALES)
         resumen_uso = []
         for email, conteos in resumen_dict.items():
-            # Ordenamos los últimos 7 días y calculamos el total
+            # Tomamos los últimos 7 días con actividad
             dias_ordenados = [{"fecha": f, "cantidad": c} for f, c in sorted(conteos.items(), reverse=True)[:7]]
             total_semana = sum(c for f, c in conteos.items())
             resumen_uso.append({
@@ -510,17 +509,17 @@ def admin_panel():
                 "total_semana": total_semana
             })
 
-        # 4. Enriquecer objeto usuarios
+        # 5. Enriquecer objeto usuarios con Lógica de Gracia
         for u in usuarios:
             try:
-                # Usamos la lógica de 1 día de gracia mencionada en tus instrucciones
                 vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
+                # Aplicamos el día de gracia: vence hoy, pero entra mañana
                 u['vencido'] = hoy > (vence + timedelta(days=1))
                 u['total_equipos'] = len(equipos_por_usuario.get(u['email'], []))
             except:
                 u['vencido'], u['total_equipos'] = True, 0
 
-        # 5. Ranking de Salud del Servicio
+        # 6. Ranking de Salud (Detectar fallos)
         conteo_ranking = Counter([l['email'] for l in logs_para_tabla if l.get('email')])
         ranking = []
         for email, count in conteo_ranking.most_common(5):
@@ -529,16 +528,15 @@ def admin_panel():
             salud = int((exitos / len(logs_cliente)) * 100) if logs_cliente else 0
             ranking.append({"email": email, "count": count, "salud": salud, "alerta": salud < 70})
 
-        # 6. Resumen de uso (chips)
-        resumen_uso = [{"email": k, "actividad": [{"fecha": f, "cantidad": c} for f, c in sorted(v.items(), reverse=True)[:7]]} for k, v in resumen_dict.items()]
-
         stats = {
             "total": len(usuarios),
             "activos": len([u for u in usuarios if not u['vencido']]),
             "vencidos": len([u for u in usuarios if u['vencido']])
         }
 
-        # RETORNO INTEGRADO CON admin.html
+        # Liberar memoria explícitamente antes de renderizar (Buena práctica en Koyeb)
+        gc.collect()
+
         return render_template('admin.html', 
                                usuarios=usuarios, 
                                stats=stats, 
@@ -546,11 +544,11 @@ def admin_panel():
                                ranking=ranking, 
                                resumen_uso=resumen_uso, 
                                admin_pass=ADMIN_PASS,
-                               tasa_actual=tasa_val) # <--- Crucial para el value="{{ tasa_actual }}"
+                               tasa_actual=tasa_val)
                                
     except Exception as e:
-        print(f"ERROR EN PANEL ADMIN: {str(e)}")
-        return f"Error interno: {str(e)}", 500
+        print(f"⚠️ ERROR CRÍTICO EN PANEL ADMIN: {str(e)}")
+        return f"Error en el servidor: {str(e)}", 500
 @app.route('/admin/crear', methods=['POST'])
 def crear_usuario():
     auth = request.form.get('auth_key')

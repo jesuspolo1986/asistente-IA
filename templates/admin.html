@@ -164,17 +164,16 @@
                         <div>
                             <p class="mb-0 fw-bold text-primary small">{{ empresa.email }}</p>
                             <span class="opacity-40" style="font-size: 0.6rem;">ÚLTIMOS 7 DÍAS</span>
-                        </div>
-                        <span class="badge bg-info text-dark" style="font-size: 0.7rem;">{{ empresa.total_semana }} Consultas</span>
-                    </div>
-                    
-                    <div class="d-flex align-items-end gap-2" style="height: 40px; padding-bottom: 5px;">
-                        {% for dia in empresa.actividad %}
-                        <div class="flex-grow-1 bg-info rounded-top" 
-                             style="height: {{ (dia.cantidad * 100) / 50 if dia.cantidad < 50 else 100 }}%; opacity: 0.6;"
-                             data-bs-toggle="tooltip" 
-                             title="{{ dia.fecha }}: {{ dia.cantidad }} pings">
-                        </div>
+                       <span class="badge bg-info text-dark">{{ empresa.total_semana }} Consultas</span>
+
+                      <div class="d-flex align-items-end gap-2" style="height: 40px;">
+                           {% for dia in empresa.actividad %}
+                     <div class="flex-grow-1 bg-info rounded-top" 
+                      style="height: {{ (dia.cantidad * 10) }}%; opacity: 0.6;" 
+                      title="{{ dia.fecha }}: {{ dia.cantidad }}">
+                   </div>
+                    {% endfor %}
+                  </div>
                         {% endfor %}
                     </div>
                     <div class="d-flex justify-content-between opacity-30 mt-1" style="font-size: 0.5rem;">
