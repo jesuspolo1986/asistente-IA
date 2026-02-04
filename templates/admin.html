@@ -306,8 +306,9 @@
             </span>
         </td>
         <td class="small opacity-75">
-            <b class="text-white">{{ log.accion }}</b>: {{ log.detalle or '' }}
-        </td>
+    <b class="text-white">{{ log.accion or 'S/A' }}</b>: 
+    <span class="text-info">{{ log.detalle if log.detalle else '(Sin texto registrado)' }}</span>
+</td>
         <td>
             {% if log.exito %}
                 <i class="fas fa-circle-check text-success"></i>

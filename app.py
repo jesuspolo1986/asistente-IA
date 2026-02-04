@@ -9,6 +9,9 @@ from supabase import create_client, Client
 import time
 from rapidfuzz import process, utils
 import gc # Recolector de basura
+import re
+import unicodedata
+import random
 app = Flask(__name__)
 app.secret_key = 'elena_farmacia_2026_key'
 
@@ -276,7 +279,7 @@ def preguntar():
 
                 # Registro y limpieza
                 supabase.table("logs_actividad").insert({
-                    "email": usuario_email, "accion": "CONSULTA", 
+                    "email": usuario_email,"detalle": pregunta_raw, "accion": "CONSULTA", 
                     "equipo_id": equipo_id, "exito": True
                 }).execute()
 
