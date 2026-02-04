@@ -155,39 +155,39 @@
     </div>
 
   <div class="card-stats mb-5">
-        <h6 class="mb-4 fw-bold text-info"><i class="fas fa-chart-line me-2"></i>RENDIMIENTO Y FLUJO POR EMPRESA</h6>
-        <div class="row g-3">
-            {% for empresa in resumen_uso %}
-            <div class="col-md-6">
-                <div class="p-3 h-100" style="background: rgba(255,255,255,0.02); border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                            <p class="mb-0 fw-bold text-primary small">{{ empresa.email }}</p>
-                            <span class="opacity-40" style="font-size: 0.6rem;">ÚLTIMOS 7 DÍAS</span>
-                       <span class="badge bg-info text-dark">{{ empresa.total_semana }} Consultas</span>
+    <h6 class="mb-4 fw-bold text-info"><i class="fas fa-chart-line me-2"></i>RENDIMIENTO Y FLUJO POR EMPRESA</h6>
+    <div class="row g-3">
+        {% for empresa in resumen_uso %}
+        <div class="col-md-6">
+            <div class="p-3 h-100" style="background: rgba(255,255,255,0.02); border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <p class="mb-0 fw-bold text-primary small">{{ empresa.email }}</p>
+                        <span class="opacity-40" style="font-size: 0.6rem;">ÚLTIMOS 7 DÍAS</span>
+                    </div>
+                    <span class="badge bg-info text-dark">{{ empresa.total_semana if empresa.total_semana else 0 }} Consultas</span>
+                </div>
 
-                      <div class="d-flex align-items-end gap-2" style="height: 40px;">
-                           {% for dia in empresa.actividad %}
-                     <div class="flex-grow-1 bg-info rounded-top" 
-                      style="height: {{ (dia.cantidad * 10) }}%; opacity: 0.6;" 
-                      title="{{ dia.fecha }}: {{ dia.cantidad }}">
-                   </div>
+                <div class="d-flex align-items-end gap-2" style="height: 40px;">
+                    {% for dia in empresa.actividad %}
+                    <div class="flex-grow-1 bg-info rounded-top" 
+                         style="height: {{ (dia.cantidad * 10) if (dia.cantidad * 10) <= 100 else 100 }}%; opacity: 0.6;" 
+                         title="{{ dia.fecha }}: {{ dia.cantidad }}">
+                    </div>
                     {% endfor %}
-                  </div>
-                        {% endfor %}
-                    </div>
-                    <div class="d-flex justify-content-between opacity-30 mt-1" style="font-size: 0.5rem;">
-                        <span>RECIENTE</span>
-                        <span>HACE 7 DÍAS</span>
-                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between opacity-30 mt-1" style="font-size: 0.5rem;">
+                    <span>RECIENTE</span>
+                    <span>HACE 7 DÍAS</span>
                 </div>
             </div>
-            {% else %}
-            <div class="col-12 text-center opacity-40 py-4">No hay actividad para mostrar.</div>
-            {% endfor %}
         </div>
+        {% else %}
+        <div class="col-12 text-center opacity-40 py-4">No hay actividad para mostrar.</div>
+        {% endfor %} 
     </div>
-
+</div>
     <div class="row mb-5 g-4">
         <div class="col-lg-6">
             <div class="card-stats">
