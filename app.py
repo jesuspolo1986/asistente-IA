@@ -468,6 +468,7 @@ def admin_panel():
         logs_raw = logs_res.data if logs_res.data else []
 
         # 3. Procesar Equipos Únicos y Resumen de Actividad
+        # 3. Procesar Equipos Únicos y Resumen de Actividad
         from collections import Counter
         equipos_por_usuario = {}
         resumen_dict = {}
@@ -477,10 +478,16 @@ def admin_panel():
             email = l.get('email')
             eid = l.get('equipo_id', 'D-000')
             
-            # Usamos 'fecha' porque tu tabla la tiene, o 'created_at' como respaldo
+            # Formateo de fecha para humanos
             raw_fecha = l.get('fecha') or l.get('created_at')
-            l['fecha_str'] = str(raw_fecha) if raw_fecha else '2026-01-01'
-            fecha_dia = l['fecha_str'].split(' ')[0] # Split por espacio si es timestamp
+            try:
+                # Si viene con T (ISO format) o espacio
+                dt = datetime.fromisoformat(str(raw_fecha).replace('Z', '+00:00'))
+                l['fecha_bonita'] = dt.strftime('%d %b, %I:%M %p')
+                fecha_dia = dt.strftime('%Y-%m-%d')
+            except:
+                l['fecha_bonita'] = str(raw_fecha)
+                fecha_dia = str(raw_fecha).split('T')[0]
             
             if email:
                 if email not in equipos_por_usuario: equipos_por_usuario[email] = set()
@@ -490,6 +497,18 @@ def admin_panel():
                 resumen_dict[email][fecha_dia] += 1
             
             logs_para_tabla.append(l)
+
+        # 6. Resumen de uso optimizado para diseño visual
+        resumen_uso = []
+        for email, conteos in resumen_dict.items():
+            # Ordenamos los últimos 7 días y calculamos el total
+            dias_ordenados = [{"fecha": f, "cantidad": c} for f, c in sorted(conteos.items(), reverse=True)[:7]]
+            total_semana = sum(c for f, c in conteos.items())
+            resumen_uso.append({
+                "email": email, 
+                "actividad": dias_ordenados,
+                "total_semana": total_semana
+            })
 
         # 4. Enriquecer objeto usuarios
         for u in usuarios:

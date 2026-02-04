@@ -154,22 +154,39 @@
         </div>
     </div>
 
-    <div class="card-stats mb-5">
-        <h6 class="mb-4 fw-bold text-info"><i class="fas fa-chart-bar me-2"></i>ACTIVIDAD RECIENTE POR EMPRESA</h6>
-        {% for empresa in resumen_uso %}
-        <div class="mb-4 p-3" style="background: rgba(255,255,255,0.01); border-radius: 20px; border: 1px solid rgba(255,255,255,0.03);">
-            <p class="mb-3 fw-bold small"><i class="fas fa-hospital-user me-2 text-primary"></i>{{ empresa.email }}</p>
-            <div class="d-flex flex-wrap">
-                {% for dia in empresa.actividad %}
-                <div class="traffic-chip">
-                    <span class="date">{{ dia.fecha[5:] }}</span> <span class="count">{{ dia.cantidad }}</span>
+  <div class="card-stats mb-5">
+        <h6 class="mb-4 fw-bold text-info"><i class="fas fa-chart-line me-2"></i>RENDIMIENTO Y FLUJO POR EMPRESA</h6>
+        <div class="row g-3">
+            {% for empresa in resumen_uso %}
+            <div class="col-md-6">
+                <div class="p-3 h-100" style="background: rgba(255,255,255,0.02); border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <p class="mb-0 fw-bold text-primary small">{{ empresa.email }}</p>
+                            <span class="opacity-40" style="font-size: 0.6rem;">ÚLTIMOS 7 DÍAS</span>
+                        </div>
+                        <span class="badge bg-info text-dark" style="font-size: 0.7rem;">{{ empresa.total_semana }} Consultas</span>
+                    </div>
+                    
+                    <div class="d-flex align-items-end gap-2" style="height: 40px; padding-bottom: 5px;">
+                        {% for dia in empresa.actividad %}
+                        <div class="flex-grow-1 bg-info rounded-top" 
+                             style="height: {{ (dia.cantidad * 100) / 50 if dia.cantidad < 50 else 100 }}%; opacity: 0.6;"
+                             data-bs-toggle="tooltip" 
+                             title="{{ dia.fecha }}: {{ dia.cantidad }} pings">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="d-flex justify-content-between opacity-30 mt-1" style="font-size: 0.5rem;">
+                        <span>RECIENTE</span>
+                        <span>HACE 7 DÍAS</span>
+                    </div>
                 </div>
-                {% endfor %}
             </div>
+            {% else %}
+            <div class="col-12 text-center opacity-40 py-4">No hay actividad para mostrar.</div>
+            {% endfor %}
         </div>
-        {% else %}
-        <p class="text-center opacity-40 py-4">No se registra actividad en los últimos 7 días.</p>
-        {% endfor %}
     </div>
 
     <div class="row mb-5 g-4">
