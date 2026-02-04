@@ -297,26 +297,34 @@
                     </tr>
                 </thead>
                 <tbody id="tablaBody">
-                    {% for log in logs %}
-                    <tr class="log-row" data-email="{{ log.email }}">
-                        <td class="text-info small fw-bold">{{ log.email }}</td>
-                        <td>
-                            <span class="badge bg-secondary" style="font-size: 0.6rem; background: rgba(255,255,255,0.1) !important;">
-                                {{ log.equipo_id if log.equipo_id else 'DESCONOCIDO' }}
-                            </span>
-                        </td>
-                        <td class="small opacity-75">"{{ log.detalle }}"</td>
-                        <td>
-                            {% if log.exito %}
-                                <i class="fas fa-circle-check text-success"></i>
-                            {% else %}
-                                <i class="fas fa-circle-xmark text-danger"></i>
-                            {% endif %}
-                        </td>
-                        <td class="small opacity-40">{{ log.fecha.split('T')[0] }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
+    {% for log in logs %}
+    <tr class="log-row" data-email="{{ log.email }}">
+        <td class="text-info small fw-bold">{{ log.email }}</td>
+        <td>
+            <span class="badge bg-secondary" style="font-size: 0.6rem; background: rgba(255,255,255,0.1) !important;">
+                {{ log.equipo_id or 'DESCONOCIDO' }}
+            </span>
+        </td>
+        <td class="small opacity-75">
+            <b class="text-white">{{ log.accion }}</b>: {{ log.detalle or '' }}
+        </td>
+        <td>
+            {% if log.exito %}
+                <i class="fas fa-circle-check text-success"></i>
+            {% else %}
+                <i class="fas fa-circle-xmark text-danger"></i>
+            {% endif %}
+        </td>
+        <td class="small opacity-40">
+            {% if log.fecha %}
+                {{ log.fecha.split(' ')[0] if ' ' in log.fecha else log.fecha.split('T')[0] }}
+            {% else %}
+                ---
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</tbody>
             </table>
         </div>
     </div>

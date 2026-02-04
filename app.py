@@ -473,8 +473,11 @@ def admin_panel():
         for l in logs_raw:
             email = l.get('email')
             eid = l.get('equipo_id', 'D-000')
-            l['fecha'] = l.get('created_at', '2026-01-01T00:00:00')
-            fecha_dia = l['fecha'].split('T')[0]
+            
+            # Usamos 'fecha' porque tu tabla la tiene, o 'created_at' como respaldo
+            raw_fecha = l.get('fecha') or l.get('created_at')
+            l['fecha_str'] = str(raw_fecha) if raw_fecha else '2026-01-01'
+            fecha_dia = l['fecha_str'].split(' ')[0] # Split por espacio si es timestamp
             
             if email:
                 if email not in equipos_por_usuario: equipos_por_usuario[email] = set()
