@@ -11,6 +11,7 @@
         body { 
             background: #0f172a; color: white; font-family: 'Inter', sans-serif;
             height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0;
+            overflow: hidden;
         }
         .bg-glow { 
             position: absolute; width: 400px; height: 400px; background: var(--primary); 
@@ -20,6 +21,7 @@
             background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(20px); border-radius: 28px; padding: 2.5rem;
             width: 100%; max-width: 420px; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            position: relative;
         }
         .logo-area { text-align: center; margin-bottom: 2rem; }
         .logo-text { font-size: 2.2rem; font-weight: 800; letter-spacing: -1px; background: linear-gradient(to right, #00d2ff, #a18cd1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -34,6 +36,7 @@
 </head>
 <body>
     <div class="bg-glow"></div>
+    
     <div class="login-card">
         <div class="logo-area">
             <div class="logo-text">ELENA AI</div>
@@ -41,10 +44,14 @@
         </div>
 
         {% if error %}
-        <div class="error-tag"><i class="fas fa-exclamation-circle me-2"></i>{{ error }}</div>
+        <div class="error-tag">
+            <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
+        </div>
         {% endif %}
 
-        <form action="/login" method="POST">
+        <form action="/login" method="POST" id="loginForm">
+            <input type="hidden" name="device_id" id="device_id">
+
             <div class="input-group-custom">
                 <i class="fas fa-envelope"></i>
                 <input type="email" name="email" placeholder="Correo corporativo" required>
@@ -60,5 +67,27 @@
         
         <p class="text-center mt-4 small opacity-40">© 2026 Elena AI - Panel Seguro</p>
     </div>
+
+    <script>
+        // Función para gestionar la huella digital del equipo
+        function getDeviceId() {
+            let id = localStorage.getItem('elena_device_id');
+            if (!id) {
+                // Genera un ID único basado en random y timestamp
+                id = 'DEV-' + Math.random().toString(36).substr(2, 9).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+                localStorage.setItem('elena_device_id', id);
+            }
+            return id;
+        }
+
+        // Asignar el ID al campo oculto antes de que el usuario haga clic o al cargar
+        document.addEventListener('DOMContentLoaded', function() {
+            const deviceField = document.getElementById('device_id');
+            if (deviceField) {
+                deviceField.value = getDeviceId();
+                console.log("Device ID asignado:", deviceField.value);
+            }
+        });
+    </script>
 </body>
 </html>

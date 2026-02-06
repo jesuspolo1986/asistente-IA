@@ -80,36 +80,64 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email', '').lower().strip()
         password = request.form.get('password')
+        # Capturamos el ID único generado por el script en login.html
+        current_device_id = request.form.get('device_id', 'unknown_device')
         
-        # Buscamos al usuario
+        # Buscamos al usuario en Supabase
         res = supabase.table("suscripciones").select("*").eq("email", email).execute()
         
         if res.data:
             user = res.data[0]
             
-            # 1. Verificamos contraseña y estado básico
+            # 1. VERIFICACIÓN DE CREDENCIALES Y ESTADO
             if user.get('password') == password and user.get('activo') == 1:
                 
-                # --- AQUÍ ESTÁ EL BLOQUEO POR FECHA ---
+                # 2. BLOQUEO POR FECHA (INCLUYE 1 DÍA DE GRACIA)
                 try:
                     fecha_vence = datetime.strptime(user['fecha_vencimiento'], '%Y-%m-%d').date()
                     hoy = datetime.now().date()
-                    
-                    # Definimos el límite: Fecha de vencimiento + 1 día de gracia
-                    # Si vence el 22, puede entrar el 22 y el 23. El 24 ya NO.
                     limite_gracia = fecha_vence + timedelta(days=1)
                     
                     if hoy > limite_gracia:
-                        return render_template('login.html', error="Suscripción expirada el " + str(fecha_vence) + ". Contacte soporte.")
+                        return render_template('login.html', error=f"Suscripción expirada el {fecha_vence}. Contacte soporte.")
                 except Exception as e:
                     print(f"Error validando fecha: {e}")
-                # --------------------------------------
 
-                # Si pasó los filtros anteriores, entra al sistema
+                # 3. BLOQUEO POR LÍMITE DE EQUIPOS SEGÚN PLAN
+                logs_res = supabase.table("logs_actividad")\
+                    .select("detalle")\
+                    .eq("email", email)\
+                    .eq("accion", "LOGIN")\
+                    .execute()
+                
+                equipos_registrados = set()
+                for log in logs_res.data:
+                    if "ID:" in log['detalle']:
+                        d_id = log['detalle'].split("ID:")[1].strip()
+                        equipos_registrados.add(d_id)
+                
+                # Obtiene el límite de la DB (columna 'limite_equipos') o usa 1 por defecto
+                limite_permitido = user.get('limite_equipos', 1) 
+
+                if current_device_id not in equipos_registrados:
+                    if len(equipos_registrados) >= limite_permitido:
+                        return render_template('login.html', 
+                            error=f"Acceso denegado: Su plan actual permite {limite_permitido} equipo(s).")
+
+                # 4. REGISTRO DE ACCESO EXITOSO Y CREACIÓN DE SESIÓN
+                supabase.table("logs_actividad").insert({
+                    "email": email,
+                    "accion": "LOGIN",
+                    "detalle": f"Ingreso desde ID: {current_device_id}",
+                    "exito": True
+                }).execute()
+
                 session.permanent = True
                 session['logged_in'] = True
                 session['usuario'] = email
+                session['device_id'] = current_device_id
                 session['fecha_vencimiento'] = user['fecha_vencimiento']
+                
                 return redirect(url_for('index'))
             
             return render_template('login.html', error="Credenciales incorrectas o cuenta inactiva")
@@ -629,6 +657,33 @@ def eliminar_usuario():
     except Exception as e:
         return f"Error al eliminar: {str(e)}"
 # --- PANEL ADMINISTRATIVO (ADMIN) ---
+# --- LÓGICA DE BLOQUEO POR EQUIPO ---
+
+def verificar_limite_equipos(email, plan_tipo, current_device_id):
+    # Definir límites según el plan
+    limite = 1 if plan_tipo == "basico" else 3 # Ejemplo: básico 1, premium 3
+    
+    # Consultar cuántos equipos distintos ha usado este email
+    res = supabase.table("logs_actividad")\
+        .select("detalle")\
+        .eq("email", email)\
+        .eq("accion", "LOGIN")\
+        .execute()
+    
+    # Extraer IDs de dispositivos únicos de los logs
+    equipos_registrados = set()
+    for log in res.data:
+        # Asumiendo que guardamos el ID en el campo detalle o tenemos un campo específico
+        if 'ID:' in log['detalle']:
+            device_id = log['detalle'].split('ID:')[1].strip()
+            equipos_registrados.add(device_id)
+    
+    # Si el equipo actual es nuevo y ya alcanzó el límite
+    if current_device_id not in equipos_registrados and len(equipos_registrados) >= limite:
+        return False # Bloquear acceso
+    return True # Permitir acceso
+
+
 @app.route('/admin/reset_equipos', methods=['POST'])
 def reset_equipos():
     auth = request.form.get('auth_key')
