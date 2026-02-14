@@ -17,7 +17,7 @@ app.secret_key = 'elena_farmacia_2026_key'
 
 # --- CONFIGURACIÓN ---
 SUPABASE_URL = "https://kebpamfydhnxeaeegulx.supabase.co"
-SUPABASE_KEY = "sb_secret_lSrahuG5Nv32T1ZaV7lfRw_WFXuiP4H"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlYnBhbWZ5ZGhueGVhZWVndWx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY4ODExNzUsImV4cCI6MjA4MjQ1NzE3NX0.CIeBgEwmhbd8f-NYgdpebokVenaA12qnsNyLFYVP51M"
 ADMIN_PASS = "1234"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -98,12 +98,12 @@ def login():
                 # 2. BLOQUEO POR FECHA (INCLUYE 1 DÍA DE GRACIA REAL)
                 try:
                     fecha_vence = datetime.strptime(user['fecha_vencimiento'], '%Y-%m-%d').date()
-                    
+                    dia_gracia = fecha_vence + timedelta(days=1)
                     # El límite de gracia es el día siguiente al vencimiento
-                    limite_gracia = fecha_vence + timedelta(days=1)
+                    limite_bloqueo_total = fecha_vence + timedelta(days=2)
                     
                     # Bloqueo estricto: Si hoy ya pasó el día de gracia
-                    if hoy > limite_gracia:
+                    if hoy > limite_bloqueo_total:
                         return render_template('login.html', error=f"Suscripción expirada el {fecha_vence}. Contacte soporte.")
                     
                     # LÓGICA DE BANNER: Si hoy es exactamente el día después del vencimiento
