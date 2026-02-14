@@ -78,38 +78,46 @@ def get_tasa_usuario(email):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # --- IMPORTANTE: Definir hoy para que la comparación funcione ---
-        hoy = datetime.now().date() 
+        # 0. DEFINIR FECHA ACTUAL (Crítico para que funcione la validación)
+        hoy = datetime.now().date()
         
         email = request.form.get('email', '').lower().strip()
         password = request.form.get('password')
+        # Capturamos el ID único generado por el script en login.html
         current_device_id = request.form.get('device_id', 'unknown_device')
         
+        # Buscamos al usuario en Supabase
         res = supabase.table("suscripciones").select("*").eq("email", email).execute()
         
         if res.data:
             user = res.data[0]
             
+            # 1. VERIFICACIÓN DE CREDENCIALES Y ESTADO
             if user.get('password') == password and user.get('activo') == 1:
                 
-                # 2. BLOQUEO POR FECHA (INCLUYE 1 DÍA DE GRACIA)
+                # 2. BLOQUEO POR FECHA (INCLUYE 1 DÍA DE GRACIA REAL)
                 try:
                     fecha_vence = datetime.strptime(user['fecha_vencimiento'], '%Y-%m-%d').date()
+                    
+                    # El límite de gracia es el día siguiente al vencimiento
                     limite_gracia = fecha_vence + timedelta(days=1)
                     
+                    # Bloqueo estricto: Si hoy ya pasó el día de gracia
                     if hoy > limite_gracia:
                         return render_template('login.html', error=f"Suscripción expirada el {fecha_vence}. Contacte soporte.")
                     
-                    # SI ESTÁ EN EL DÍA DE GRACIA (Hoy es exactamente el día después del vencimiento)
+                    # LÓGICA DE BANNER: Si hoy es exactamente el día después del vencimiento
                     if hoy == limite_gracia:
-                        session['aviso_gracia'] = f"Tu suscripción expiró ayer ({fecha_vence}). Tienes un día de gracia."
+                        session['aviso_gracia'] = f"Tu suscripción expiró ayer ({fecha_vence}). Tienes un día de gracia para renovar."
                     else:
                         session['aviso_gracia'] = None
 
                 except Exception as e:
                     print(f"Error validando fecha: {e}")
+                    # En caso de error, dejamos pasar por seguridad de servicio, pero logueamos
+                    session['aviso_gracia'] = None
 
-                # 3. BLOQUEO POR LÍMITE DE EQUIPOS
+                # 3. BLOQUEO POR LÍMITE DE EQUIPOS SEGÚN PLAN
                 logs_res = supabase.table("logs_actividad")\
                     .select("detalle")\
                     .eq("email", email)\
@@ -117,11 +125,16 @@ def login():
                     .execute()
                 
                 equipos_registrados = set()
-                for log in logs_res.data:
-                    if "ID:" in log['detalle']:
-                        d_id = log['detalle'].split("ID:")[1].strip()
-                        equipos_registrados.add(d_id)
+                if logs_res.data:
+                    for log in logs_res.data:
+                        if "ID:" in log['detalle']:
+                            try:
+                                d_id = log['detalle'].split("ID:")[1].strip()
+                                equipos_registrados.add(d_id)
+                            except IndexError:
+                                continue
                 
+                # Obtiene el límite de la DB o usa 1 por defecto
                 limite_permitido = user.get('limite_equipos', 1) 
 
                 if current_device_id not in equipos_registrados:
@@ -129,13 +142,16 @@ def login():
                         return render_template('login.html', 
                             error=f"Acceso denegado: Su plan actual permite {limite_permitido} equipo(s).")
 
-                # 4. REGISTRO Y SESIÓN
+                # 4. REGISTRO DE ACCESO EXITOSO Y CREACIÓN DE SESIÓN
                 supabase.table("logs_actividad").insert({
                     "email": email,
                     "accion": "LOGIN",
                     "detalle": f"Ingreso desde ID: {current_device_id}",
                     "exito": True
                 }).execute()
+
+                # Limpieza de basura para ahorrar memoria en el servidor
+                gc.collect()
 
                 session.permanent = True
                 session['logged_in'] = True
@@ -547,9 +563,7 @@ def admin_panel():
             try:
                 vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
                 # Aplicamos el día de gracia: vence hoy, pero entra mañana
-                u['vencido'] = hoy > vence 
-                limite_gracia = vence + timedelta(days=1)
-                u['en_gracia'] = hoy == limite_gracia
+                u['vencido'] = hoy > (vence + timedelta(days=1))
                 u['total_equipos'] = len(equipos_por_usuario.get(u['email'], []))
             except:
                 u['vencido'], u['total_equipos'] = True, 0
