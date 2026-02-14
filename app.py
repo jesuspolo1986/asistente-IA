@@ -547,7 +547,9 @@ def admin_panel():
             try:
                 vence = datetime.strptime(u['fecha_vencimiento'], '%Y-%m-%d').date()
                 # Aplicamos el día de gracia: vence hoy, pero entra mañana
-                u['vencido'] = hoy > (vence + timedelta(days=1))
+                u['vencido'] = hoy > vence 
+                limite_gracia = vence + timedelta(days=1)
+                u['en_gracia'] = hoy == limite_gracia
                 u['total_equipos'] = len(equipos_por_usuario.get(u['email'], []))
             except:
                 u['vencido'], u['total_equipos'] = True, 0

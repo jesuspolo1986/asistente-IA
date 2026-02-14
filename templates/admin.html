@@ -255,10 +255,20 @@
                             <span class="badge bg-info rounded-pill" style="font-size: 0.7rem;">{{ u.total_equipos or 0 }}</span>
                         </td>
                         <td class="text-center">
-                            <span class="badge rounded-pill {{ 'badge-expired' if u.vencido else 'badge-active' }} px-3 py-2" style="font-size: 0.65rem;">
-                                {{ 'EXPIRADO' if u.vencido else 'VIGENTE' }}
-                            </span>
-                        </td>
+    {% if u.en_gracia %}
+        <span class="badge rounded-pill bg-warning text-dark px-3 py-2" style="font-size: 0.65rem;">
+            DÍA DE GRACIA
+        </span>
+    {% elif u.vencido %}
+        <span class="badge rounded-pill badge-expired px-3 py-2" style="font-size: 0.65rem;">
+            EXPIRADO
+        </span>
+    {% else %}
+        <span class="badge rounded-pill badge-active px-3 py-2" style="font-size: 0.65rem;">
+            VIGENTE
+        </span>
+    {% endif %}
+</td>
                         <td class="text-end">
                             <div class="d-flex justify-content-end align-items-center">
                                 <form action="/admin/reset_equipos" method="POST" class="me-1" onsubmit="return confirm('¿Deseas limpiar la lista de equipos de esta farmacia? Esto les permitirá registrar equipos nuevos.');">
