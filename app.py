@@ -138,24 +138,29 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
         print(f"🔥 Error crítico en búsqueda de inventario: {str(e)}")
         return {"encontrado": False, "error": str(e)}
 
-def procesar_vision_groq(image_path):
-    """Función interna para enviar la imagen a Groq"""
+def analizar_recipe_con_groq(image_path):
     with open(image_path, "rb") as image_file:
-        encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-    completion = groq_client.chat.completions.create(
+    # CAMBIAMOS EL MODELO AQUÍ:
+    chat_completion = groq_client.chat.completions.create(
         messages=[{
             "role": "user",
             "content": [
-                {"type": "text", "text": "Identifica el medicamento en este récipe. Responde SOLO JSON: {\"nombre_del_medicamento\": \"VALOR\"}"},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}}
+                {
+                    "type": "text", 
+                    "text": "Eres una experta farmacéutica. Identifica el nombre del medicamento en este récipe. Responde SOLO en formato JSON: {\"nombre_del_medicamento\": \"VALOR\"}"
+                },
+                {
+                    "type": "image_url", 
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                }
             ]
         }],
-        model="llama-3.2-11b-vision-preview",
+        model="llama-3.2-90b-vision-preview", # <--- MODELO ACTUALIZADO
         response_format={"type": "json_object"}
     )
-    return completion.choices[0].message.content
-
+    return chat_completion.choices[0].message.content
 @app.route('/analizar_recipe', methods=['POST'])
 def api_analizar_recipe():
     # Evitar error de sesión si no se ha logueado
