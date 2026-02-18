@@ -111,34 +111,64 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
         print(f"Error en búsqueda Excel: {e}")
     
     return {"encontrado": False}
+import json # <--- ASEGÚRATE DE TENER ESTO AL INICIO DEL ARCHIVO
+
 @app.route('/analizar_recipe', methods=['POST'])
 def api_analizar_recipe():
+    # Verificar si el usuario está logueado para acceder a su sesión
+    if 'usuario' not in session:
+        return jsonify({"error": "Sesión no iniciada"}), 401
+
     if 'foto' not in request.files:
         return jsonify({"error": "No se subió ninguna imagen"}), 400
     
     foto = request.files['foto']
-    # Guardar temporalmente
-    path = os.path.join('/tmp', foto.filename)
+    if foto.filename == '':
+        return jsonify({"error": "Nombre de archivo vacío"}), 400
+
+    # Guardar temporalmente en /tmp
+    path = os.path.join('/tmp', f"recipe_{int(time.time())}_{foto.filename}")
     foto.save(path)
     
-    # 1. Groq analiza la imagen
     try:
-        raw_json = analizar_recipe(path) # Tu función de prueba
+        # 1. Groq analiza la imagen (Asegúrate que analizar_recipe use groq_client)
+        raw_json = analizar_recipe_con_groq(path) 
         datos_medico = json.loads(raw_json)
-        medicamento = datos_medico.get("nombre_del_medicamento")
+        medicamento = datos_medico.get("nombre_del_medicamento", "")
         
         # 2. Buscar en el Excel del usuario actual
-        resultado = buscar_producto_excel(medicamento, session['usuario'])
+        # Usamos session.get('usuario') por seguridad
+        resultado = buscar_producto_excel(medicamento, session.get('usuario'))
         
-        # 3. Eliminar foto temporal
-        os.remove(path)
+        # 3. Eliminar foto temporal para no llenar el disco del servidor
+        if os.path.exists(path):
+            os.remove(path)
         
         return jsonify({
+            "exito": True,
             "lectura_ia": datos_medico,
             "inventario": resultado
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        if os.path.exists(path): os.remove(path)
+        print(f"ERROR CRÍTICO EN RECIPE: {str(e)}") # Esto saldrá en tus logs de Koyeb
+        return jsonify({"error": "Elena no pudo interpretar la imagen", "detalle": str(e)}), 500
+def analizar_recipe_con_groq(image_path):
+    with open(image_path, "rb") as image_file:
+        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+    chat_completion = groq_client.chat.completions.create(
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Extrae el nombre del medicamento de este récipe. Responde SOLO en formato JSON: {\"nombre_del_medicamento\": \"valor\"}"},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+            ]
+        }],
+        model="llama-3.2-11b-vision-preview", # Modelo que soporta imágenes
+        response_format={"type": "json_object"}
+    )
+    return chat_completion.choices[0].message.content
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
