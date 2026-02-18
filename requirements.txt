@@ -29,3 +29,4 @@ rapidfuzz
 requests
 beautifulsoup4
 pyDolarVenezuela
+groq
