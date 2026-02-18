@@ -140,35 +140,51 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
 
 # 1. Asegúrate de que el nombre aquí sea 'procesar_vision_groq'
 def procesar_vision_groq(image_path):
-    # ... (tu código de base64 igual) ...
+    import base64
+    import json
     
-    completion = groq_client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "Identify the medicine. Return ONLY JSON format: {\"nombre_del_medicamento\": \"NAME\"}"},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-            ]
-        }],
-        # Eliminamos temporalmente response_format si da problemas 
-        # o nos aseguramos de limpiar la respuesta
-    )
-
-    respuesta_raw = completion.choices[0].message.content
-    
-    # LIMPIEZA DE SEGURIDAD:
     try:
-        # Buscamos donde empieza el '{' y donde termina el '}'
+        # 1. ESTO ES LO QUE FALTABA: Definir la variable base64_image
+        with open(image_path, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+        # 2. Ahora sí la usamos en la llamada
+        completion = groq_client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text", 
+                        "text": "Identify the medicine. Return ONLY JSON format: {\"nombre_del_medicamento\": \"NAME\"}"
+                    },
+                    {
+                        "type": "image_url", 
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                    }
+                ]
+            }],
+            # Mantenemos temperature baja para mayor precisión
+            temperature=0.1
+        )
+
+        respuesta_raw = completion.choices[0].message.content
+        
+        # 3. LIMPIEZA DE SEGURIDAD PARA EL JSON:
         inicio = respuesta_raw.find('{')
         final = respuesta_raw.rfind('}') + 1
-        json_limpio = respuesta_raw[inicio:final]
         
-        resultado = json.loads(json_limpio)
-        return resultado.get("nombre_del_medicamento", "Desconocido")
-    except:
-        # Si falla el JSON, devolvemos el texto puro que leyó la IA
-        return respuesta_raw.strip()
+        if inicio != -1 and final != 0:
+            json_limpio = respuesta_raw[inicio:final]
+            resultado = json.loads(json_limpio)
+            return resultado.get("nombre_del_medicamento", "Desconocido")
+        else:
+            # Si no hay llaves, devolvemos el texto limpio
+            return respuesta_raw.strip()
+
+    except Exception as e:
+        print(f"Error procesando visión: {e}")
+        return "Error en lectura"
 @app.route('/analizar_recipe', methods=['POST'])
 def api_analizar_recipe():
     usuario_id = session.get('usuario', 'invitado')
