@@ -140,33 +140,35 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
 
 # 1. Asegúrate de que el nombre aquí sea 'procesar_vision_groq'
 def procesar_vision_groq(image_path):
-    with open(image_path, "rb") as image_file:
-        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-
-    # IMPORTANTE: Cambiamos al nuevo modelo Llama 4 Scout
-    chat_completion = groq_client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct", 
+    # ... (tu código de base64 igual) ...
+    
+    completion = groq_client.chat.completions.create(
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
         messages=[{
             "role": "user",
             "content": [
-                {
-                    "type": "text", 
-                    "text": "Identifica el nombre del medicamento. Responde SOLO en formato JSON: {\"nombre_del_medicamento\": \"VALOR\"}"
-                },
-                {
-                    "type": "image_url", 
-                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
-                }
+                {"type": "text", "text": "Identify the medicine. Return ONLY JSON format: {\"nombre_del_medicamento\": \"NAME\"}"},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
             ]
         }],
-        response_format={"type": "json_object"},
-        temperature=0.1 # Bajamos la temperatura para que sea más preciso
+        # Eliminamos temporalmente response_format si da problemas 
+        # o nos aseguramos de limpiar la respuesta
     )
+
+    respuesta_raw = completion.choices[0].message.content
     
-    # Extraer el resultado
-    import json
-    res_obj = json.loads(chat_completion.choices[0].message.content)
-    return res_obj.get("nombre_del_medicamento", "No detectado")
+    # LIMPIEZA DE SEGURIDAD:
+    try:
+        # Buscamos donde empieza el '{' y donde termina el '}'
+        inicio = respuesta_raw.find('{')
+        final = respuesta_raw.rfind('}') + 1
+        json_limpio = respuesta_raw[inicio:final]
+        
+        resultado = json.loads(json_limpio)
+        return resultado.get("nombre_del_medicamento", "Desconocido")
+    except:
+        # Si falla el JSON, devolvemos el texto puro que leyó la IA
+        return respuesta_raw.strip()
 @app.route('/analizar_recipe', methods=['POST'])
 def api_analizar_recipe():
     usuario_id = session.get('usuario', 'invitado')
@@ -483,17 +485,36 @@ def upload_file():
     if not file: 
         return jsonify({"success": False, "error": "No file"})
 
+    nombre_archivo = file.filename.lower()
+
     try:
-        # 1. Leer Excel
-        df = pd.read_excel(file)
+        # --- MEJORA 1: Soporte para CSV y Excel ---
+        def leer_segun_tipo(f, saltar=0):
+            f.seek(0) # Siempre resetear antes de leer
+            if nombre_archivo.endswith('.csv'):
+                return pd.read_csv(f, skiprows=saltar)
+            else:
+                return pd.read_excel(f, skiprows=saltar)
+
+        # Intento inicial
+        df = leer_segun_tipo(file)
         
-        # Búsqueda inteligente de cabeceras si hay basura arriba
-        if not any(x in str(df.columns).lower() for x in ['producto', 'precio', 'articulo']):
-            file.seek(0) # Resetear puntero del archivo para volver a leer
-            for i in range(10):
-                df = pd.read_excel(file, skiprows=i+1)
-                if any(x in str(df.columns).lower() for x in ['producto', 'precio', 'articulo']):
+        # Búsqueda inteligente de cabeceras (Tu lógica original mejorada)
+        cabeceras_validas = ['producto', 'precio', 'articulo', 'nombre']
+        if not any(x in str(df.columns).lower() for x in cabeceras_validas):
+            encontrado = False
+            for i in range(1, 11): # Probar saltando de 1 a 10 filas
+                df = leer_segun_tipo(file, saltar=i)
+                if any(x in str(df.columns).lower() for x in cabeceras_validas):
+                    encontrado = True
                     break
+            if not encontrado:
+                return jsonify({"success": False, "error": "No se encontraron cabeceras válidas en las primeras 10 filas"})
+
+        # --- El resto de tu lógica de limpieza de columnas ---
+        cols_encontradas = encontrar_columnas_maestras(df.columns)
+        
+        # ... (Tu código de limpieza de stock y precios está perfecto) ...
 
         # 2. Encontrar columnas automáticamente
         cols_encontradas = encontrar_columnas_maestras(df.columns)
