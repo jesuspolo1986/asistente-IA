@@ -30,7 +30,6 @@
         
         .btn-icon { background: none; border: none; color: var(--primary); font-size: 1.2rem; cursor: pointer; }
         
-        /* Estilo para el botón de subir Excel */
         .btn-upload-excel { background: rgba(46, 204, 113, 0.1); color: #2ecc71; border: 1px solid #2ecc71; border-radius: 15px; padding: 8px; font-size: 0.8rem; font-weight: bold; margin-top: 15px; width: 100%; display: none; transition: 0.3s; cursor: pointer; }
         .btn-upload-excel:hover { background: #2ecc71; color: white; }
 
@@ -82,17 +81,16 @@
     <div class="res-box" id="textoElena">Haz clic en mi rostro para hablar o usa la cámara.</div>
     
     <div class="input-group-elena">
-        <button class="btn-icon" onclick="abrirCamara()"><i class="fas fa-camera"></i></button>
-        <input type="text" id="userInput" class="input-elena" placeholder="Consultar precio..." onkeypress="if(event.key==='Enter') enviar()">
+        <button class="btn-icon" title="Escanear" onclick="abrirCamara()"><i class="fas fa-camera"></i></button>
+        <button class="btn-icon" id="btnMic" title="Hablar" onclick="escuchar()" style="color: #ff4b2b;"><i class="fas fa-microphone"></i></button>
+        <input type="text" id="userInput" class="input-elena" placeholder="Escribe o habla..." onkeypress="if(event.key==='Enter') enviar()">
         <button class="btn-icon" onclick="enviar()"><i class="fas fa-paper-plane"></i></button>
     </div>
 
-    <div id="adminActions">
-        <input type="file" id="fileInput" hidden accept=".xlsx, .xls, .csv" onchange="subirArchivo()">
-        <button class="btn-upload-excel" id="btnSubirExcel" onclick="document.getElementById('fileInput').click()">
-            <i class="fas fa-file-excel me-2"></i> ACTUALIZAR INVENTARIO EXCEL
-        </button>
-    </div>
+    <input type="file" id="fileInput" hidden accept=".xlsx, .xls, .csv" onchange="subirArchivo()">
+    <button class="btn-upload-excel" id="btnSubirExcel" onclick="document.getElementById('fileInput').click()">
+        <i class="fas fa-file-excel me-2"></i> ACTUALIZAR INVENTARIO EXCEL
+    </button>
 </div>
 
 <div id="cameraModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:10000; flex-direction:column; align-items:center; justify-content:center;">
@@ -110,7 +108,6 @@
     const diasRestantes = {{ dias_restantes }};
     let modoGerencia = false;
 
-    // --- ENVIAR CONSULTA ---
     async function enviar() {
         const input = document.getElementById('userInput');
         const query = input.value.trim();
@@ -144,27 +141,20 @@
         if (diasRestantes <= 1) document.getElementById('adminCapsule').style.display = "block";
     }
 
-    // --- CARGAR EXCEL ---
     async function subirArchivo() {
         const file = document.getElementById('fileInput').files[0];
         if(!file) return;
-        
         const formData = new FormData();
         formData.append('archivo', file);
-        
         document.getElementById('textoElena').innerText = "Procesando Excel...";
         const res = await fetch('/upload', { method: 'POST', body: formData });
         const data = await res.json();
-        
         if(data.success) {
-            hablar("Inventario actualizado desde el archivo Excel.");
+            hablar("Inventario actualizado.");
             document.getElementById('textoElena').innerText = "Inventario cargado con éxito.";
-        } else {
-            hablar("Hubo un error al cargar el archivo.");
         }
     }
 
-    // --- CÁMARA ---
     let streamMedia;
     async function abrirCamara() {
         document.getElementById('cameraModal').style.display = 'flex';
@@ -183,27 +173,23 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
-        
         cerrarCamara();
         canvas.toBlob(async (blob) => {
             const formData = new FormData();
             formData.append('foto', blob);
-            
-            document.getElementById('textoElena').innerText = "Leyendo récipe...";
-            hablar("Leyendo récipe.");
-            
+            document.getElementById('textoElena').innerText = "Leyendo...";
+            hablar("Dame un segundo.");
             const res = await fetch('/analizar_recipe', { method: 'POST', body: formData });
             const data = await res.json();
-            
             if(data.inventario && data.inventario.encontrado) {
                 document.getElementById('priceDisplay').style.display = 'block';
                 document.getElementById('nombreProducto').innerText = data.inventario.nombre;
                 const tasa = parseFloat(document.getElementById('displayTasa').innerText);
                 document.getElementById('priceBs').innerText = (data.inventario.precio * tasa).toFixed(2);
                 document.getElementById('priceUsd').innerText = data.inventario.precio.toFixed(2) + " $";
-                hablar(`He encontrado ${data.inventario.nombre}. El precio es ${data.inventario.precio} dólares.`);
+                hablar(`Lo tengo. El precio es ${data.inventario.precio} dólares.`);
             } else {
-                hablar("No encontré ese producto en el inventario.");
+                hablar("No lo encontré en el inventario.");
             }
         }, 'image/jpeg');
     }
@@ -215,6 +201,28 @@
         u.onstart = () => aura.classList.add('hablando');
         u.onend = () => aura.classList.remove('hablando');
         synth.speak(u);
+    }
+
+    function escuchar() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitRecognition;
+        if(!SpeechRecognition) return;
+        const rec = new SpeechRecognition();
+        rec.lang = 'es-VE';
+        const btnMic = document.getElementById('btnMic');
+        rec.onstart = () => { 
+            aura.classList.add('hablando'); 
+            btnMic.classList.add('fa-beat');
+            document.getElementById('textoElena').innerText = "Te escucho..."; 
+        };
+        rec.onresult = (e) => { 
+            document.getElementById('userInput').value = e.results[0][0].transcript; 
+            enviar(); 
+        };
+        rec.onend = () => {
+            aura.classList.remove('hablando');
+            btnMic.classList.remove('fa-beat');
+        };
+        rec.start();
     }
 
     function handleLogout() {
