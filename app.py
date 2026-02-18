@@ -81,97 +81,113 @@ def get_tasa_usuario(email):
 # --- RUTAS DE AUTENTICACIÓN ---
 def buscar_producto_excel(nombre_medicamento, email_usuario):
     try:
-        # 1. Traemos el inventario de este usuario específico desde la DB
-        res = supabase.table("inventarios").select("producto, precio_usd, stock").eq("empresa_email", email_usuario).execute()
+        # 1. Traemos el inventario filtrado por email
+        # Agregamos orden para consistencia
+        res = supabase.table("inventarios")\
+            .select("producto, precio_usd, stock")\
+            .eq("empresa_email", email_usuario)\
+            .execute()
+        
         inventario = res.data
         
         if not inventario:
+            print(f"Búsqueda: Inventario no encontrado para {email_usuario}")
             return {"encontrado": False, "error": "Inventario vacío"}
 
-        # 2. Extraemos solo los nombres para RapidFuzz
-        nombres_productos = [str(i['producto']) for i in inventario]
+        # 2. Limpieza de nombres para mejorar la coincidencia
+        # Convertimos todo a string y quitamos espacios extra
+        nombres_productos = [str(i['producto']).strip() for i in inventario if i.get('producto')]
         
-        # 3. Buscamos la mejor coincidencia (mínimo 70% de similitud)
-        match = process.extractOne(nombre_medicamento, nombres_productos, score_cutoff=70)
+        if not nombre_medicamento:
+            return {"encontrado": False, "error": "Nombre de medicamento vacío"}
+
+        # 3. Buscamos la mejor coincidencia
+        # Usamos processor=utils.default_process para ignorar mayúsculas/minúsculas y acentos
+        match = process.extractOne(
+            nombre_medicamento, 
+            nombres_productos, 
+            score_cutoff=60, # Bajamos a 60 para ser más flexibles con fotos movidas
+            processor=utils.default_process
+        )
         
         if match:
             nombre_real = match[0]
-            # Buscamos el objeto completo en nuestra lista 'inventario'
-            item = next((i for i in inventario if i['producto'] == nombre_real), None)
+            puntuacion = match[1]
             
-            return {
-                "encontrado": True,
-                "nombre": nombre_real,
-                "precio": item['precio_usd'],
-                "stock": item.get('stock', 0)
-            }
+            # Buscamos el objeto completo
+            item = next((i for i in inventario if str(i['producto']).strip() == nombre_real), None)
+            
+            if item:
+                # Aseguramos que el precio sea un float, si es None ponemos 0.0
+                precio = float(item.get('precio_usd', 0) or 0)
+                
+                print(f"✅ Match encontrado: {nombre_real} (Similitud: {puntuacion}%)")
+                
+                return {
+                    "encontrado": True,
+                    "nombre": nombre_real,
+                    "precio": precio,
+                    "stock": item.get('stock', 0),
+                    "score": puntuacion
+                }
+        
+        print(f"❌ No se encontró coincidencia cercana para: {nombre_medicamento}")
+        return {"encontrado": False}
+
     except Exception as e:
-        print(f"Error en búsqueda Excel: {e}")
-    
-    return {"encontrado": False}
-import json # <--- ASEGÚRATE DE TENER ESTO AL INICIO DEL ARCHIVO
+        print(f"🔥 Error crítico en búsqueda de inventario: {str(e)}")
+        return {"encontrado": False, "error": str(e)}
 
-import base64
-import json
-import time
-
-# --- FUNCIÓN DE APOYO PARA GROQ VISION ---
-def analizar_recipe_con_groq(image_path):
+def procesar_vision_groq(image_path):
+    """Función interna para enviar la imagen a Groq"""
     with open(image_path, "rb") as image_file:
-        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+        encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-    # Usamos el modelo Vision de Groq (Llama 3.2 11B es excelente para esto)
-    chat_completion = groq_client.chat.completions.create(
+    completion = groq_client.chat.completions.create(
         messages=[{
             "role": "user",
             "content": [
-                {
-                    "type": "text", 
-                    "text": "Eres una experta farmacéutica. Identifica el nombre del medicamento en este récipe. Responde SOLO en formato JSON: {\"nombre_del_medicamento\": \"VALOR\"}"
-                },
-                {
-                    "type": "image_url", 
-                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
-                }
+                {"type": "text", "text": "Identifica el medicamento en este récipe. Responde SOLO JSON: {\"nombre_del_medicamento\": \"VALOR\"}"},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}}
             ]
         }],
         model="llama-3.2-11b-vision-preview",
         response_format={"type": "json_object"}
     )
-    return chat_completion.choices[0].message.content
+    return completion.choices[0].message.content
 
-# --- RUTA DE ANÁLISIS ACTUALIZADA ---
 @app.route('/analizar_recipe', methods=['POST'])
 def api_analizar_recipe():
-    if 'usuario' not in session:
-        return jsonify({"error": "Sesión expirada"}), 401
+    # Evitar error de sesión si no se ha logueado
+    usuario_id = session.get('usuario', 'admin@admin.com') 
     
     if 'foto' not in request.files:
-        return jsonify({"error": "No se recibió imagen"}), 400
+        return jsonify({"error": "No llegó la imagen"}), 400
     
     foto = request.files['foto']
-    # Usamos /tmp porque Koyeb no permite escribir en la carpeta del proyecto
-    path = os.path.join('/tmp', f"scan_{int(time.time())}.jpg")
-    foto.save(path)
+    temp_path = os.path.join('/tmp', f"v_{int(time.time())}.jpg")
+    foto.save(temp_path)
     
     try:
-        # 1. Groq lee la imagen
-        raw_json = analizar_recipe_con_groq(path)
-        datos_medico = json.loads(raw_json)
-        medicamento = datos_medico.get("nombre_del_medicamento", "")
+        # 1. IA analiza la imagen
+        respuesta_ia = procesar_vision_groq(temp_path)
+        datos = json.loads(respuesta_ia)
+        nombre_med = datos.get("nombre_del_medicamento", "")
         
-        # 2. Buscar en el inventario (Usando tu función existente)
-        # Nota: Asegúrate que buscar_producto_excel esté bien definida con df_inventario
-        resultado = buscar_producto_excel(medicamento, session['usuario'])
+        print(f"--- ELENA LEYÓ: {nombre_med} ---") # Esto saldrá en tus logs de Koyeb
+
+        # 2. Buscar en Excel/Supabase
+        res_inventario = buscar_producto_excel(nombre_med, usuario_id)
         
-        if os.path.exists(path): os.remove(path) # Limpieza
+        if os.path.exists(temp_path): os.remove(temp_path)
         
         return jsonify({
-            "lectura_ia": datos_medico,
-            "inventario": resultado
+            "lectura_ia": datos,
+            "inventario": res_inventario
         })
     except Exception as e:
-        if os.path.exists(path): os.remove(path)
+        if os.path.exists(temp_path): os.remove(temp_path)
+        print(f"ERROR CRÍTICO: {str(e)}")
         return jsonify({"error": str(e)}), 500
 @app.route('/login', methods=['GET', 'POST'])
 def login():
