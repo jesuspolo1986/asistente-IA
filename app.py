@@ -140,27 +140,37 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
 
 # 1. Asegúrate de que el nombre aquí sea 'procesar_vision_groq'
 def procesar_vision_groq(image_path):
-    with open(image_path, "rb") as image_file:
-        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+    try:
+        with open(image_path, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-    chat_completion = groq_client.chat.completions.create(
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "text", 
-                    "text": "Identifica el nombre del medicamento en este récipe. Responde SOLO en formato JSON: {\"nombre_del_medicamento\": \"VALOR\"}"
-                },
-                {
-                    "type": "image_url", 
-                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
-                }
-            ]
-        }],
-        model="llama-3.2-90b-vision-preview", # El modelo que sí funciona
-        response_format={"type": "json_object"}
-    )
-    return chat_completion.choices[0].message.content
+        chat_completion = groq_client.chat.completions.create(
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text", 
+                        "text": "Identifica el nombre del medicamento en este récipe. Responde SOLO en formato JSON: {\"nombre_del_medicamento\": \"VALOR\"}"
+                    },
+                    {
+                        "type": "image_url", 
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                    }
+                ]
+            }],
+            model="llama-3.2-11b-vision-preview",
+            response_format={"type": "json_object"}
+        )
+        
+        # Extraemos el contenido
+        resultado_json = json.loads(chat_completion.choices[0].message.content)
+        return resultado_json.get("nombre_del_medicamento", "Desconocido")
+
+    except Exception as e:
+        print(f"ERROR EN VISION: {e}")
+        return "Error al leer imagen"
+    
+    
 
 # 2. Y que aquí también se use el mismo nombre
 @app.route('/analizar_recipe', methods=['POST'])
