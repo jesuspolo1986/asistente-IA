@@ -138,18 +138,18 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
         print(f"🔥 Error crítico en búsqueda de inventario: {str(e)}")
         return {"encontrado": False, "error": str(e)}
 
-def analizar_recipe_con_groq(image_path):
+# 1. Asegúrate de que el nombre aquí sea 'procesar_vision_groq'
+def procesar_vision_groq(image_path):
     with open(image_path, "rb") as image_file:
         base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-    # CAMBIAMOS EL MODELO AQUÍ:
     chat_completion = groq_client.chat.completions.create(
         messages=[{
             "role": "user",
             "content": [
                 {
                     "type": "text", 
-                    "text": "Eres una experta farmacéutica. Identifica el nombre del medicamento en este récipe. Responde SOLO en formato JSON: {\"nombre_del_medicamento\": \"VALOR\"}"
+                    "text": "Identifica el nombre del medicamento en este récipe. Responde SOLO en formato JSON: {\"nombre_del_medicamento\": \"VALOR\"}"
                 },
                 {
                     "type": "image_url", 
@@ -157,42 +157,40 @@ def analizar_recipe_con_groq(image_path):
                 }
             ]
         }],
-        model="llama-3.2-90b-vision-preview", # <--- MODELO ACTUALIZADO
+        model="llama-3.2-90b-vision-preview", # El modelo que sí funciona
         response_format={"type": "json_object"}
     )
     return chat_completion.choices[0].message.content
+
+# 2. Y que aquí también se use el mismo nombre
 @app.route('/analizar_recipe', methods=['POST'])
 def api_analizar_recipe():
-    # Evitar error de sesión si no se ha logueado
-    usuario_id = session.get('usuario', 'admin@admin.com') 
+    usuario_id = session.get('usuario', 'invitado')
     
     if 'foto' not in request.files:
-        return jsonify({"error": "No llegó la imagen"}), 400
+        return jsonify({"error": "No se recibió imagen"}), 400
     
     foto = request.files['foto']
-    temp_path = os.path.join('/tmp', f"v_{int(time.time())}.jpg")
-    foto.save(temp_path)
+    path = os.path.join('/tmp', f"scan_{int(time.time())}.jpg")
+    foto.save(path)
     
     try:
-        # 1. IA analiza la imagen
-        respuesta_ia = procesar_vision_groq(temp_path)
-        datos = json.loads(respuesta_ia)
-        nombre_med = datos.get("nombre_del_medicamento", "")
+        # AQUÍ ESTABA EL ERROR: El nombre debe ser procesar_vision_groq
+        raw_json = procesar_vision_groq(path) 
+        datos_medico = json.loads(raw_json)
+        medicamento = datos_medico.get("nombre_del_medicamento", "")
         
-        print(f"--- ELENA LEYÓ: {nombre_med} ---") # Esto saldrá en tus logs de Koyeb
-
-        # 2. Buscar en Excel/Supabase
-        res_inventario = buscar_producto_excel(nombre_med, usuario_id)
+        resultado = buscar_producto_excel(medicamento, usuario_id)
         
-        if os.path.exists(temp_path): os.remove(temp_path)
+        if os.path.exists(path): os.remove(path)
         
         return jsonify({
-            "lectura_ia": datos,
-            "inventario": res_inventario
+            "lectura_ia": datos_medico,
+            "inventario": resultado
         })
     except Exception as e:
-        if os.path.exists(temp_path): os.remove(temp_path)
-        print(f"ERROR CRÍTICO: {str(e)}")
+        if os.path.exists(path): os.remove(path)
+        print(f"ERROR CRÍTICO: {str(e)}") # Esto te dirá el error real en los logs
         return jsonify({"error": str(e)}), 500
 @app.route('/login', methods=['GET', 'POST'])
 def login():
