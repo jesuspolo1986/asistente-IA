@@ -3,38 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elena AI - Farmacia</title>
+    <title>Elena AI - Farmacia Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --primary: #00d2ff; --bg: #0f172a; --card: rgba(30, 41, 59, 0.7); }
         body { background: #0f172a; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; position: relative; }
 
+        /* Cápsula de Estado de Suscripción */
         .admin-status-capsule { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; width: auto; min-width: 320px; border-radius: 50px; padding: 8px 20px; backdrop-filter: blur(15px); box-shadow: 0 10px 40px rgba(0,0,0,0.6); border: 1px solid rgba(255, 255, 255, 0.15); animation: slideDown 0.5s ease-out; }
         @keyframes slideDown { from { top: -80px; } to { top: 20px; } }
 
+        /* Tarjeta Principal */
         .card-elena { background: var(--card); border-radius: 40px; padding: 2.5rem; width: 440px; text-align: center; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(20px); box-shadow: 0 25px 50px rgba(0,0,0,0.5); position: relative; }
 
+        /* Visualización de Precios */
         .price-display { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(0, 210, 255, 0.2); border-radius: 30px; padding: 20px; margin: 15px 0; display: none; }
         .price-val { font-size: 2.2rem; font-weight: 800; line-height: 1; }
         .price-label { font-size: 0.7rem; color: #94a3b8; letter-spacing: 1px; margin-top: 5px; }
         .divider { width: 1px; background: rgba(255,255,255,0.1); height: 50px; margin: 0 20px; }
 
+        /* Aura de Elena */
         .aura { width: 140px; height: 140px; margin: 1.5rem auto; border-radius: 50%; border: 4px solid var(--primary); position: relative; overflow: hidden; box-shadow: 0 0 25px rgba(0, 210, 255, 0.4); cursor: pointer; transition: 0.3s; }
         #elenaVideo { width: 100%; height: 100%; object-fit: cover; }
         .hablando { animation: pulse-border 1s infinite; border-color: #fff !important; }
         @keyframes pulse-border { 50% { box-shadow: 0 0 50px var(--primary), 0 0 20px #fff; } }
 
         .res-box { min-height: 60px; margin-bottom: 1.5rem; color: #cbd5e1; font-size: 0.9rem; padding: 0 10px; }
-        .input-elena { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; color: white; padding: 12px; width: 100%; text-align: center; outline: none; transition: 0.3s; }
-        .input-elena:focus { border-color: var(--primary); background: rgba(255,255,255,0.1); }
+
+        /* Barra de Entrada de Texto con Botones Integrados */
+        .input-group-elena { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 5px 15px; transition: 0.3s; }
+        .input-group-elena:focus-within { border-color: var(--primary); background: rgba(255,255,255,0.1); }
+        .input-elena { background: transparent; border: none; color: white; padding: 8px; width: 100%; text-align: center; outline: none; }
+        
+        .btn-icon { background: none; border: none; color: var(--primary); font-size: 1.2rem; cursor: pointer; transition: 0.3s; padding: 5px; }
+        .btn-icon:hover { transform: scale(1.2); color: white; }
 
         .btn-admin-action { background: rgba(0, 210, 255, 0.1); color: var(--primary); border: 1px solid var(--primary); border-radius: 15px; padding: 10px; font-weight: bold; margin-top: 15px; display: none; width: 100%; transition: 0.3s; }
         .btn-admin-action:hover { background: var(--primary); color: #0f172a; }
         
-        .btn-whatsapp { background: #25d366; color: white; border-radius: 20px; padding: 5px 15px; text-decoration: none; font-weight: 800; font-size: 0.7rem; transition: 0.3s; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.2); }
-        .btn-whatsapp:hover { background: #1eb954; transform: translateY(-2px); color: white; }
+        .btn-whatsapp { background: #25d366; color: white; border-radius: 20px; padding: 5px 15px; text-decoration: none; font-weight: 800; font-size: 0.7rem; transition: 0.3s; }
         
+        /* Cabecera */
         .top-info { position: absolute; top: 25px; left: 30px; display: flex; align-items: center; gap: 10px; }
         .badge-mode { background: var(--primary); color: #0f172a; padding: 2px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; margin-left: 5px; }
         .logout-btn { position: absolute; top: 25px; right: 30px; color: #cbd5e1; cursor: pointer; font-size: 1.2rem; border: none; background: none; transition: 0.3s; }
@@ -60,7 +70,7 @@
         <div id="badgeAdmin" class="badge-mode" style="display: none;">GERENCIA</div>
     </div>
     
-    <button onclick="handleLogout()" class="logout-btn" title="Cerrar Sesión / Salir de Gerencia">
+    <button onclick="handleLogout()" class="logout-btn" title="Cerrar Sesión">
         <i class="fas fa-sign-out-alt"></i>
     </button>
 
@@ -87,13 +97,20 @@
         </div>
     </div>
     
-    <div class="res-box" id="textoElena">Haz clic en mi rostro para consultar.</div>
+    <div class="res-box" id="textoElena">Haz clic en mi rostro para consultar o usa la cámara.</div>
     
-    <input type="text" id="userInput" class="input-elena" placeholder="Consulta o actualiza tasa (ej: Tasa 55)" onkeypress="if(event.key==='Enter') enviar()">
-    
+    <div class="input-group-elena">
+        <button class="btn-icon" title="Escanear Récipe Médico" onclick="document.getElementById('recipeInput').click()">
+            <i class="fas fa-camera"></i>
+        </button>
+        <input type="text" id="userInput" class="input-elena" placeholder="Escribe o pulsa mi rostro..." onkeypress="if(event.key==='Enter') enviar()">
+    </div>
+
+    <input type="file" id="recipeInput" accept="image/*" style="display: none;" onchange="subirRecipe()">
     <input type="file" id="fileInput" style="display: none;" onchange="subirArchivo()">
+
     <button id="btnAdmin" class="btn-admin-action" onclick="document.getElementById('fileInput').click()">
-        <i class="fas fa-upload me-2"></i> ACTUALIZAR INVENTARIO
+        <i class="fas fa-upload me-2"></i> ACTUALIZAR INVENTARIO EXCEL
     </button>
 </div>
 
@@ -103,73 +120,95 @@
     const diasRestantes = {{ dias_restantes }};
     let modoGerencia = false;
 
-    // --- NUEVO: Identificación de Equipo Único ---
-    let equipoID = localStorage.getItem('elena_equipo_id');
-    if (!equipoID) {
-        equipoID = 'EQ-' + Math.random().toString(36).substring(2, 9).toUpperCase();
-        localStorage.setItem('elena_equipo_id', equipoID);
+    // Identificador de Equipo Único para Supabase
+    let equipoID = localStorage.getItem('elena_equipo_id') || 'EQ-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+    localStorage.setItem('elena_equipo_id', equipoID);
+
+    // --- FUNCIÓN PARA ANALIZAR RÉCIPE MÉDICO (GROQ) ---
+    async function subirRecipe() {
+        const fileInput = document.getElementById('recipeInput');
+        if (fileInput.files.length === 0) return;
+
+        const textoElena = document.getElementById('textoElena');
+        textoElena.innerText = "Analizando tu récipe médico... dame un momento.";
+        hablar("Analizando tu récipe médico. Dame un momento para leer la letra.");
+
+        const formData = new FormData();
+        formData.append('foto', fileInput.files[0]);
+
+        try {
+            const response = await fetch('/analizar_recipe', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            if (data.error) throw new Error(data.error);
+
+            const med = data.lectura_ia.nombre_del_medicamento || "el medicamento";
+            const inv = data.inventario;
+
+            if (inv.encontrado) {
+                document.getElementById('priceDisplay').style.display = 'block';
+                document.getElementById('nombreProducto').innerText = inv.nombre;
+                
+                const tasa = parseFloat(document.getElementById('displayTasa').innerText);
+                const precioBs = (inv.precio * tasa).toLocaleString('es-VE', {minimumFractionDigits: 2});
+                
+                document.getElementById('priceBs').innerText = precioBs;
+                document.getElementById('priceUsd').innerText = inv.precio.toFixed(2) + " $";
+                
+                const respuesta = `He leído ${med}. Lo tenemos disponible. El precio es de ${inv.precio} dólares.`;
+                textoElena.innerText = respuesta;
+                hablar(respuesta);
+            } else {
+                const respuesta = `He leído ${med} en el récipe, pero no lo tengo en inventario actualmente.`;
+                textoElena.innerText = respuesta;
+                hablar(respuesta);
+                document.getElementById('priceDisplay').style.display = 'none';
+            }
+        } catch (error) {
+            textoElena.innerText = "Error al leer el récipe. Intenta que la foto sea más clara.";
+            hablar("Lo siento, no pude procesar la imagen del récipe.");
+        }
+        fileInput.value = ""; // Limpiar input
     }
-    console.log("Identificador de este equipo:", equipoID);
-    // ---------------------------------------------
 
-    let voces = [];
-    function cargarVoces() { voces = synth.getVoices(); }
-    if (speechSynthesis.onvoiceschanged !== undefined) { speechSynthesis.onvoiceschanged = cargarVoces; }
-
+    // --- LOGICA DE CONSULTA POR TEXTO ---
     async function enviar() {
         const input = document.getElementById('userInput');
         const query = input.value.trim();
         if(!query) return;
 
-        // Lógica de actualización de tasa
+        // Tasa manual
         if(query.toLowerCase().startsWith("tasa ")) {
             const nuevaTasa = query.split(" ")[1];
-            try {
-                const resT = await fetch('/preguntar', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        nueva_tasa: nuevaTasa, 
-                        modo_admin: modoGerencia,
-                        equipo_id: equipoID 
-                    })
-                });
-                const dataT = await resT.json();
-                if(dataT.tasa) {
-                    document.getElementById('displayTasa').innerText = dataT.tasa;
-                    document.getElementById('textoElena').innerText = "Tasa actualizada a " + dataT.tasa;
-                    hablar("Tasa actualizada");
-                }
-            } catch(e) { console.error("Error tasa:", e); }
-            input.value = "";
-            return;
+            const resT = await fetch('/preguntar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ nueva_tasa: nuevaTasa, modo_admin: modoGerencia, equipo_id: equipoID })
+            });
+            const dataT = await resT.json();
+            if(dataT.tasa) {
+                document.getElementById('displayTasa').innerText = dataT.tasa;
+                document.getElementById('textoElena').innerText = "Tasa actualizada.";
+                hablar("Tasa actualizada");
+            }
+            input.value = ""; return;
         }
 
-        // Lógica de consulta normal
         const res = await fetch('/preguntar', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ 
-                pregunta: query, 
-                modo_admin: modoGerencia,
-                equipo_id: equipoID 
-            })
+            body: JSON.stringify({ pregunta: query, modo_admin: modoGerencia, equipo_id: equipoID })
         });
         const data = await res.json();
         
-        // --- CORRECCIÓN AQUÍ ---
-        // --- BUSCA ESTA PARTE EN TU FUNCIÓN enviar() ---
-        if(data.exito && data.producto_nombre !== "GERENCIA" && data.p_bs !== undefined) {
+        if(data.exito && data.producto_nombre !== "GERENCIA" && data.p_bs) {
             document.getElementById('priceDisplay').style.display = 'block';
             document.getElementById('nombreProducto').innerText = data.producto_nombre;
             document.getElementById('priceBs').innerText = data.p_bs;
             document.getElementById('priceUsd').innerText = data.p_usd + " $";
         } else {
-            // Si no hay éxito, ocultamos y reseteamos a valores base
             document.getElementById('priceDisplay').style.display = 'none';
             document.getElementById('nombreProducto').innerText = data.producto_nombre || "ELENA AI";
-            document.getElementById('priceBs').innerText = "0,00"; // Limpieza
-            document.getElementById('priceUsd').innerText = "0,00 $"; // Limpieza
         }
 
         document.getElementById('textoElena').innerText = data.respuesta;
@@ -179,26 +218,20 @@
         input.value = "";
     }
 
-   function activarModoGerencia() {
-        if(modoGerencia) return; 
+    // --- MODOS Y ADMINISTRACIÓN ---
+    function activarModoGerencia() {
         modoGerencia = true;
-        
         document.getElementById('btnAdmin').style.display = 'block';
         document.getElementById('badgeAdmin').style.display = 'inline-block';
         
         const capsule = document.getElementById('adminCapsule');
-        if (diasRestantes <= 0) {
+        if (diasRestantes <= 1) {
             capsule.style.display = "block";
-            const statusText = document.getElementById('statusText');
-            if(diasRestantes === 0) {
-                statusText.innerHTML = "LICENCIA: VENCE HOY";
-                statusText.style.color = "#ffb347";
-            } else {
-                statusText.innerHTML = "🚫 ACCESO POR VENCER: RENOVAR";
-                statusText.style.color = "#ff6b6b";
-            }
+            const st = document.getElementById('statusText');
+            st.innerHTML = diasRestantes === 0 ? "⚠️ LICENCIA VENCE HOY" : "DÍA DE GRACIA ACTIVO";
+            st.style.color = "#ff6b6b";
         }
-    } // Asegúrate de que termine aquí antes de handleLogout
+    }
 
     function handleLogout() {
         if(modoGerencia) {
@@ -206,10 +239,8 @@
             document.getElementById('btnAdmin').style.display = 'none';
             document.getElementById('badgeAdmin').style.display = 'none';
             document.getElementById('adminCapsule').style.display = 'none';
-            document.getElementById('nombreProducto').innerText = "ELENA AI";
-            document.getElementById('priceDisplay').style.display = 'none';
-            document.getElementById('textoElena').innerText = "Modo Vendedor activo.";
-            hablar("Modo vendedor activado");
+            document.getElementById('textoElena').innerText = "Modo Vendedor.";
+            hablar("Modo vendedor activo");
         } else {
             window.location.href = "/logout";
         }
@@ -220,7 +251,6 @@
         synth.cancel(); 
         const u = new SpeechSynthesisUtterance(msj);
         u.lang = 'es-MX';
-        u.rate = 0.9;
         u.onstart = () => aura.classList.add('hablando');
         u.onend = () => aura.classList.remove('hablando');
         synth.speak(u);
@@ -228,20 +258,11 @@
 
     function escuchar() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitRecognition;
-        if(!SpeechRecognition) {
-            alert("Tu navegador no soporta reconocimiento de voz.");
-            return;
-        }
+        if(!SpeechRecognition) return;
         const rec = new SpeechRecognition();
         rec.lang = 'es-VE';
-        rec.onstart = () => { 
-            document.getElementById('textoElena').innerText = "Escuchando..."; 
-            aura.classList.add('hablando'); 
-        };
-        rec.onresult = (e) => { 
-            document.getElementById('userInput').value = e.results[0][0].transcript; 
-            enviar(); 
-        };
+        rec.onstart = () => { aura.classList.add('hablando'); document.getElementById('textoElena').innerText = "Te escucho..."; };
+        rec.onresult = (e) => { document.getElementById('userInput').value = e.results[0][0].transcript; enviar(); };
         rec.onend = () => aura.classList.remove('hablando');
         rec.start();
     }
@@ -251,58 +272,21 @@
         if(!file) return;
         const formData = new FormData();
         formData.append('archivo', file);
-        document.getElementById('textoElena').innerText = "Cargando inventario...";
-        try {
-            const res = await fetch('/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-            if(data.success) {
-                document.getElementById('textoElena').innerText = `Éxito: ${data.productos} productos listos.`;
-                hablar("Inventario actualizado con éxito");
-            }
-        } catch(e) { document.getElementById('textoElena').innerText = "Error al subir archivo."; }
+        document.getElementById('textoElena').innerText = "Actualizando...";
+        const res = await fetch('/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if(data.success) {
+            document.getElementById('textoElena').innerText = "Inventario cargado.";
+            hablar("Inventario actualizado correctamente");
+        }
     }
 
-    function contactarSoporte() {
-        const mensaje = encodeURIComponent("Hola, necesito renovar mi licencia de Elena AI para la farmacia: {{ email }}");
-        const telefono = "584128598727"; 
-        window.open(`https://wa.me/${telefono}?text=${mensaje}`, '_blank');
-    }
-   // --- FUNCIÓN DE SINCRONIZACIÓN ---
     function sincronizarTasa() {
-        fetch('/obtener_tasa_actual')
-            .then(response => response.json())
-            .then(data => {
-                if (data.tasa) {
-                    const tasaDisplay = document.getElementById('displayTasa'); 
-                    if (tasaDisplay) {
-                        const tasaAnterior = tasaDisplay.innerText.trim();
-                        const nuevaTasa = data.tasa.toString();
-                        
-                        if (tasaAnterior !== nuevaTasa) {
-                            tasaDisplay.innerText = nuevaTasa;
-                            console.log("¡Tasa sincronizada!");
-                            
-                            // Efecto visual
-                            tasaDisplay.style.transition = "0.5s";
-                            tasaDisplay.style.color = '#00ff00'; 
-                            setTimeout(() => { 
-                                tasaDisplay.style.color = 'var(--primary)'; 
-                            }, 2000);
-                        }
-                    }
-                }
-            })
-            .catch(err => console.error("Error sincronizando tasa:", err));
+        fetch('/obtener_tasa_actual').then(r => r.json()).then(d => {
+            if(d.tasa) document.getElementById('displayTasa').innerText = d.tasa;
+        });
     }
-
-    // --- ACTIVADORES (FUERA DE LA FUNCIÓN) ---
-    
-    // 1. Ejecutar inmediatamente al cargar
-    sincronizarTasa();
-
-    // 2. Ejecutar cada 10 segundos
-    setInterval(sincronizarTasa, 30000);
-
+    setInterval(sincronizarTasa, 60000);
 </script>
 </body>
 </html>

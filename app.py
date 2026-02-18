@@ -14,7 +14,13 @@ import unicodedata
 import random
 app = Flask(__name__)
 app.secret_key = 'elena_farmacia_2026_key'
+from groq import Groq
+import base64
 
+# ... tus otras configuraciones ...
+# Ahora el código buscará la llave en el sistema, no en el texto
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+groq_client = Groq(api_key=GROQ_API_KEY)
 # --- CONFIGURACIÓN ---
 SUPABASE_URL = "https://kebpamfydhnxeaeegulx.supabase.co"
 SUPABASE_KEY = "sb_secret_lSrahuG5Nv32T1ZaV7lfRw_WFXuiP4H"
@@ -75,6 +81,64 @@ def get_tasa_usuario(email):
     # Si la DB falla o ya tenemos una tasa fresca en RAM, la usamos
     return memoria_tasa.get('global', obtener_tasa_real())
 # --- RUTAS DE AUTENTICACIÓN ---
+def buscar_producto_excel(nombre_medicamento, email_usuario):
+    try:
+        # 1. Traemos el inventario de este usuario específico desde la DB
+        res = supabase.table("inventarios").select("producto, precio_usd, stock").eq("empresa_email", email_usuario).execute()
+        inventario = res.data
+        
+        if not inventario:
+            return {"encontrado": False, "error": "Inventario vacío"}
+
+        # 2. Extraemos solo los nombres para RapidFuzz
+        nombres_productos = [str(i['producto']) for i in inventario]
+        
+        # 3. Buscamos la mejor coincidencia (mínimo 70% de similitud)
+        match = process.extractOne(nombre_medicamento, nombres_productos, score_cutoff=70)
+        
+        if match:
+            nombre_real = match[0]
+            # Buscamos el objeto completo en nuestra lista 'inventario'
+            item = next((i for i in inventario if i['producto'] == nombre_real), None)
+            
+            return {
+                "encontrado": True,
+                "nombre": nombre_real,
+                "precio": item['precio_usd'],
+                "stock": item.get('stock', 0)
+            }
+    except Exception as e:
+        print(f"Error en búsqueda Excel: {e}")
+    
+    return {"encontrado": False}
+@app.route('/analizar_recipe', methods=['POST'])
+def api_analizar_recipe():
+    if 'foto' not in request.files:
+        return jsonify({"error": "No se subió ninguna imagen"}), 400
+    
+    foto = request.files['foto']
+    # Guardar temporalmente
+    path = os.path.join("uploads", foto.filename)
+    foto.save(path)
+    
+    # 1. Groq analiza la imagen
+    try:
+        raw_json = analizar_recipe(path) # Tu función de prueba
+        datos_medico = json.loads(raw_json)
+        medicamento = datos_medico.get("nombre_del_medicamento")
+        
+        # 2. Buscar en el Excel del usuario actual
+        resultado = buscar_producto_excel(medicamento, session['usuario'])
+        
+        # 3. Eliminar foto temporal
+        os.remove(path)
+        
+        return jsonify({
+            "lectura_ia": datos_medico,
+            "inventario": resultado
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
