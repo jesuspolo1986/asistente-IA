@@ -1,24 +1,22 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
-import pandas as pd
 import os
-import io
-from pyDolarVenezuela.pages import AlCambio
-from pyDolarVenezuela import Monitor
-from datetime import datetime, timedelta
-from supabase import create_client, Client
 import time
-from rapidfuzz import process, utils
-import gc # Recolector de basura
+import json
+import base64
+import gc
 import re
 import unicodedata
 import random
+from datetime import datetime, timedelta
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
+import pandas as pd
+from supabase import create_client, Client
+from groq import Groq
+from rapidfuzz import process, utils
+
 app = Flask(__name__)
 app.secret_key = 'elena_farmacia_2026_key'
-from groq import Groq
-import base64
 
-# ... tus otras configuraciones ...
-# Ahora el código buscará la llave en el sistema, no en el texto
+# Inicialización de Groq (Asegúrate de tener la variable en Koyeb)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 groq_client = Groq(api_key=GROQ_API_KEY)
 # --- CONFIGURACIÓN ---
@@ -113,62 +111,68 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
     return {"encontrado": False}
 import json # <--- ASEGÚRATE DE TENER ESTO AL INICIO DEL ARCHIVO
 
+import base64
+import json
+import time
+
+# --- FUNCIÓN DE APOYO PARA GROQ VISION ---
+def analizar_recipe_con_groq(image_path):
+    with open(image_path, "rb") as image_file:
+        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+    # Usamos el modelo Vision de Groq (Llama 3.2 11B es excelente para esto)
+    chat_completion = groq_client.chat.completions.create(
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "text", 
+                    "text": "Eres una experta farmacéutica. Identifica el nombre del medicamento en este récipe. Responde SOLO en formato JSON: {\"nombre_del_medicamento\": \"VALOR\"}"
+                },
+                {
+                    "type": "image_url", 
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                }
+            ]
+        }],
+        model="llama-3.2-11b-vision-preview",
+        response_format={"type": "json_object"}
+    )
+    return chat_completion.choices[0].message.content
+
+# --- RUTA DE ANÁLISIS ACTUALIZADA ---
 @app.route('/analizar_recipe', methods=['POST'])
 def api_analizar_recipe():
-    # Verificar si el usuario está logueado para acceder a su sesión
     if 'usuario' not in session:
-        return jsonify({"error": "Sesión no iniciada"}), 401
-
+        return jsonify({"error": "Sesión expirada"}), 401
+    
     if 'foto' not in request.files:
-        return jsonify({"error": "No se subió ninguna imagen"}), 400
+        return jsonify({"error": "No se recibió imagen"}), 400
     
     foto = request.files['foto']
-    if foto.filename == '':
-        return jsonify({"error": "Nombre de archivo vacío"}), 400
-
-    # Guardar temporalmente en /tmp
-    path = os.path.join('/tmp', f"recipe_{int(time.time())}_{foto.filename}")
+    # Usamos /tmp porque Koyeb no permite escribir en la carpeta del proyecto
+    path = os.path.join('/tmp', f"scan_{int(time.time())}.jpg")
     foto.save(path)
     
     try:
-        # 1. Groq analiza la imagen (Asegúrate que analizar_recipe use groq_client)
-        raw_json = analizar_recipe_con_groq(path) 
+        # 1. Groq lee la imagen
+        raw_json = analizar_recipe_con_groq(path)
         datos_medico = json.loads(raw_json)
         medicamento = datos_medico.get("nombre_del_medicamento", "")
         
-        # 2. Buscar en el Excel del usuario actual
-        # Usamos session.get('usuario') por seguridad
-        resultado = buscar_producto_excel(medicamento, session.get('usuario'))
+        # 2. Buscar en el inventario (Usando tu función existente)
+        # Nota: Asegúrate que buscar_producto_excel esté bien definida con df_inventario
+        resultado = buscar_producto_excel(medicamento, session['usuario'])
         
-        # 3. Eliminar foto temporal para no llenar el disco del servidor
-        if os.path.exists(path):
-            os.remove(path)
+        if os.path.exists(path): os.remove(path) # Limpieza
         
         return jsonify({
-            "exito": True,
             "lectura_ia": datos_medico,
             "inventario": resultado
         })
     except Exception as e:
         if os.path.exists(path): os.remove(path)
-        print(f"ERROR CRÍTICO EN RECIPE: {str(e)}") # Esto saldrá en tus logs de Koyeb
-        return jsonify({"error": "Elena no pudo interpretar la imagen", "detalle": str(e)}), 500
-def analizar_recipe_con_groq(image_path):
-    with open(image_path, "rb") as image_file:
-        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-
-    chat_completion = groq_client.chat.completions.create(
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "Extrae el nombre del medicamento de este récipe. Responde SOLO en formato JSON: {\"nombre_del_medicamento\": \"valor\"}"},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-            ]
-        }],
-        model="llama-3.2-11b-vision-preview", # Modelo que soporta imágenes
-        response_format={"type": "json_object"}
-    )
-    return chat_completion.choices[0].message.content
+        return jsonify({"error": str(e)}), 500
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':

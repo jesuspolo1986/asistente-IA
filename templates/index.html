@@ -99,19 +99,23 @@
     
     <div class="res-box" id="textoElena">Haz clic en mi rostro para consultar o usa la cámara.</div>
     
-    <div class="input-group-elena">
-        <button class="btn-icon" title="Escanear Récipe Médico" onclick="document.getElementById('recipeInput').click()">
-            <i class="fas fa-camera"></i>
+<div class="input-group-elena">
+    <button class="btn-icon" title="Escanear Récipe" onclick="abrirCamara()">
+    <i class="fas fa-camera"></i>
+</button>
+    <input type="text" id="userInput" class="input-elena" placeholder="Escribe o escanea récipe...">
+</div>
+
+<div id="cameraModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:10000; flex-direction:column; align-items:center; justify-content:center;">
+    <h4 style="color:var(--primary); margin-bottom:15px;">Muestra el récipe a la cámara</h4>
+    <video id="videoPreview" autoplay playsinline style="width:90%; max-width:500px; border-radius:20px; border:2px solid var(--primary);"></video>
+    <div style="margin-top:25px; display:flex; gap:15px;">
+        <button onclick="cerrarCamara()" class="btn btn-outline-light rounded-pill px-4">CANCELAR</button>
+        <button onclick="tomarFoto()" class="btn btn-primary rounded-pill px-4" style="background:var(--primary); color:#0f172a; font-weight:bold;">
+            <i class="fas fa-camera me-2"></i> CAPTURAR
         </button>
-        <input type="text" id="userInput" class="input-elena" placeholder="Escribe o pulsa mi rostro..." onkeypress="if(event.key==='Enter') enviar()">
     </div>
-
-    <input type="file" id="recipeInput" accept="image/*" style="display: none;" onchange="subirRecipe()">
-    <input type="file" id="fileInput" style="display: none;" onchange="subirArchivo()">
-
-    <button id="btnAdmin" class="btn-admin-action" onclick="document.getElementById('fileInput').click()">
-        <i class="fas fa-upload me-2"></i> ACTUALIZAR INVENTARIO EXCEL
-    </button>
+    <canvas id="photoCanvas" style="display:none;"></canvas>
 </div>
 
 <script>
@@ -287,6 +291,81 @@
         });
     }
     setInterval(sincronizarTasa, 60000);
+
+    let streamMedia;
+
+async function abrirCamara() {
+    const modal = document.getElementById('cameraModal');
+    const video = document.getElementById('videoPreview');
+    modal.style.display = 'flex';
+
+    try {
+        // Solicita cámara trasera si es celular
+        streamMedia = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: "environment" }, 
+            audio: false 
+        });
+        video.srcObject = streamMedia;
+    } catch (err) {
+        alert("Error al acceder a la cámara: " + err);
+        cerrarCamara();
+    }
+}
+
+function cerrarCamara() {
+    if (streamMedia) {
+        streamMedia.getTracks().forEach(track => track.stop());
+    }
+    document.getElementById('cameraModal').style.display = 'none';
+}
+
+async function tomarFoto() {
+    const video = document.getElementById('videoPreview');
+    const canvas = document.getElementById('photoCanvas');
+    const context = canvas.getContext('2d');
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    cerrarCamara(); // Cerramos la cámara para ahorrar recursos
+
+    // Convertir a Blob y enviar
+    canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        formData.append('foto', blob, 'recipe.jpg');
+
+        document.getElementById('textoElena').innerText = "Analizando lo que me mostraste...";
+        hablar("Dame un momento, estoy leyendo el récipe.");
+
+        try {
+            const response = await fetch('/analizar_recipe', { method: 'POST', body: formData });
+            const data = await response.json();
+            
+            if (data.inventario && data.inventario.encontrado) {
+                // Llenar la interfaz con los datos encontrados
+                document.getElementById('priceDisplay').style.display = 'block';
+                document.getElementById('nombreProducto').innerText = data.inventario.nombre;
+                
+                const tasa = parseFloat(document.getElementById('displayTasa').innerText);
+                const pBs = (data.inventario.precio * tasa).toLocaleString('es-VE', {minimumFractionDigits: 2});
+                
+                document.getElementById('priceBs').innerText = pBs;
+                document.getElementById('priceUsd').innerText = data.inventario.precio.toFixed(2) + " $";
+                
+                const msj = `He identificado ${data.inventario.nombre}. El precio es de ${data.inventario.precio} dólares.`;
+                document.getElementById('textoElena').innerText = msj;
+                hablar(msj);
+            } else {
+                const med = data.lectura_ia.nombre_del_medicamento || "lo que me mostraste";
+                hablar(`Lo siento, identifiqué ${med}, pero no lo tenemos en existencia.`);
+                document.getElementById('textoElena').innerText = `No encontramos: ${med}`;
+            }
+        } catch (e) {
+            hablar("Hubo un error al conectar con el servidor.");
+        }
+    }, 'image/jpeg');
+}
 </script>
 </body>
 </html>
