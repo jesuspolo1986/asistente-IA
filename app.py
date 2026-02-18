@@ -118,7 +118,7 @@ def api_analizar_recipe():
     
     foto = request.files['foto']
     # Guardar temporalmente
-    path = os.path.join("uploads", foto.filename)
+    path = os.path.join('/tmp', foto.filename)
     foto.save(path)
     
     # 1. Groq analiza la imagen
