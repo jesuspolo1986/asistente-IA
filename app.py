@@ -79,10 +79,11 @@ def get_tasa_usuario(email):
     # Si la DB falla o ya tenemos una tasa fresca en RAM, la usamos
     return memoria_tasa.get('global', obtener_tasa_real())
 # --- RUTAS DE AUTENTICACIÓN ---
+from rapidfuzz import process, fuzz, utils
+
 def buscar_producto_excel(nombre_medicamento, email_usuario):
     try:
         # 1. Traemos el inventario filtrado por email
-        # Agregamos orden para consistencia
         res = supabase.table("inventarios")\
             .select("producto, precio_usd, stock")\
             .eq("empresa_email", email_usuario)\
@@ -94,42 +95,50 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
             print(f"Búsqueda: Inventario no encontrado para {email_usuario}")
             return {"encontrado": False, "error": "Inventario vacío"}
 
-        # 2. Limpieza de nombres para mejorar la coincidencia
-        # Convertimos todo a string y quitamos espacios extra
-        nombres_productos = [str(i['producto']).strip() for i in inventario if i.get('producto')]
-        
         if not nombre_medicamento:
             return {"encontrado": False, "error": "Nombre de medicamento vacío"}
 
-        # 3. Buscamos la mejor coincidencia
-        # Usamos processor=utils.default_process para ignorar mayúsculas/minúsculas y acentos
+        # --- MEJORA CRÍTICA: Estandarización a minúsculas ---
+        # Creamos una lista de nombres limpia para la IA
+        # Guardamos el original en un diccionario para recuperarlo luego
+        nombres_para_busqueda = {
+            str(i['producto']).strip().lower(): i 
+            for i in inventario if i.get('producto')
+        }
+        
+        lista_nombres = list(nombres_para_busqueda.keys())
+        query_usuario = str(nombre_medicamento).strip().lower()
+
+        # 2. Buscamos la mejor coincidencia con RapidFuzz
+        # fuzz.partial_ratio es mejor para casos como "vitamina c" vs "VITAMINA C 1G"
         match = process.extractOne(
-            nombre_medicamento, 
-            nombres_productos, 
-            score_cutoff=60, # Bajamos a 60 para ser más flexibles con fotos movidas
-            processor=utils.default_process
+            query_usuario, 
+            lista_nombres, 
+            score_cutoff=60, 
+            processor=utils.default_process,
+            scorer=fuzz.partial_ratio # Busca la coincidencia parcial (mejor para récipes)
         )
         
         if match:
-            nombre_real = match[0]
+            nombre_minimo = match[0]
             puntuacion = match[1]
             
-            # Buscamos el objeto completo
-            item = next((i for i in inventario if str(i['producto']).strip() == nombre_real), None)
+            # Recuperamos el item original (con sus mayúsculas y datos)
+            item = nombres_para_busqueda[nombre_minimo]
             
-            if item:
-                # Aseguramos que el precio sea un float, si es None ponemos 0.0
-                precio = float(item.get('precio_usd', 0) or 0)
-                
-                print(f"✅ Match encontrado: {nombre_real} (Similitud: {puntuacion}%)")
-                
-                return {
-                    "encontrado": True,
-                    "nombre": nombre_real,
-                    "precio": precio,
-                    "stock": item.get('stock', 0),
-                    "score": puntuacion
-                }
+            # Aseguramos tipos de datos correctos
+            precio = float(item.get('precio_usd', 0) or 0)
+            nombre_original = str(item.get('producto'))
+            
+            print(f"✅ Match encontrado: {nombre_original} (Similitud: {puntuacion}%)")
+            
+            return {
+                "encontrado": True,
+                "nombre": nombre_original,
+                "precio": precio,
+                "stock": item.get('stock', 0),
+                "score": puntuacion
+            }
         
         print(f"❌ No se encontró coincidencia cercana para: {nombre_medicamento}")
         return {"encontrado": False}
@@ -137,7 +146,6 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
     except Exception as e:
         print(f"🔥 Error crítico en búsqueda de inventario: {str(e)}")
         return {"encontrado": False, "error": str(e)}
-
 # 1. Asegúrate de que el nombre aquí sea 'procesar_vision_groq'
 def procesar_vision_groq(image_path):
     import base64
@@ -187,22 +195,24 @@ def api_analizar_recipe():
     foto.save(path)
     
     try:
-        # AQUÍ ESTABA EL ERROR: El nombre debe ser procesar_vision_groq
-        raw_json = procesar_vision_groq(path) 
-        datos_medico = json.loads(raw_json)
-        medicamento = datos_medico.get("nombre_del_medicamento", "")
+        # 1. Obtenemos el nombre directamente (Ya no es un JSON)
+        medicamento_detectado = procesar_vision_groq(path) 
         
-        resultado = buscar_producto_excel(medicamento, usuario_id)
+        # 2. Buscamos en el inventario usando ese nombre
+        # medicamento_detectado será algo como "VITAMINA C"
+        resultado = buscar_producto_excel(medicamento_detectado, usuario_id)
         
         if os.path.exists(path): os.remove(path)
         
+        # 3. Respondemos con el texto plano que leyó la IA
         return jsonify({
-            "lectura_ia": datos_medico,
+            "lectura_ia": {"nombre_del_medicamento": medicamento_detectado},
             "inventario": resultado
         })
+
     except Exception as e:
         if os.path.exists(path): os.remove(path)
-        print(f"ERROR CRÍTICO: {str(e)}") # Esto te dirá el error real en los logs
+        print(f"ERROR CRÍTICO: {str(e)}")
         return jsonify({"error": str(e)}), 500
 @app.route('/login', methods=['GET', 'POST'])
 def login():
