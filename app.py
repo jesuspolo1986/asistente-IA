@@ -923,11 +923,7 @@ def reset_equipos():
     except Exception as e:
         print(f"Error al resetear equipos: {e}")
         return f"Error: {str(e)}"
-@app.route('/desactivar_gerencia', methods=['POST'])
-def desactivar_gerencia():
-    # Cambiamos el permiso en la sesión sin cerrar la cuenta del usuario
-    session['es_modo_admin'] = False
-    return jsonify({"success": True, "mensaje": "Modo gerencia desactivado"})
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
