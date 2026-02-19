@@ -147,7 +147,7 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
         print(f"🔥 Error crítico en búsqueda de inventario: {str(e)}")
         return {"encontrado": False, "error": str(e)}
 # 1. Asegúrate de que el nombre aquí sea 'procesar_vision_groq'
-def formatear_respuesta_farmacia(producto_data, tasa):
+def formatear_respuesta_farmacia(producto_data, tasa, es_modo_admin=False):
     nombre = producto_data['nombre']
     precio_usd = producto_data['precio']
     stock = producto_data['stock']
@@ -156,9 +156,15 @@ def formatear_respuesta_farmacia(producto_data, tasa):
     # Convertimos 768.80 en "768 con 80" para que el audio sea natural
     txt_audio_bs = f"{precio_bs:.2f}".replace(".", " con ")
     
-    return (f"¡Claro! He encontrado {nombre}. "
-            f"Tiene un precio de {precio_usd} dólares, que al cambio son {txt_audio_bs} bolívares. "
-            f"Nos quedan {stock} unidades disponibles.")
+    # --- FRASE BASE (Para todos) ---
+    respuesta = (f"¡Claro! He encontrado {nombre}. "
+                 f"Tiene un precio de {precio_usd} dólares, que al cambio son {txt_audio_bs} bolívares.")
+    
+    # --- DETALLE DE STOCK (Solo para Gerencia) ---
+    if es_modo_admin:
+        respuesta += f" Además, te informo que nos quedan {stock} unidades disponibles."
+    
+    return respuesta
 def procesar_vision_groq(image_path):
     import base64
     import json
@@ -198,8 +204,12 @@ def procesar_vision_groq(image_path):
 @app.route('/analizar_recipe', methods=['POST'])
 def api_analizar_recipe():
     usuario_id = session.get('usuario', 'invitado')
-    tasa_actual = get_tasa_usuario(usuario_id) # Obtenemos la tasa real del usuario
+    tasa_actual = get_tasa_usuario(usuario_id)
     
+    # --- NUEVO: Obtenemos el modo_admin desde el form o la sesión ---
+    # Si lo guardas en sesión al activar el modo gerencia, es más seguro.
+    es_modo_admin = session.get('es_modo_admin', False) 
+
     if 'foto' not in request.files:
         return jsonify({"error": "No se recibió imagen"}), 400
     
@@ -214,18 +224,23 @@ def api_analizar_recipe():
         if os.path.exists(path): os.remove(path)
 
         if resultado_busqueda.get("encontrado"):
-            # UNIFICACIÓN: Generamos el mismo mensaje que la voz
-            mensaje_voz = formatear_respuesta_farmacia(resultado_busqueda, tasa_actual)
+            # UNIFICACIÓN: Pasamos 'es_modo_admin' a la función formateadora
+            mensaje_voz = formatear_respuesta_farmacia(resultado_busqueda, tasa_actual, es_modo_admin)
             
+            # Limpiamos el stock del JSON de salida si no es admin por seguridad
+            if not es_modo_admin:
+                resultado_busqueda['stock'] = None
+
             return jsonify({
                 "lectura_ia": {"nombre_del_medicamento": medicamento_detectado},
                 "inventario": resultado_busqueda,
-                "respuesta": mensaje_voz # <--- EL FRONTEND DEBE LEER ESTO
+                "respuesta": mensaje_voz,
+                "modo_admin": es_modo_admin
             })
         else:
             return jsonify({
                 "lectura_ia": {"nombre_del_medicamento": medicamento_detectado},
-                "respuesta": f"Lo siento, leí {medicamento_detectado} pero no está en el inventario."
+                "respuesta": f"Elena: Leí {medicamento_detectado}, pero no lo tengo registrado en el inventario."
             })
 
     except Exception as e:
@@ -475,7 +490,7 @@ def preguntar():
                 inicio_frase = f"{random.choice(saludos_inicio)} {random.choice(acciones)} {random.choice(conectores)}"
                 
                 respuesta_texto = f"{inicio_frase} {txt_audio} Bolívares."
-                
+                stock_actual = item.get('stock', 0)
                 
                 
                 if es_modo_admin:
@@ -496,6 +511,7 @@ def preguntar():
                     "producto_nombre": nombre_p, 
                     "p_bs": v_bs_vis,
                     "p_usd": f"{p_usd:,.2f}",
+                    "stock": stock_actual if es_modo_admin else None, # Enviamos el dato al frontend solo si es admin
                     "respuesta": respuesta_texto, 
                     "modo_admin": es_modo_admin
                 })
