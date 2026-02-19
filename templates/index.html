@@ -181,18 +181,26 @@
             hablar("Dame un segundo.");
             const res = await fetch('/analizar_recipe', { method: 'POST', body: formData });
             const data = await res.json();
-            if(data.inventario && data.inventario.encontrado) {
-                document.getElementById('priceDisplay').style.display = 'block';
-                document.getElementById('nombreProducto').innerText = data.inventario.nombre;
-                const tasa = parseFloat(document.getElementById('displayTasa').innerText);
-                document.getElementById('priceBs').innerText = (data.inventario.precio * tasa).toFixed(2);
-                document.getElementById('priceUsd').innerText = data.inventario.precio.toFixed(2) + " $";
-                hablar(`Lo tengo. El precio es ${data.inventario.precio} dólares.`);
-            } else {
-                hablar("No lo encontré en el inventario.");
-            }
-        }, 'image/jpeg');
-    }
+            // --- CORRECCIÓN DENTRO DE tomarFoto() ---
+if(data.inventario && data.inventario.encontrado) {
+    document.getElementById('priceDisplay').style.display = 'block';
+    document.getElementById('nombreProducto').innerText = data.inventario.nombre;
+    
+    // Usamos los datos que vienen listos del servidor
+    document.getElementById('priceBs').innerText = data.inventario.precio_bs || (data.inventario.precio * parseFloat(document.getElementById('displayTasa').innerText)).toFixed(2);
+    document.getElementById('priceUsd').innerText = data.inventario.precio.toFixed(2) + " $";
+    
+    // ¡CRÍTICO! Usar el mensaje que viene de Python (que incluye bolívares y stock)
+    // Si no viene 'respuesta', usamos un fallback
+    const mensajeParaHablar = data.respuesta || `Lo tengo. El precio es ${data.inventario.precio} dólares.`;
+    
+    document.getElementById('textoElena').innerText = mensajeParaHablar;
+    hablar(mensajeParaHablar);
+} else {
+    const errorMsg = data.respuesta || "No lo encontré en el inventario.";
+    document.getElementById('textoElena').innerText = errorMsg;
+    hablar(errorMsg);
+}
 
     function hablar(msj) {
         synth.cancel();

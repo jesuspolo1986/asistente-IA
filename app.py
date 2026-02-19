@@ -147,6 +147,18 @@ def buscar_producto_excel(nombre_medicamento, email_usuario):
         print(f"🔥 Error crítico en búsqueda de inventario: {str(e)}")
         return {"encontrado": False, "error": str(e)}
 # 1. Asegúrate de que el nombre aquí sea 'procesar_vision_groq'
+def formatear_respuesta_farmacia(producto_data, tasa):
+    nombre = producto_data['nombre']
+    precio_usd = producto_data['precio']
+    stock = producto_data['stock']
+    
+    precio_bs = precio_usd * tasa
+    # Convertimos 768.80 en "768 con 80" para que el audio sea natural
+    txt_audio_bs = f"{precio_bs:.2f}".replace(".", " con ")
+    
+    return (f"¡Claro! He encontrado {nombre}. "
+            f"Tiene un precio de {precio_usd} dólares, que al cambio son {txt_audio_bs} bolívares. "
+            f"Nos quedan {stock} unidades disponibles.")
 def procesar_vision_groq(image_path):
     import base64
     import json
@@ -186,6 +198,7 @@ def procesar_vision_groq(image_path):
 @app.route('/analizar_recipe', methods=['POST'])
 def api_analizar_recipe():
     usuario_id = session.get('usuario', 'invitado')
+    tasa_actual = get_tasa_usuario(usuario_id) # Obtenemos la tasa real del usuario
     
     if 'foto' not in request.files:
         return jsonify({"error": "No se recibió imagen"}), 400
@@ -195,24 +208,28 @@ def api_analizar_recipe():
     foto.save(path)
     
     try:
-        # 1. Obtenemos el nombre directamente (Ya no es un JSON)
         medicamento_detectado = procesar_vision_groq(path) 
-        
-        # 2. Buscamos en el inventario usando ese nombre
-        # medicamento_detectado será algo como "VITAMINA C"
-        resultado = buscar_producto_excel(medicamento_detectado, usuario_id)
+        resultado_busqueda = buscar_producto_excel(medicamento_detectado, usuario_id)
         
         if os.path.exists(path): os.remove(path)
-        
-        # 3. Respondemos con el texto plano que leyó la IA
-        return jsonify({
-            "lectura_ia": {"nombre_del_medicamento": medicamento_detectado},
-            "inventario": resultado
-        })
+
+        if resultado_busqueda.get("encontrado"):
+            # UNIFICACIÓN: Generamos el mismo mensaje que la voz
+            mensaje_voz = formatear_respuesta_farmacia(resultado_busqueda, tasa_actual)
+            
+            return jsonify({
+                "lectura_ia": {"nombre_del_medicamento": medicamento_detectado},
+                "inventario": resultado_busqueda,
+                "respuesta": mensaje_voz # <--- EL FRONTEND DEBE LEER ESTO
+            })
+        else:
+            return jsonify({
+                "lectura_ia": {"nombre_del_medicamento": medicamento_detectado},
+                "respuesta": f"Lo siento, leí {medicamento_detectado} pero no está en el inventario."
+            })
 
     except Exception as e:
         if os.path.exists(path): os.remove(path)
-        print(f"ERROR CRÍTICO: {str(e)}")
         return jsonify({"error": str(e)}), 500
 @app.route('/login', methods=['GET', 'POST'])
 def login():
