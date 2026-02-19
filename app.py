@@ -174,8 +174,8 @@ def procesar_vision_groq(image_path):
             messages=[{
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "What is the name of the medicine in this image? Respond only with the name, no sentences."},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                 {"type": "text", "text": "Identify the medicine name in this image. Even if the handwriting is bad or misspelled, provide the most likely correct commercial or generic name. Respond only with the name."},
+                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                 ]
             }],
             temperature=0.0 # Cero para máxima precisión
@@ -439,7 +439,7 @@ def preguntar():
         nombres = [str(i['producto']) for i in inventario]
         match = process.extractOne(limpia, nombres, processor=utils.default_process)
 
-        if match and match[1] > 60: # Bajamos a 60 para mayor flexibilidad
+        if match and match[1] > 45: # Bajamos a 60 para mayor flexibilidad
             nombre_p = match[0]
             item = next((i for i in inventario if i['producto'] == nombre_p), None)
             
