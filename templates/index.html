@@ -108,6 +108,29 @@
     const diasRestantes = {{ dias_restantes }};
     let modoGerencia = false;
 
+    // --- FUNCIÓN CENTRAL DE ACTUALIZACIÓN VISUAL ---
+    // Esta función unifica cómo se muestra el producto en pantalla
+    function actualizarInterfazProducto(data) {
+        if(data.exito || (data.inventario && data.inventario.encontrado)) {
+            const info = data.inventario || data;
+            document.getElementById('priceDisplay').style.display = 'block';
+            document.getElementById('nombreProducto').innerText = info.nombre || info.producto_nombre;
+            document.getElementById('priceBs').innerText = info.p_bs || "Consultando...";
+            document.getElementById('priceUsd').innerText = (info.precio || info.p_usd) + " $";
+            
+            // Si el servidor envió p_bs formateado, lo usamos, si no, calculamos fallback
+            if (!info.p_bs && info.precio) {
+                const tasa = parseFloat(document.getElementById('displayTasa').innerText);
+                document.getElementById('priceBs').innerText = (info.precio * tasa).toLocaleString('es-VE', {minimumFractionDigits: 2});
+            }
+        }
+        
+        // Siempre mostramos y hablamos la respuesta generada por Elena en Python
+        const mensaje = data.respuesta || "No pude procesar la solicitud.";
+        document.getElementById('textoElena').innerText = mensaje;
+        hablar(mensaje);
+    }
+
     async function enviar() {
         const input = document.getElementById('userInput');
         const query = input.value.trim();
@@ -120,25 +143,42 @@
         });
         const data = await res.json();
         
-        if(data.exito && data.p_bs && data.producto_nombre !== "MODO GERENCIA") {
-            document.getElementById('priceDisplay').style.display = 'block';
-            document.getElementById('nombreProducto').innerText = data.producto_nombre;
-            document.getElementById('priceBs').innerText = data.p_bs;
-            document.getElementById('priceUsd').innerText = data.p_usd + " $";
-        }
-
-        document.getElementById('textoElena').innerText = data.respuesta;
-        hablar(data.respuesta);
+        actualizarInterfazProducto(data);
 
         if(data.modo_admin) activarModoGerencia();
         input.value = "";
     }
 
+    async function tomarFoto() {
+        const video = document.getElementById('videoPreview');
+        const canvas = document.getElementById('photoCanvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        cerrarCamara();
+        
+        canvas.toBlob(async (blob) => {
+            const formData = new FormData();
+            formData.append('foto', blob);
+            document.getElementById('textoElena').innerText = "Analizando imagen...";
+            hablar("Dame un segundo para leer el récipe.");
+            
+            const res = await fetch('/analizar_recipe', { method: 'POST', body: formData });
+            const data = await res.json();
+            
+            actualizarInterfazProducto(data);
+        }, 'image/jpeg');
+    }
+
+    // --- LÓGICA DE APOYO ---
     function activarModoGerencia() {
         modoGerencia = true;
         document.getElementById('badgeAdmin').style.display = 'inline-block';
         document.getElementById('btnSubirExcel').style.display = 'block';
-        if (diasRestantes <= 1) document.getElementById('adminCapsule').style.display = "block";
+        if (diasRestantes <= 1) {
+            document.getElementById('adminCapsule').style.display = "block";
+            document.getElementById('statusText').innerText = diasRestantes === 0 ? "¡Suscripción vence hoy!" : "Día de gracia activo.";
+        }
     }
 
     async function subirArchivo() {
@@ -146,12 +186,12 @@
         if(!file) return;
         const formData = new FormData();
         formData.append('archivo', file);
-        document.getElementById('textoElena').innerText = "Procesando Excel...";
+        document.getElementById('textoElena').innerText = "Actualizando base de datos...";
         const res = await fetch('/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if(data.success) {
-            hablar("Inventario actualizado.");
-            document.getElementById('textoElena').innerText = "Inventario cargado con éxito.";
+            hablar("Inventario actualizado correctamente.");
+            document.getElementById('textoElena').innerText = "¡Excel cargado con éxito!";
         }
     }
 
@@ -166,41 +206,6 @@
         if(streamMedia) streamMedia.getTracks().forEach(t => t.stop());
         document.getElementById('cameraModal').style.display = 'none';
     }
-
-    async function tomarFoto() {
-        const video = document.getElementById('videoPreview');
-        const canvas = document.getElementById('photoCanvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        cerrarCamara();
-        canvas.toBlob(async (blob) => {
-            const formData = new FormData();
-            formData.append('foto', blob);
-            document.getElementById('textoElena').innerText = "Leyendo...";
-            hablar("Dame un segundo.");
-            const res = await fetch('/analizar_recipe', { method: 'POST', body: formData });
-            const data = await res.json();
-            // --- CORRECCIÓN DENTRO DE tomarFoto() ---
-if(data.inventario && data.inventario.encontrado) {
-    document.getElementById('priceDisplay').style.display = 'block';
-    document.getElementById('nombreProducto').innerText = data.inventario.nombre;
-    
-    // Usamos los datos que vienen listos del servidor
-    document.getElementById('priceBs').innerText = data.inventario.precio_bs || (data.inventario.precio * parseFloat(document.getElementById('displayTasa').innerText)).toFixed(2);
-    document.getElementById('priceUsd').innerText = data.inventario.precio.toFixed(2) + " $";
-    
-    // ¡CRÍTICO! Usar el mensaje que viene de Python (que incluye bolívares y stock)
-    // Si no viene 'respuesta', usamos un fallback
-    const mensajeParaHablar = data.respuesta || `Lo tengo. El precio es ${data.inventario.precio} dólares.`;
-    
-    document.getElementById('textoElena').innerText = mensajeParaHablar;
-    hablar(mensajeParaHablar);
-} else {
-    const errorMsg = data.respuesta || "No lo encontré en el inventario.";
-    document.getElementById('textoElena').innerText = errorMsg;
-    hablar(errorMsg);
-}
 
     function hablar(msj) {
         synth.cancel();
