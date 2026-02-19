@@ -107,9 +107,8 @@
     const aura = document.getElementById('auraContainer');
     const diasRestantes = {{ dias_restantes }};
     let modoGerencia = false;
+    let scannerInterval; // Control del escaneo automático
 
-    // --- FUNCIÓN CENTRAL DE ACTUALIZACIÓN VISUAL ---
-    // Esta función unifica cómo se muestra el producto en pantalla
     function actualizarInterfazProducto(data) {
         if(data.exito || (data.inventario && data.inventario.encontrado)) {
             const info = data.inventario || data;
@@ -118,14 +117,11 @@
             document.getElementById('priceBs').innerText = info.p_bs || "Consultando...";
             document.getElementById('priceUsd').innerText = (info.precio || info.p_usd) + " $";
             
-            // Si el servidor envió p_bs formateado, lo usamos, si no, calculamos fallback
             if (!info.p_bs && info.precio) {
                 const tasa = parseFloat(document.getElementById('displayTasa').innerText);
                 document.getElementById('priceBs').innerText = (info.precio * tasa).toLocaleString('es-VE', {minimumFractionDigits: 2});
             }
         }
-        
-        // Siempre mostramos y hablamos la respuesta generada por Elena en Python
         const mensaje = data.respuesta || "No pude procesar la solicitud.";
         document.getElementById('textoElena').innerText = mensaje;
         hablar(mensaje);
@@ -142,14 +138,61 @@
             body: JSON.stringify({ pregunta: query, modo_admin: modoGerencia })
         });
         const data = await res.json();
-        
         actualizarInterfazProducto(data);
-
         if(data.modo_admin) activarModoGerencia();
         input.value = "";
     }
 
+    // --- LÓGICA DE CÁMARA CON ESCANEO AUTOMÁTICO ---
+
+    let streamMedia;
+    async function abrirCamara() {
+        document.getElementById('cameraModal').style.display = 'flex';
+        try {
+            streamMedia = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            document.getElementById('videoPreview').srcObject = streamMedia;
+
+            // Iniciar escaneo automático cada 3 segundos mientras esté abierta la cámara
+            scannerInterval = setInterval(() => {
+                ejecutarEscanerSilencioso();
+            }, 3000);
+        } catch (err) {
+            console.error("Error cámara:", err);
+            document.getElementById('textoElena').innerText = "Error al abrir la cámara.";
+        }
+    }
+
+    function cerrarCamara() {
+        if(streamMedia) streamMedia.getTracks().forEach(t => t.stop());
+        clearInterval(scannerInterval); // Detener escáner
+        document.getElementById('cameraModal').style.display = 'none';
+    }
+
+    async function ejecutarEscanerSilencioso() {
+        const video = document.getElementById('videoPreview');
+        const canvas = document.getElementById('photoCanvas');
+        if (!video.videoWidth) return;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+
+        canvas.toBlob(async (blob) => {
+            const formData = new FormData();
+            formData.append('foto', blob);
+            
+            const res = await fetch('/analizar_recipe', { method: 'POST', body: formData });
+            const data = await res.json();
+            
+            if(data.inventario && data.inventario.encontrado) {
+                cerrarCamara(); // Detiene todo si lo encuentra
+                actualizarInterfazProducto(data);
+            }
+        }, 'image/jpeg', 0.6); // Calidad media para rapidez
+    }
+
     async function tomarFoto() {
+        // Botón manual por si el automático tarda
         const video = document.getElementById('videoPreview');
         const canvas = document.getElementById('photoCanvas');
         canvas.width = video.videoWidth;
@@ -160,17 +203,17 @@
         canvas.toBlob(async (blob) => {
             const formData = new FormData();
             formData.append('foto', blob);
-            document.getElementById('textoElena').innerText = "Analizando imagen...";
-            hablar("Dame un segundo para leer el récipe.");
+            document.getElementById('textoElena').innerText = "Analizando...";
+            hablar("Dame un segundo.");
             
             const res = await fetch('/analizar_recipe', { method: 'POST', body: formData });
             const data = await res.json();
-            
             actualizarInterfazProducto(data);
         }, 'image/jpeg');
     }
 
-    // --- LÓGICA DE APOYO ---
+    // --- RESTO DE FUNCIONES ---
+
     function activarModoGerencia() {
         modoGerencia = true;
         document.getElementById('badgeAdmin').style.display = 'inline-block';
@@ -186,25 +229,13 @@
         if(!file) return;
         const formData = new FormData();
         formData.append('archivo', file);
-        document.getElementById('textoElena').innerText = "Actualizando base de datos...";
+        document.getElementById('textoElena').innerText = "Actualizando...";
         const res = await fetch('/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if(data.success) {
-            hablar("Inventario actualizado correctamente.");
-            document.getElementById('textoElena').innerText = "¡Excel cargado con éxito!";
+            hablar("Inventario actualizado.");
+            document.getElementById('textoElena').innerText = "¡Excel cargado!";
         }
-    }
-
-    let streamMedia;
-    async function abrirCamara() {
-        document.getElementById('cameraModal').style.display = 'flex';
-        streamMedia = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        document.getElementById('videoPreview').srcObject = streamMedia;
-    }
-
-    function cerrarCamara() {
-        if(streamMedia) streamMedia.getTracks().forEach(t => t.stop());
-        document.getElementById('cameraModal').style.display = 'none';
     }
 
     function hablar(msj) {
