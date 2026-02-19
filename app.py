@@ -392,6 +392,7 @@ def preguntar():
     # --- 1. PRIORIDAD: MODO GERENCIA ---
     pregunta_sin_tildes = eliminar_tildes(pregunta_raw)
     if "activar modo gerencia" in pregunta_sin_tildes or "modo gerencia" in pregunta_sin_tildes:
+        session['es_modo_admin'] = True
         return jsonify({
             "exito": True,
             "respuesta": "Modo gerencia activado. Ahora puedes ver el stock y cambiar la tasa.",
@@ -922,6 +923,11 @@ def reset_equipos():
     except Exception as e:
         print(f"Error al resetear equipos: {e}")
         return f"Error: {str(e)}"
+@app.route('/desactivar_gerencia', methods=['POST'])
+def desactivar_gerencia():
+    # Cambiamos el permiso en la sesión sin cerrar la cuenta del usuario
+    session['es_modo_admin'] = False
+    return jsonify({"success": True, "mensaje": "Modo gerencia desactivado"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
