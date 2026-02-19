@@ -34,6 +34,41 @@
         .btn-upload-excel:hover { background: #2ecc71; color: white; }
 
         .badge-mode { background: var(--primary); color: #0f172a; padding: 2px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; display: none; }
+        /* Contenedor relativo para el video dentro del modal */
+#cameraContainer {
+    position: relative;
+    width: 90%;
+    max-width: 500px;
+    overflow: hidden;
+    border-radius: 20px;
+    border: 4px solid white; /* Borde inicial blanco */
+    transition: border-color 0.3s ease; /* Para el cambio a Cian */
+}
+
+/* La línea del Escáner Láser */
+.scanner-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(to bottom, transparent, rgba(0, 210, 255, 1), transparent);
+    box-shadow: 0 0 15px 5px rgba(0, 210, 255, 0.5);
+    z-index: 10;
+    animation: scan 2.5s infinite ease-in-out;
+}
+
+@keyframes scan {
+    0% { top: 0; }
+    50% { top: 100%; }
+    100% { top: 0; }
+}
+
+/* Estado: Elena está mirando (Borde Cian) */
+.elena-mirando {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 20px var(--primary);
+}
     </style>
 </head>
 <body>
@@ -94,15 +129,22 @@
 </div>
 
 <div id="cameraModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:10000; flex-direction:column; align-items:center; justify-content:center;">
-    <video id="videoPreview" autoplay playsinline style="width:90%; max-width:500px; border-radius:20px;"></video>
+    
+    <div id="cameraContainer">
+        <div class="scanner-line"></div>
+        <video id="videoPreview" autoplay playsinline style="width:100%; display: block;"></video>
+    </div>
+
+    <div id="scanStatus" class="mt-3 small" style="color: #00d2ff; letter-spacing: 2px;">MODO ESCÁNER ACTIVO</div>
+
     <div class="mt-4 d-flex gap-3">
         <button onclick="cerrarCamara()" class="btn btn-outline-light rounded-pill px-4">SALIR</button>
         <button onclick="tomarFoto()" class="btn btn-primary rounded-pill px-4">CAPTURAR</button>
     </div>
     <canvas id="photoCanvas" style="display:none;"></canvas>
 </div>
-
 <script>
+    let ultimaDeteccion = ""; // Guarda el último producto encontrado para evitar repeticiones
     const synth = window.speechSynthesis;
     const aura = document.getElementById('auraContainer');
     const diasRestantes = {{ dias_restantes }};
@@ -163,33 +205,62 @@
     }
 
     function cerrarCamara() {
-        if(streamMedia) streamMedia.getTracks().forEach(t => t.stop());
-        clearInterval(scannerInterval); // Detener escáner
-        document.getElementById('cameraModal').style.display = 'none';
-    }
+    if(streamMedia) streamMedia.getTracks().forEach(t => t.stop());
+    clearInterval(scannerInterval); 
+    ultimaDeteccion = ""; // Resetear la caché al salir
+    document.getElementById('cameraModal').style.display = 'none';
+}
 
-    async function ejecutarEscanerSilencioso() {
-        const video = document.getElementById('videoPreview');
-        const canvas = document.getElementById('photoCanvas');
-        if (!video.videoWidth) return;
+  async function ejecutarEscanerSilencioso() {
+    const video = document.getElementById('videoPreview');
+    const canvas = document.getElementById('photoCanvas');
+    const container = document.getElementById('cameraContainer');
+    const statusText = document.getElementById('scanStatus');
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
+    if (!video.videoWidth) return;
 
-        canvas.toBlob(async (blob) => {
-            const formData = new FormData();
-            formData.append('foto', blob);
-            
+    container.classList.add('elena-mirando');
+    statusText.innerText = "ELENA ESTÁ MIRANDO...";
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        formData.append('foto', blob);
+        
+        try {
             const res = await fetch('/analizar_recipe', { method: 'POST', body: formData });
             const data = await res.json();
             
             if(data.inventario && data.inventario.encontrado) {
-                cerrarCamara(); // Detiene todo si lo encuentra
+                const nombreActual = data.inventario.nombre;
+
+                // --- LÓGICA DE CACHÉ ---
+                if (nombreActual === ultimaDeteccion) {
+                    console.log("Producto ya detectado recientemente: " + nombreActual);
+                    return; // No hacemos nada si es el mismo
+                }
+
+                // Si llegamos aquí, es un producto nuevo o el primero
+                ultimaDeteccion = nombreActual; 
+                cerrarCamara();
                 actualizarInterfazProducto(data);
+                
+                // Limpiamos la caché después de 10 segundos por si quiere volver a escanear lo mismo
+                setTimeout(() => { ultimaDeteccion = ""; }, 10000);
             }
-        }, 'image/jpeg', 0.6); // Calidad media para rapidez
-    }
+        } catch (e) {
+            console.error("Error en escaneo");
+        } finally {
+            setTimeout(() => {
+                container.classList.remove('elena-mirando');
+                statusText.innerText = "MODO ESCÁNER ACTIVO";
+            }, 800);
+        }
+    }, 'image/jpeg', 0.6);
+}
 
     async function tomarFoto() {
         // Botón manual por si el automático tarda
