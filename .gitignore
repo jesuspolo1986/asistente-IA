@@ -8,3 +8,4 @@ venv/
 supermercado.db
 
 # Ignorar claves de API (aunque estamos usando os.environ, es buena práctica)
+#hbjnjnj
